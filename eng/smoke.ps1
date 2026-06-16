@@ -39,6 +39,22 @@ $eventBody = @{
 $event = Invoke-RestMethod -Method Post -Uri "$BaseUrl/sessions/$($session.id)/events" -Headers $headers -ContentType 'application/json' -Body $eventBody
 $event | Format-List
 
+Write-Host 'Saving provider credential through protected store...'
+$credentialBody = @{
+  secretValue = 'smoke-test-provider-secret-12345'
+  authType = 'ApiKey'
+  defaultModel = 'local-smoke-model'
+  metadata = @{ purpose = 'smoke-test' }
+} | ConvertTo-Json -Depth 4
+$credentialResponse = Invoke-RestMethod -Method Post -Uri "$BaseUrl/providers/SmokeProvider/credential" -Headers $headers -ContentType 'application/json' -Body $credentialBody
+$credentialResponse.provider | Format-List
+$credentialResponse.credential | Format-List
+
+Write-Host 'Reading provider credential descriptor without exposing value...'
+$encodedReference = [System.Uri]::EscapeDataString($credentialResponse.credential.reference)
+$descriptor = Invoke-RestMethod -Method Get -Uri "$BaseUrl/secrets/$encodedReference" -Headers $headers
+$descriptor | Format-List
+
 Write-Host 'Registering adapter...'
 $adapterBody = @{
   kind = 'DevelopmentTool'
@@ -54,6 +70,6 @@ $heartbeat = Invoke-RestMethod -Method Post -Uri "$BaseUrl/adapters/$($adapter.i
 $heartbeat | Format-List
 
 Write-Host 'Reading recent audit events...'
-Invoke-RestMethod -Method Get -Uri "$BaseUrl/audit/recent?take=10" -Headers $headers | Format-Table
+Invoke-RestMethod -Method Get -Uri "$BaseUrl/audit/recent?take=15" -Headers $headers | Format-Table
 
 Write-Host 'Smoke test complete.'
