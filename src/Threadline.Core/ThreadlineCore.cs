@@ -23,16 +23,19 @@ public sealed record ContextEvent(string Id, string SessionId, DateTimeOffset Ti
 
 public enum CaptureRuleType { ApplicationName, ProcessName, WindowTitleContains, DomainContains, UriContains }
 public enum CaptureRuleAction { Allow, Ask, Block }
-public sealed record CaptureRule(string Id, CaptureRuleType RuleType, string Pattern, CaptureRuleAction Action, DateTimeOffset CreatedAt)
+public enum CaptureRuleSource { Default, User, Organization, Runtime }
+
+public sealed record CaptureRule(string Id, CaptureRuleType RuleType, string Pattern, CaptureRuleAction Action, DateTimeOffset CreatedAt, CaptureRuleSource Source = CaptureRuleSource.Default)
 {
-    public static CaptureRule Create(CaptureRuleType ruleType, string pattern, CaptureRuleAction action, DateTimeOffset now) => new($"rule_{Guid.NewGuid():N}", ruleType, pattern.Trim(), action, now);
+    public static CaptureRule Create(CaptureRuleType ruleType, string pattern, CaptureRuleAction action, DateTimeOffset now, CaptureRuleSource source = CaptureRuleSource.Default) =>
+        new($"rule_{Guid.NewGuid():N}", ruleType, pattern.Trim(), action, now, source);
 }
 
-public sealed record CaptureDecision(bool IsAllowed, string Reason, bool RequiresExplicitApproval = false)
+public sealed record CaptureDecision(bool IsAllowed, string Reason, bool RequiresExplicitApproval = false, CaptureRule? MatchedRule = null)
 {
-    public static CaptureDecision Allow(string reason = "Allowed") => new(true, reason);
-    public static CaptureDecision Ask(string reason) => new(true, reason, true);
-    public static CaptureDecision Block(string reason) => new(false, reason);
+    public static CaptureDecision Allow(string reason = "Allowed", CaptureRule? matchedRule = null) => new(true, reason, false, matchedRule);
+    public static CaptureDecision Ask(string reason, CaptureRule? matchedRule = null) => new(true, reason, true, matchedRule);
+    public static CaptureDecision Block(string reason, CaptureRule? matchedRule = null) => new(false, reason, false, matchedRule);
 }
 
 public sealed class CapturePolicy
@@ -50,10 +53,10 @@ public sealed class CapturePolicy
             if (!Matches(rule, contextEvent)) continue;
             return rule.Action switch
             {
-                CaptureRuleAction.Allow => CaptureDecision.Allow($"Allowed by rule {rule.Id}"),
-                CaptureRuleAction.Ask => CaptureDecision.Ask($"Approval required by rule {rule.Id}"),
-                CaptureRuleAction.Block => CaptureDecision.Block($"Blocked by rule {rule.Id}"),
-                _ => CaptureDecision.Ask("Unknown rule action")
+                CaptureRuleAction.Allow => CaptureDecision.Allow($"Allowed by {rule.Source} rule {rule.Id}", rule),
+                CaptureRuleAction.Ask => CaptureDecision.Ask($"Approval required by {rule.Source} rule {rule.Id}", rule),
+                CaptureRuleAction.Block => CaptureDecision.Block($"Blocked by {rule.Source} rule {rule.Id}", rule),
+                _ => CaptureDecision.Ask("Unknown rule action", rule)
             };
         }
 
@@ -77,25 +80,92 @@ public sealed class CapturePolicy
     }
 }
 
+public enum RedactionKind
+{
+    GenericSecret,
+    ApiKey,
+    BearerToken,
+    Jwt,
+    PrivateKey,
+    ConnectionString,
+    EmailAddress,
+    PhoneNumber,
+    SocialSecurityNumber,
+    UrlSecret,
+    PhiMarker
+}
+
+public sealed record RedactionFinding(RedactionKind Kind, string Label, int StartIndex, int Length);
+
+public sealed record RedactionResult(string OriginalText, string RedactedText, IReadOnlyList<RedactionFinding> Findings)
+{
+    public bool WasRedacted => Findings.Count > 0;
+}
+
 public sealed class SecretRedactor
 {
-    private static readonly Regex[] Patterns =
+    private static readonly RedactionRule[] Rules =
     [
-        new Regex("(?i)(api[_-]?key|secret|token|password)\\s*[:=]\\s*['\"]?[^\\s'\"]+", RegexOptions.Compiled),
-        new Regex(@"sk-[A-Za-z0-9_\-]{20,}", RegexOptions.Compiled),
-        new Regex(@"(?i)bearer\s+[A-Za-z0-9._\-]{20,}", RegexOptions.Compiled),
-        new Regex(@"(?i)(authorization:\s*)[^\r\n]+", RegexOptions.Compiled),
-        new Regex(@"\b\d{3}-\d{2}-\d{4}\b", RegexOptions.Compiled)
+        new(RedactionKind.PrivateKey, "private key", new Regex("-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]*?-----END [A-Z ]*PRIVATE KEY-----", RegexOptions.Compiled)),
+        new(RedactionKind.ApiKey, "OpenAI-style API key", new Regex(@"sk-[A-Za-z0-9_\-]{20,}", RegexOptions.Compiled)),
+        new(RedactionKind.BearerToken, "bearer token", new Regex(@"(?i)(authorization:\s*)bearer\s+[A-Za-z0-9._\-]{20,}", RegexOptions.Compiled), PreservePrefix),
+        new(RedactionKind.BearerToken, "bearer token", new Regex(@"(?i)\bbearer\s+[A-Za-z0-9._\-]{20,}", RegexOptions.Compiled)),
+        new(RedactionKind.Jwt, "JWT", new Regex(@"\beyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\b", RegexOptions.Compiled)),
+        new(RedactionKind.ConnectionString, "connection string", new Regex(@"(?i)\b(server|data source|user id|uid|password|pwd)\s*=\s*[^;\r\n]+(;\s*(server|data source|user id|uid|password|pwd)\s*=\s*[^;\r\n]+)+", RegexOptions.Compiled)),
+        new(RedactionKind.UrlSecret, "URL secret parameter", new Regex(@"(?i)([?&](api[_-]?key|token|access_token|client_secret|password)=)[^&\s]+", RegexOptions.Compiled), PreservePrefix),
+        new(RedactionKind.GenericSecret, "named secret", new Regex("(?i)(api[_-]?key|secret|token|password|client_secret)\\s*[:=]\\s*['\"]?[^\\s'\"]+", RegexOptions.Compiled), PreserveAssignmentPrefix),
+        new(RedactionKind.EmailAddress, "email address", new Regex(@"\b[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase)),
+        new(RedactionKind.PhoneNumber, "phone number", new Regex(@"\b(?:\+?1[\s.\-]?)?(?:\(?\d{3}\)?[\s.\-]?)\d{3}[\s.\-]?\d{4}\b", RegexOptions.Compiled)),
+        new(RedactionKind.SocialSecurityNumber, "social security number", new Regex(@"\b\d{3}-\d{2}-\d{4}\b", RegexOptions.Compiled)),
+        new(RedactionKind.PhiMarker, "medical record number", new Regex(@"(?i)\b(MRN|medical record number|patient id)\s*[:#=]?\s*[A-Za-z0-9\-]{5,}\b", RegexOptions.Compiled))
     ];
 
-    public string Redact(string input)
+    public string Redact(string input) => Analyze(input).RedactedText;
+
+    public RedactionResult Analyze(string? input)
     {
-        var result = input ?? string.Empty;
-        foreach (var pattern in Patterns)
+        var original = input ?? string.Empty;
+        var redacted = original;
+        var findings = new List<RedactionFinding>();
+
+        foreach (var rule in Rules)
         {
-            result = pattern.Replace(result, match => match.Value.Contains(':') ? $"{match.Value.Split(':', 2)[0]}: [REDACTED]" : match.Value.Contains('=') ? $"{match.Value.Split('=', 2)[0]}=[REDACTED]" : "[REDACTED]");
+            var matches = rule.Pattern.Matches(redacted);
+            if (matches.Count == 0)
+            {
+                continue;
+            }
+
+            foreach (Match match in matches)
+            {
+                findings.Add(new RedactionFinding(rule.Kind, rule.Label, match.Index, match.Length));
+            }
+
+            redacted = rule.Pattern.Replace(redacted, match => rule.Replacement(match));
         }
-        return result;
+
+        return new RedactionResult(original, redacted, findings);
+    }
+
+    private static string PreserveAssignmentPrefix(Match match)
+    {
+        var value = match.Value;
+        var separatorIndex = value.IndexOf(':');
+        if (separatorIndex >= 0)
+        {
+            return value[..separatorIndex] + ": [REDACTED]";
+        }
+
+        separatorIndex = value.IndexOf('=');
+        return separatorIndex >= 0 ? value[..separatorIndex] + "=[REDACTED]" : "[REDACTED]";
+    }
+
+    private static string PreservePrefix(Match match) =>
+        match.Groups.Count > 1 && match.Groups[1].Success ? match.Groups[1].Value + "[REDACTED]" : "[REDACTED]";
+
+    private sealed record RedactionRule(RedactionKind Kind, string Label, Regex Pattern, Func<Match, string>? Replacement = null)
+    {
+        public Func<Match, string> Replacement { get; } = Replacement ?? (_ => "[REDACTED]");
     }
 }
 
