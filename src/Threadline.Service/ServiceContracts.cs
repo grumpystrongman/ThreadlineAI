@@ -35,6 +35,26 @@ public sealed record SaveProviderConnectionRequest(
     DateTimeOffset? CreatedAt = null,
     IReadOnlyDictionary<string, string>? Metadata = null);
 
+public sealed record SaveProviderCredentialRequest(
+    string SecretValue,
+    ProviderAuthType AuthType = ProviderAuthType.ApiKey,
+    string? BaseUrl = null,
+    string? DefaultModel = null,
+    ProviderConnectionStatus Status = ProviderConnectionStatus.Ready,
+    IReadOnlyDictionary<string, string>? Metadata = null);
+
+public sealed record SecretDescriptorResponse(
+    string Reference,
+    string Name,
+    SecretProtectionKind ProtectionKind,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? UpdatedAt,
+    IReadOnlyDictionary<string, string>? Metadata = null)
+{
+    public static SecretDescriptorResponse FromDescriptor(SecretDescriptor descriptor) =>
+        new(descriptor.Reference, descriptor.Name, descriptor.ProtectionKind, descriptor.CreatedAt, descriptor.UpdatedAt, descriptor.Metadata);
+}
+
 public sealed record RegisterAdapterRequest(
     AdapterKind Kind,
     string DisplayName,
