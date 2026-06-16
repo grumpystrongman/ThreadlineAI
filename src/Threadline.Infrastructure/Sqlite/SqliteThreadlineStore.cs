@@ -69,7 +69,7 @@ public sealed class SqliteThreadlineStore : ISessionRepository, IProviderConnect
         command.Parameters.AddWithValue("$name", session.Name);
         command.Parameters.AddWithValue("$createdAtUtc", ToText(session.CreatedAt));
         command.Parameters.AddWithValue("$status", session.Status.ToString());
-        command.Parameters.AddWithValue("$activeProvider", (object?)session.ActiveProvider ?? DBNull.Value);
+        command.Parameters.AddWithValue("$activeProvider", ToDbValue(session.ActiveProvider));
         command.Parameters.AddWithValue("$endedAtUtc", ToNullableText(session.EndedAt));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -88,13 +88,13 @@ public sealed class SqliteThreadlineStore : ISessionRepository, IProviderConnect
         command.Parameters.AddWithValue("$source", contextEvent.Source.ToString());
         command.Parameters.AddWithValue("$contextType", contextEvent.ContextType);
         command.Parameters.AddWithValue("$content", contextEvent.Content);
-        command.Parameters.AddWithValue("$applicationName", (object?)contextEvent.ApplicationName ?? DBNull.Value);
-        command.Parameters.AddWithValue("$processName", (object?)contextEvent.ProcessName ?? DBNull.Value);
-        command.Parameters.AddWithValue("$windowTitle", (object?)contextEvent.WindowTitle ?? DBNull.Value);
-        command.Parameters.AddWithValue("$uri", (object?)contextEvent.Uri ?? DBNull.Value);
+        command.Parameters.AddWithValue("$applicationName", ToDbValue(contextEvent.ApplicationName));
+        command.Parameters.AddWithValue("$processName", ToDbValue(contextEvent.ProcessName));
+        command.Parameters.AddWithValue("$windowTitle", ToDbValue(contextEvent.WindowTitle));
+        command.Parameters.AddWithValue("$uri", ToDbValue(contextEvent.Uri));
         command.Parameters.AddWithValue("$sensitivity", contextEvent.Sensitivity.ToString());
         command.Parameters.AddWithValue("$userApproved", contextEvent.UserApproved ? 1 : 0);
-        command.Parameters.AddWithValue("$metadataJson", ToJson(contextEvent.Metadata));
+        command.Parameters.AddWithValue("$metadataJson", ToJsonDbValue(contextEvent.Metadata));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -173,13 +173,13 @@ public sealed class SqliteThreadlineStore : ISessionRepository, IProviderConnect
         command.Parameters.AddWithValue("$id", connectionRecord.Id);
         command.Parameters.AddWithValue("$providerName", connectionRecord.ProviderName);
         command.Parameters.AddWithValue("$authType", connectionRecord.AuthType.ToString());
-        command.Parameters.AddWithValue("$credentialReference", (object?)connectionRecord.CredentialReference ?? DBNull.Value);
-        command.Parameters.AddWithValue("$baseUrl", (object?)connectionRecord.BaseUrl ?? DBNull.Value);
-        command.Parameters.AddWithValue("$defaultModel", (object?)connectionRecord.DefaultModel ?? DBNull.Value);
+        command.Parameters.AddWithValue("$credentialReference", ToDbValue(connectionRecord.CredentialReference));
+        command.Parameters.AddWithValue("$baseUrl", ToDbValue(connectionRecord.BaseUrl));
+        command.Parameters.AddWithValue("$defaultModel", ToDbValue(connectionRecord.DefaultModel));
         command.Parameters.AddWithValue("$status", connectionRecord.Status.ToString());
         command.Parameters.AddWithValue("$createdAtUtc", ToText(connectionRecord.CreatedAt));
         command.Parameters.AddWithValue("$updatedAtUtc", ToNullableText(connectionRecord.UpdatedAt));
-        command.Parameters.AddWithValue("$metadataJson", ToJson(connectionRecord.Metadata));
+        command.Parameters.AddWithValue("$metadataJson", ToJsonDbValue(connectionRecord.Metadata));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -224,11 +224,11 @@ public sealed class SqliteThreadlineStore : ISessionRepository, IProviderConnect
             VALUES ($id, $sessionId, $eventType, $timestampUtc, $message, $metadataJson);
             """;
         command.Parameters.AddWithValue("$id", auditEvent.Id);
-        command.Parameters.AddWithValue("$sessionId", (object?)auditEvent.SessionId ?? DBNull.Value);
+        command.Parameters.AddWithValue("$sessionId", ToDbValue(auditEvent.SessionId));
         command.Parameters.AddWithValue("$eventType", auditEvent.EventType.ToString());
         command.Parameters.AddWithValue("$timestampUtc", ToText(auditEvent.Timestamp));
         command.Parameters.AddWithValue("$message", auditEvent.Message);
-        command.Parameters.AddWithValue("$metadataJson", ToJson(auditEvent.Metadata));
+        command.Parameters.AddWithValue("$metadataJson", ToJsonDbValue(auditEvent.Metadata));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -315,8 +315,9 @@ public sealed class SqliteThreadlineStore : ISessionRepository, IProviderConnect
 
     private static string ToText(DateTimeOffset value) => value.ToUniversalTime().ToString("O");
     private static object ToNullableText(DateTimeOffset? value) => value is null ? DBNull.Value : ToText(value.Value);
+    private static object ToDbValue(string? value) => value is null ? DBNull.Value : value;
+    private static object ToJsonDbValue(IReadOnlyDictionary<string, string>? value) => value is null ? DBNull.Value : JsonSerializer.Serialize(value, JsonOptions);
     private static DateTimeOffset FromText(string value) => DateTimeOffset.Parse(value, null, System.Globalization.DateTimeStyles.RoundtripKind);
-    private static string? ToJson(IReadOnlyDictionary<string, string>? value) => value is null ? null : JsonSerializer.Serialize(value, JsonOptions);
     private static IReadOnlyDictionary<string, string>? FromJson(string? value) => string.IsNullOrWhiteSpace(value) ? null : JsonSerializer.Deserialize<Dictionary<string, string>>(value, JsonOptions);
 
     private static readonly string[] SchemaStatements =
