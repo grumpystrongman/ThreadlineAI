@@ -1,0 +1,47 @@
+name: Phase 1 Validation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  dotnet-core:
+    name: .NET core, service, and tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore core projects
+        run: |
+          dotnet restore src/Threadline.Core/Threadline.Core.csproj
+          dotnet restore src/Threadline.Infrastructure/Threadline.Infrastructure.csproj
+          dotnet restore src/Threadline.Service/Threadline.Service.csproj
+          dotnet restore tests/Threadline.Core.Tests/Threadline.Core.Tests.csproj
+          dotnet restore tests/Threadline.Infrastructure.Tests/Threadline.Infrastructure.Tests.csproj
+      - name: Build core projects
+        run: |
+          dotnet build src/Threadline.Core/Threadline.Core.csproj --configuration Release --no-restore
+          dotnet build src/Threadline.Infrastructure/Threadline.Infrastructure.csproj --configuration Release --no-restore
+          dotnet build src/Threadline.Service/Threadline.Service.csproj --configuration Release --no-restore
+      - name: Run tests
+        run: |
+          dotnet test tests/Threadline.Core.Tests/Threadline.Core.Tests.csproj --configuration Release --logger trx
+          dotnet test tests/Threadline.Infrastructure.Tests/Threadline.Infrastructure.Tests.csproj --configuration Release --logger trx
+
+  browser-extension:
+    name: Browser extension TypeScript build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: adapters/browser-extension
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - run: npm run build
