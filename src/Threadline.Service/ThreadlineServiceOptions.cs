@@ -34,7 +34,7 @@ public sealed record ThreadlineServiceOptions(
         var suppliedToken = request.Headers["X-Threadline-Token"].ToString();
         if (string.IsNullOrWhiteSpace(suppliedToken))
         {
-            var authorization = request.Headers.Authorization.ToString();
+            var authorization = request.Headers["Authorization"].ToString();
             const string bearerPrefix = "Bearer ";
             if (authorization.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
             {
