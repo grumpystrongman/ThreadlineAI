@@ -4,11 +4,20 @@ ThreadlineAI is a Windows-first, session-aware AI companion framework. It is des
 
 The project is provider-agnostic. OpenAI, Anthropic Claude, Gemini, DeepSeek, OpenRouter, and local OpenAI-compatible runtimes should sit behind the same provider interface.
 
+## Current status
+
+ThreadlineAI is in early alpha engineering.
+
+- Phase 0/1: scaffold and engineering foundation are complete.
+- Phase 2: core domain and local service spine are in progress/complete enough for adapter and UI wiring.
+- The local service now uses SQLite for sessions, context events, summaries, provider connection records, and audit events.
+- Context preview is now a first-class concept and should be called before context is stored or sent to a model.
+
 ## What is in this scaffold
 
-- Core domain model for sessions, context events, capture rules, prompt composition, and provider abstraction.
-- Infrastructure skeleton for in-memory storage and OpenAI-compatible HTTP providers.
-- Local service API scaffold for adapters and the Windows shell.
+- Core domain model for sessions, context events, capture rules, prompt composition, provider abstraction, provider connections, artifacts, audit events, and context preview.
+- Infrastructure for SQLite persistence, in-memory testing, and OpenAI-compatible HTTP providers.
+- Local service API for adapters and the Windows shell.
 - Windows app shell scaffold for the future slide-out panel, active-window monitoring, and hotkey support.
 - Browser extension skeleton for Chrome/Edge context capture through native messaging.
 - PowerShell transcript adapter scripts.
@@ -38,7 +47,10 @@ adapters/
   browser-extension/         Chrome/Edge extension scaffold
   powershell/                PowerShell transcript adapter scripts
 docs/
-  Architecture, provider, privacy, and roadmap notes
+  Architecture, provider, privacy, roadmap, and service API notes
+tests/
+  Threadline.Core.Tests/
+  Threadline.Infrastructure.Tests/
 ```
 
 ## Development prerequisites
@@ -48,6 +60,21 @@ docs/
 - Visual Studio 2022 with Windows App SDK / WinUI workload
 - Node.js 20+ for the browser extension
 - PowerShell 7+
+
+## Build and test
+
+```powershell
+./eng/build.ps1
+./eng/test.ps1
+```
+
+Run the local service:
+
+```powershell
+dotnet run --project src/Threadline.Service/Threadline.Service.csproj
+```
+
+See `docs/SERVICE_API.md` for local API details.
 
 ## Privacy-first defaults
 
