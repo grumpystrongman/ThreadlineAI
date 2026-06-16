@@ -80,6 +80,31 @@ public static class RequestValidator
         return null;
     }
 
+    public static IResult? ValidateProviderCredential(SaveProviderCredentialRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.SecretValue))
+        {
+            return Results.BadRequest(new { error = "Provider credential secret value is required." });
+        }
+
+        if (request.SecretValue.Length < 8)
+        {
+            return Results.BadRequest(new { error = "Provider credential secret value is too short." });
+        }
+
+        return null;
+    }
+
+    public static IResult? ValidateSecretReference(string? reference)
+    {
+        if (string.IsNullOrWhiteSpace(reference) || !reference.StartsWith("secret://", StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.BadRequest(new { error = "A valid Threadline secret reference is required." });
+        }
+
+        return null;
+    }
+
     public static IResult? ValidateAdapter(RegisterAdapterRequest request)
     {
         if (request.Kind == AdapterKind.Unknown)
