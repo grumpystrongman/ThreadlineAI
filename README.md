@@ -9,14 +9,15 @@ The project is provider-agnostic. OpenAI, Anthropic Claude, Gemini, DeepSeek, Op
 ThreadlineAI is in early alpha engineering.
 
 - Phase 0/1: scaffold and engineering foundation are complete.
-- Phase 2: core domain and local service spine are in progress/complete enough for adapter and UI wiring.
-- The local service now uses SQLite for sessions, context events, summaries, provider connection records, and audit events.
-- Context preview is now a first-class concept and should be called before context is stored or sent to a model.
+- Phase 2: core domain and local service spine are complete enough for adapter and UI wiring.
+- Phase 3: local service/context broker hardening is underway, with optional protected local access, validation, adapter registration, and a smoke-test script.
+- The local service uses SQLite for sessions, context events, summaries, provider connection records, and audit events.
+- Context preview is a first-class concept and should be called before context is stored or sent to a model.
 
 ## What is in this scaffold
 
-- Core domain model for sessions, context events, capture rules, prompt composition, provider abstraction, provider connections, artifacts, audit events, and context preview.
-- Infrastructure for SQLite persistence, in-memory testing, and OpenAI-compatible HTTP providers.
+- Core domain model for sessions, context events, capture rules, prompt composition, provider abstraction, provider connections, artifacts, audit events, context preview, and adapter registration.
+- Infrastructure for SQLite persistence, in-memory adapter registration, in-memory testing, and OpenAI-compatible HTTP providers.
 - Local service API for adapters and the Windows shell.
 - Windows app shell scaffold for the future slide-out panel, active-window monitoring, and hotkey support.
 - Browser extension skeleton for Chrome/Edge context capture through native messaging.
@@ -71,14 +72,20 @@ tests/
 Run the local service:
 
 ```powershell
-dotnet run --project src/Threadline.Service/Threadline.Service.csproj
+dotnet run --project src/Threadline.Service/Threadline.Service.csproj --urls "http://localhost:5057"
+```
+
+Then run the local smoke test:
+
+```powershell
+./eng/smoke.ps1 -BaseUrl http://localhost:5057
 ```
 
 See `docs/SERVICE_API.md` for local API details.
 
 ## Privacy-first defaults
 
-ThreadlineAI should never behave like invisible spyware. Capture should be visible, pausable, previewable, and rule-driven. Sensitive applications, password managers, private browsing windows, tokens, credentials, PHI, and other sensitive information must be excluded or redacted before any provider call.
+ThreadlineAI should never behave like invisible spyware. Capture should be visible, pausable, previewable, and rule-driven. Sensitive applications, private browsing windows, credentials, and private records must be excluded or redacted before any provider call.
 
 ## License
 
