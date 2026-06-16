@@ -1,5 +1,6 @@
 using Threadline.Core;
 using Threadline.Infrastructure;
+using Threadline.Infrastructure.Security;
 
 namespace Threadline.Service;
 
@@ -130,6 +131,58 @@ public static class ThreadlineEndpointMappings
 
             var saved = await providers.SaveAsync(connection, ct);
             return Results.Created($"/providers/{saved.ProviderName}", saved);
+        });
+
+        api.MapPost("/providers/{providerName}/credential", async (string providerName, SaveProviderCredentialRequest request, SecretService secrets, ProviderConnectionService providers, IClock clock, CancellationToken ct) =>
+        {
+            var invalidProvider = RequestValidator.ValidateProviderName(providerName);
+            if (invalidProvider is not null) return invalidProvider;
+
+            var invalidCredential = RequestValidator.ValidateProviderCredential(request);
+            if (invalidCredential is not null) return invalidCredential;
+
+            var normalizedProvider = providerName.Trim();
+            var descriptor = await secrets.SetAsync($"provider/{normalizedProvider.ToLowerInvariant()}/credential", request.SecretValue, request.Metadata, ct);
+            var connection = new ProviderConnection(
+                $"prv_{Guid.NewGuid():N}",
+                normalizedProvider,
+                request.AuthType,
+                descriptor.Reference,
+                request.BaseUrl,
+                request.DefaultModel,
+                request.Status,
+                clock.UtcNow,
+                clock.UtcNow,
+                new Dictionary<string, string>
+                {
+                    ["credentialProtectionKind"] = descriptor.ProtectionKind.ToString(),
+                    ["credentialName"] = descriptor.Name
+                });
+
+            var saved = await providers.SaveAsync(connection, ct);
+            return Results.Created($"/providers/{saved.ProviderName}", new { provider = saved, credential = SecretDescriptorResponse.FromDescriptor(descriptor) });
+        });
+
+        api.MapGet("/secrets/{*reference}", async (string reference, SecretService secrets, CancellationToken ct) =>
+        {
+            reference = Uri.UnescapeDataString(reference);
+            var invalidReference = RequestValidator.ValidateSecretReference(reference);
+            if (invalidReference is not null) return invalidReference;
+
+            var descriptor = await secrets.DescribeAsync(reference, ct);
+            IResult result = descriptor is null ? Results.NotFound() : Results.Ok(SecretDescriptorResponse.FromDescriptor(descriptor));
+            return result;
+        });
+
+        api.MapDelete("/secrets/{*reference}", async (string reference, SecretService secrets, CancellationToken ct) =>
+        {
+            reference = Uri.UnescapeDataString(reference);
+            var invalidReference = RequestValidator.ValidateSecretReference(reference);
+            if (invalidReference is not null) return invalidReference;
+
+            var deleted = await secrets.DeleteAsync(reference, ct);
+            IResult result = deleted ? Results.NoContent() : Results.NotFound();
+            return result;
         });
 
         api.MapGet("/audit/recent", async (string? sessionId, int? take, IAuditRepository audit, CancellationToken ct) =>
