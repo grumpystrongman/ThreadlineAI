@@ -30,32 +30,99 @@ public sealed class SessionService
 {
     private readonly ISessionRepository _repository;
     private readonly IClock _clock;
-    private readonly SecretRedactor _redactor;
-    private readonly CapturePolicy _capturePolicy;
+    private readonly ContextPreviewBuilder _previewBuilder;
+    private readonly IAuditRepository? _auditRepository;
 
-    public SessionService(ISessionRepository repository, IClock clock, SecretRedactor redactor, CapturePolicy capturePolicy)
+    public SessionService(
+        ISessionRepository repository,
+        IClock clock,
+        SecretRedactor redactor,
+        CapturePolicy capturePolicy,
+        ContextPreviewBuilder? previewBuilder = null,
+        IAuditRepository? auditRepository = null)
     {
         _repository = repository;
         _clock = clock;
-        _redactor = redactor;
-        _capturePolicy = capturePolicy;
+        _previewBuilder = previewBuilder ?? new ContextPreviewBuilder(capturePolicy, redactor);
+        _auditRepository = auditRepository;
     }
 
     public async Task<ThreadlineSession> StartAsync(string name, string? provider = null, CancellationToken cancellationToken = default)
     {
         var session = ThreadlineSession.Start(name, _clock.UtcNow, provider);
         await _repository.SaveSessionAsync(session, cancellationToken);
+        await AppendAuditAsync(AuditEvent.Create(session.Id, AuditEventType.SessionStarted, _clock.UtcNow, $"Session started: {session.Name}"), cancellationToken);
         return session;
+    }
+
+    public Task<ContextPreview> PreviewContextAsync(ContextEvent contextEvent, CancellationToken cancellationToken = default)
+    {
+        var preview = _previewBuilder.Build(contextEvent);
+        return Task.FromResult(preview);
     }
 
     public async Task<ContextEvent> AppendContextAsync(ContextEvent contextEvent, CancellationToken cancellationToken = default)
     {
-        var decision = _capturePolicy.Evaluate(contextEvent);
-        if (!decision.IsAllowed) throw new InvalidOperationException($"Context capture blocked: {decision.Reason}");
-        var redacted = contextEvent with { Content = _redactor.Redact(contextEvent.Content), UserApproved = contextEvent.UserApproved && !decision.RequiresExplicitApproval };
-        await _repository.AppendEventAsync(redacted, cancellationToken);
-        return redacted;
+        var preview = _previewBuilder.Build(contextEvent);
+
+        if (!preview.Decision.IsAllowed)
+        {
+            await AppendAuditAsync(AuditEvent.Create(contextEvent.SessionId, AuditEventType.ContextBlocked, _clock.UtcNow, preview.Decision.Reason), cancellationToken);
+            throw new InvalidOperationException($"Context capture blocked: {preview.Decision.Reason}");
+        }
+
+        if (preview.RequiresExplicitApproval && !contextEvent.UserApproved)
+        {
+            await AppendAuditAsync(AuditEvent.Create(contextEvent.SessionId, AuditEventType.ContextBlocked, _clock.UtcNow, "Context requires explicit user approval before storage."), cancellationToken);
+            throw new InvalidOperationException("Context requires explicit user approval before storage.");
+        }
+
+        var approved = preview.OriginalEvent with
+        {
+            Content = preview.RedactedContent,
+            UserApproved = true
+        };
+
+        await _repository.AppendEventAsync(approved, cancellationToken);
+        await AppendAuditAsync(AuditEvent.Create(contextEvent.SessionId, AuditEventType.ContextStored, _clock.UtcNow, $"Stored context event {approved.Id}"), cancellationToken);
+        return approved;
     }
+
+    private Task AppendAuditAsync(AuditEvent auditEvent, CancellationToken cancellationToken) =>
+        _auditRepository is null ? Task.CompletedTask : _auditRepository.AppendAuditEventAsync(auditEvent, cancellationToken);
+}
+
+public sealed class ProviderConnectionService
+{
+    private readonly IProviderConnectionRepository _repository;
+    private readonly IAuditRepository? _auditRepository;
+    private readonly IClock _clock;
+
+    public ProviderConnectionService(IProviderConnectionRepository repository, IClock clock, IAuditRepository? auditRepository = null)
+    {
+        _repository = repository;
+        _clock = clock;
+        _auditRepository = auditRepository;
+    }
+
+    public async Task<ProviderConnection> SaveAsync(ProviderConnection connection, CancellationToken cancellationToken = default)
+    {
+        var saved = connection with { UpdatedAt = _clock.UtcNow };
+        await _repository.SaveProviderConnectionAsync(saved, cancellationToken);
+        if (_auditRepository is not null)
+        {
+            await _auditRepository.AppendAuditEventAsync(
+                AuditEvent.Create(null, AuditEventType.ProviderConfigured, _clock.UtcNow, $"Provider configured: {connection.ProviderName}"),
+                cancellationToken);
+        }
+        return saved;
+    }
+
+    public Task<ProviderConnection?> GetAsync(string providerName, CancellationToken cancellationToken = default) =>
+        _repository.GetProviderConnectionAsync(providerName, cancellationToken);
+
+    public Task<IReadOnlyList<ProviderConnection>> ListAsync(CancellationToken cancellationToken = default) =>
+        _repository.ListProviderConnectionsAsync(cancellationToken);
 }
 
 public sealed record OpenAiCompatibleProviderOptions(string ProviderName, string BaseUrl, string ApiKey, string DefaultModel);
