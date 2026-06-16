@@ -1,5 +1,5 @@
 using Threadline.Core;
-using Threadline.Infrastructure.Sqlite;
+using Threadline.Infrastructure;
 
 namespace Threadline.Service;
 
