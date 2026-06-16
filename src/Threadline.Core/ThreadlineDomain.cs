@@ -76,6 +76,52 @@ public sealed record SessionArtifact(
         new($"art_{Guid.NewGuid():N}", sessionId, artifactType, title.Trim(), reference.Trim(), now, metadata);
 }
 
+public enum AdapterKind
+{
+    Unknown,
+    WindowsShell,
+    BrowserExtension,
+    PowerShell,
+    Terminal,
+    UiAutomation,
+    DevelopmentTool
+}
+
+[Flags]
+public enum AdapterPermission
+{
+    None = 0,
+    ReadSessions = 1,
+    WriteContext = 2,
+    ComposePrompts = 4,
+    ManageProviders = 8,
+    ReadAudit = 16,
+    RegisterAdapters = 32,
+    All = ReadSessions | WriteContext | ComposePrompts | ManageProviders | ReadAudit | RegisterAdapters
+}
+
+public sealed record AdapterRegistration(
+    string Id,
+    AdapterKind Kind,
+    string DisplayName,
+    AdapterPermission Permissions,
+    DateTimeOffset RegisteredAt,
+    DateTimeOffset? LastSeenAt = null,
+    string? Version = null,
+    IReadOnlyDictionary<string, string>? Metadata = null)
+{
+    public static AdapterRegistration Create(
+        AdapterKind kind,
+        string displayName,
+        AdapterPermission permissions,
+        DateTimeOffset now,
+        string? version = null,
+        IReadOnlyDictionary<string, string>? metadata = null) =>
+        new($"adp_{Guid.NewGuid():N}", kind, displayName.Trim(), permissions, now, now, version, metadata);
+
+    public AdapterRegistration Seen(DateTimeOffset now) => this with { LastSeenAt = now };
+}
+
 public enum AuditEventType
 {
     SessionStarted,
@@ -88,7 +134,9 @@ public enum AuditEventType
     ProviderConfigured,
     ProviderCallStarted,
     ProviderCallCompleted,
-    ProviderCallFailed
+    ProviderCallFailed,
+    AdapterRegistered,
+    AdapterHeartbeat
 }
 
 public sealed record AuditEvent(
@@ -165,6 +213,14 @@ public interface IProviderConnectionRepository
     Task SaveProviderConnectionAsync(ProviderConnection connection, CancellationToken cancellationToken = default);
     Task<ProviderConnection?> GetProviderConnectionAsync(string providerName, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ProviderConnection>> ListProviderConnectionsAsync(CancellationToken cancellationToken = default);
+}
+
+public interface IAdapterRegistry
+{
+    Task<AdapterRegistration> RegisterAsync(AdapterRegistration registration, CancellationToken cancellationToken = default);
+    Task<AdapterRegistration?> GetAsync(string adapterId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<AdapterRegistration>> ListAsync(CancellationToken cancellationToken = default);
+    Task<AdapterRegistration?> MarkSeenAsync(string adapterId, DateTimeOffset now, CancellationToken cancellationToken = default);
 }
 
 public interface IAuditRepository
