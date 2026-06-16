@@ -16,4 +16,35 @@ public sealed class SecretRedactorTests
 
         Assert.Equal(expected, result);
     }
+
+    [Fact]
+    public void Analyze_ReturnsFindingsByKind()
+    {
+        var redactor = new SecretRedactor();
+        var input = "Contact jeff@example.com with MRN: A123456 and token=supersecret123";
+
+        var result = redactor.Analyze(input);
+
+        Assert.True(result.WasRedacted);
+        Assert.Contains(result.Findings, finding => finding.Kind == RedactionKind.EmailAddress);
+        Assert.Contains(result.Findings, finding => finding.Kind == RedactionKind.PhiMarker);
+        Assert.Contains(result.Findings, finding => finding.Kind == RedactionKind.GenericSecret);
+        Assert.DoesNotContain("jeff@example.com", result.RedactedText);
+        Assert.DoesNotContain("A123456", result.RedactedText);
+        Assert.DoesNotContain("supersecret123", result.RedactedText);
+    }
+
+    [Theory]
+    [InlineData("Server=myserver;User Id=threadline;Password=secret;")]
+    [InlineData("https://example.com/callback?access_token=secret-token-value&next=/home")]
+    [InlineData("Call me at 919-555-1212")]
+    public void Redact_RemovesAdditionalPrivacyRisks(string input)
+    {
+        var redactor = new SecretRedactor();
+
+        var result = redactor.Analyze(input);
+
+        Assert.True(result.WasRedacted);
+        Assert.Contains("[REDACTED]", result.RedactedText);
+    }
 }
