@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -117,7 +116,7 @@ public sealed class DpapiProtectedSecretStore : ISecretStore
             ?? Type.GetType("System.Security.Cryptography.DataProtectionScope")
             ?? throw new PlatformNotSupportedException("System.Security.Cryptography.DataProtectionScope is not available in this runtime.");
         var currentUser = Enum.Parse(scopeType, "CurrentUser");
-        var method = protectedDataType.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static, [typeof(byte[]), typeof(byte[]), scopeType])
+        var method = protectedDataType.GetMethod(methodName, [typeof(byte[]), typeof(byte[]), scopeType])
             ?? throw new MissingMethodException(protectedDataType.FullName, methodName);
 
         return (byte[])method.Invoke(null, [value, Entropy, currentUser])!;
