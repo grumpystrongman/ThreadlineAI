@@ -1,0 +1,14 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Threadline.Core", "src\Threadline.Core\Threadline.Core.csproj", "{A19BF384-46A3-4F98-8C57-2C55BD09C2E1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Threadline.Infrastructure", "src\Threadline.Infrastructure\Threadline.Infrastructure.csproj", "{C6EED0D6-6D82-4923-B68C-86A60915F373}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Threadline.Service", "src\Threadline.Service\Threadline.Service.csproj", "{A5E9A406-53C9-449A-9E9B-46C7AB3F0F95}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Threadline.Windows", "src\Threadline.Windows\Threadline.Windows.csproj", "{DE41C707-2768-4238-A23C-203A2333E8A1}"
+EndProject
+Global
+EndGlobal

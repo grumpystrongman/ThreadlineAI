@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "ThreadlineAI Context Adapter",
+  "description": "Captures approved browser context for the active ThreadlineAI session.",
+  "version": "0.1.0",
+  "permissions": ["activeTab", "scripting", "tabs", "nativeMessaging", "contextMenus"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "dist/background.js", "type": "module" },
+  "content_scripts": [{ "matches": ["<all_urls>"], "js": ["dist/contentScript.js"], "run_at": "document_idle" }],
+  "action": { "default_title": "Send page context to ThreadlineAI" }
+}

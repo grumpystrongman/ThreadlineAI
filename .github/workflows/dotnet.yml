@@ -1,0 +1,21 @@
+name: .NET
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-core:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build core/service projects
+        run: |
+          dotnet build src/Threadline.Core/Threadline.Core.csproj --configuration Release
+          dotnet build src/Threadline.Infrastructure/Threadline.Infrastructure.csproj --configuration Release
+          dotnet build src/Threadline.Service/Threadline.Service.csproj --configuration Release
