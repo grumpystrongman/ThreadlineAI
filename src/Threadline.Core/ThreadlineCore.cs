@@ -141,7 +141,7 @@ public sealed class SecretRedactor
                 findings.Add(new RedactionFinding(rule.Kind, rule.Label, match.Index, match.Length));
             }
 
-            redacted = rule.Pattern.Replace(redacted, match => rule.Replacement(match));
+            redacted = rule.Pattern.Replace(redacted, match => rule.Replace(match));
         }
 
         return new RedactionResult(original, redacted, findings);
@@ -163,9 +163,9 @@ public sealed class SecretRedactor
     private static string PreservePrefix(Match match) =>
         match.Groups.Count > 1 && match.Groups[1].Success ? match.Groups[1].Value + "[REDACTED]" : "[REDACTED]";
 
-    private sealed record RedactionRule(RedactionKind Kind, string Label, Regex Pattern, Func<Match, string>? Replacement = null)
+    private sealed record RedactionRule(RedactionKind Kind, string Label, Regex Pattern, Func<Match, string>? ReplacementFactory = null)
     {
-        public Func<Match, string> Replacement { get; } = Replacement ?? (_ => "[REDACTED]");
+        public string Replace(Match match) => ReplacementFactory is null ? "[REDACTED]" : ReplacementFactory(match);
     }
 }
 
