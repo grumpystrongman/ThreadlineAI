@@ -55,10 +55,13 @@ public sealed class SessionService
         return session;
     }
 
-    public Task<ContextPreview> PreviewContextAsync(ContextEvent contextEvent, CancellationToken cancellationToken = default)
+    public async Task<ContextPreview> PreviewContextAsync(ContextEvent contextEvent, CancellationToken cancellationToken = default)
     {
         var preview = _previewBuilder.Build(contextEvent);
-        return Task.FromResult(preview);
+        await AppendAuditAsync(
+            AuditEvent.Create(contextEvent.SessionId, AuditEventType.ContextPreviewed, _clock.UtcNow, "Context previewed.", AuditMetadata(preview)),
+            cancellationToken);
+        return preview;
     }
 
     public async Task<ContextEvent> AppendContextAsync(ContextEvent contextEvent, CancellationToken cancellationToken = default)
@@ -67,25 +70,82 @@ public sealed class SessionService
 
         if (!preview.Decision.IsAllowed)
         {
-            await AppendAuditAsync(AuditEvent.Create(contextEvent.SessionId, AuditEventType.ContextBlocked, _clock.UtcNow, preview.Decision.Reason), cancellationToken);
+            await AppendAuditAsync(AuditEvent.Create(contextEvent.SessionId, AuditEventType.ContextBlocked, _clock.UtcNow, preview.Decision.Reason, AuditMetadata(preview)), cancellationToken);
             throw new InvalidOperationException($"Context capture blocked: {preview.Decision.Reason}");
         }
 
         if (preview.RequiresExplicitApproval && !contextEvent.UserApproved)
         {
-            await AppendAuditAsync(AuditEvent.Create(contextEvent.SessionId, AuditEventType.ContextBlocked, _clock.UtcNow, "Context requires explicit user approval before storage."), cancellationToken);
+            await AppendAuditAsync(AuditEvent.Create(contextEvent.SessionId, AuditEventType.ContextBlocked, _clock.UtcNow, "Context requires explicit user approval before storage.", AuditMetadata(preview)), cancellationToken);
             throw new InvalidOperationException("Context requires explicit user approval before storage.");
         }
 
         var approved = preview.OriginalEvent with
         {
             Content = preview.RedactedContent,
-            UserApproved = true
+            UserApproved = true,
+            Metadata = MergeMetadata(preview.OriginalEvent.Metadata, preview.PrivacyMetadata, ConsentState.Stored)
         };
 
+        if (preview.RedactionFindings?.Count > 0)
+        {
+            await AppendAuditAsync(AuditEvent.Create(contextEvent.SessionId, AuditEventType.RedactionApplied, _clock.UtcNow, $"Applied {preview.RedactionFindings.Count} redaction(s).", AuditMetadata(preview)), cancellationToken);
+        }
+
         await _repository.AppendEventAsync(approved, cancellationToken);
-        await AppendAuditAsync(AuditEvent.Create(contextEvent.SessionId, AuditEventType.ContextStored, _clock.UtcNow, $"Stored context event {approved.Id}"), cancellationToken);
+        await AppendAuditAsync(AuditEvent.Create(contextEvent.SessionId, AuditEventType.ContextStored, _clock.UtcNow, $"Stored context event {approved.Id}", AuditMetadata(preview, ConsentState.Stored)), cancellationToken);
         return approved;
+    }
+
+    private static IReadOnlyDictionary<string, string> AuditMetadata(ContextPreview preview, ConsentState? overrideConsentState = null)
+    {
+        var metadata = new Dictionary<string, string>
+        {
+            ["contextEventId"] = preview.OriginalEvent.Id,
+            ["contextSource"] = preview.OriginalEvent.Source.ToString(),
+            ["contextType"] = preview.OriginalEvent.ContextType,
+            ["sensitivity"] = preview.OriginalEvent.Sensitivity.ToString(),
+            ["consentState"] = (overrideConsentState ?? preview.ConsentState).ToString(),
+            ["redactionCount"] = (preview.RedactionFindings?.Count ?? 0).ToString(),
+            ["requiresApproval"] = preview.RequiresExplicitApproval.ToString()
+        };
+
+        if (preview.Decision.MatchedRule is not null)
+        {
+            metadata["matchedRuleId"] = preview.Decision.MatchedRule.Id;
+            metadata["matchedRuleSource"] = preview.Decision.MatchedRule.Source.ToString();
+            metadata["matchedRuleAction"] = preview.Decision.MatchedRule.Action.ToString();
+        }
+
+        if (preview.RedactionFindings?.Count > 0)
+        {
+            metadata["redactionKinds"] = string.Join(",", preview.RedactionFindings.Select(f => f.Kind).Distinct());
+        }
+
+        return metadata;
+    }
+
+    private static IReadOnlyDictionary<string, string>? MergeMetadata(IReadOnlyDictionary<string, string>? original, IReadOnlyDictionary<string, string>? privacy, ConsentState consentState)
+    {
+        var result = new Dictionary<string, string>();
+        if (original is not null)
+        {
+            foreach (var pair in original)
+            {
+                result[pair.Key] = pair.Value;
+            }
+        }
+
+        if (privacy is not null)
+        {
+            foreach (var pair in privacy)
+            {
+                result[$"privacy.{pair.Key}"] = pair.Value;
+            }
+        }
+
+        result["privacy.consentState"] = consentState.ToString();
+        return result;
     }
 
     private Task AppendAuditAsync(AuditEvent auditEvent, CancellationToken cancellationToken) =>
