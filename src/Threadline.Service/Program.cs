@@ -38,7 +38,8 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "Threadlin
 app.MapGet("/sessions/active", async (ISessionRepository repository, CancellationToken ct) =>
 {
     var session = await repository.GetActiveSessionAsync(ct);
-    return session is null ? Results.NotFound() : Results.Ok(session);
+    IResult result = session is null ? Results.NotFound() : Results.Ok(session);
+    return result;
 });
 
 app.MapPost("/sessions", async (StartSessionRequest request, SessionService sessions, CancellationToken ct) =>
@@ -82,7 +83,8 @@ app.MapGet("/providers", async (ProviderConnectionService providers, Cancellatio
 app.MapGet("/providers/{providerName}", async (string providerName, ProviderConnectionService providers, CancellationToken ct) =>
 {
     var provider = await providers.GetAsync(providerName, ct);
-    return provider is null ? Results.NotFound() : Results.Ok(provider);
+    IResult result = provider is null ? Results.NotFound() : Results.Ok(provider);
+    return result;
 });
 
 app.MapPost("/providers", async (SaveProviderConnectionRequest request, ProviderConnectionService providers, IClock clock, CancellationToken ct) =>
