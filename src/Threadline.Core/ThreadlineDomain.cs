@@ -122,6 +122,29 @@ public sealed record AdapterRegistration(
     public AdapterRegistration Seen(DateTimeOffset now) => this with { LastSeenAt = now };
 }
 
+public enum SecretProtectionKind
+{
+    Unknown,
+    WindowsDpapiCurrentUser,
+    InMemory
+}
+
+public sealed record SecretDescriptor(
+    string Reference,
+    string Name,
+    SecretProtectionKind ProtectionKind,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? UpdatedAt = null,
+    IReadOnlyDictionary<string, string>? Metadata = null);
+
+public interface ISecretStore
+{
+    Task<SecretDescriptor> SetSecretAsync(string name, string secretValue, IReadOnlyDictionary<string, string>? metadata = null, CancellationToken cancellationToken = default);
+    Task<string?> GetSecretAsync(string reference, CancellationToken cancellationToken = default);
+    Task<SecretDescriptor?> DescribeSecretAsync(string reference, CancellationToken cancellationToken = default);
+    Task<bool> DeleteSecretAsync(string reference, CancellationToken cancellationToken = default);
+}
+
 public enum AuditEventType
 {
     SessionStarted,
@@ -138,7 +161,10 @@ public enum AuditEventType
     ProviderCallCompleted,
     ProviderCallFailed,
     AdapterRegistered,
-    AdapterHeartbeat
+    AdapterHeartbeat,
+    SecretStored,
+    SecretDeleted,
+    SecretRead
 }
 
 public sealed record AuditEvent(
