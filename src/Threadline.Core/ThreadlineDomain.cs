@@ -131,6 +131,8 @@ public enum AuditEventType
     ContextPreviewed,
     ContextStored,
     ContextBlocked,
+    ContextApproved,
+    RedactionApplied,
     ProviderConfigured,
     ProviderCallStarted,
     ProviderCallCompleted,
@@ -151,13 +153,25 @@ public sealed record AuditEvent(
         new($"aud_{Guid.NewGuid():N}", sessionId, eventType, timestamp, message, metadata);
 }
 
+public enum ConsentState
+{
+    NotRequired,
+    Required,
+    Approved,
+    Blocked,
+    Stored
+}
+
 public sealed record ContextPreview(
     ContextEvent OriginalEvent,
     CaptureDecision Decision,
     string RedactedContent,
     bool WillBeStored,
     bool RequiresExplicitApproval,
-    IReadOnlyList<string> Warnings)
+    IReadOnlyList<string> Warnings,
+    ConsentState ConsentState = ConsentState.NotRequired,
+    IReadOnlyList<RedactionFinding>? RedactionFindings = null,
+    IReadOnlyDictionary<string, string>? PrivacyMetadata = null)
 {
     public ContextEvent ToApprovedEvent() => OriginalEvent with
     {
@@ -180,7 +194,7 @@ public sealed class ContextPreviewBuilder
     public ContextPreview Build(ContextEvent contextEvent)
     {
         var decision = _capturePolicy.Evaluate(contextEvent);
-        var redactedContent = _redactor.Redact(contextEvent.Content);
+        var redaction = _redactor.Analyze(contextEvent.Content);
         var warnings = new List<string>();
 
         if (!decision.IsAllowed)
@@ -188,9 +202,9 @@ public sealed class ContextPreviewBuilder
             warnings.Add(decision.Reason);
         }
 
-        if (!string.Equals(contextEvent.Content, redactedContent, StringComparison.Ordinal))
+        if (redaction.WasRedacted)
         {
-            warnings.Add("Potential secrets or sensitive identifiers were redacted.");
+            warnings.Add($"{redaction.Findings.Count} potential secret or sensitive identifier(s) were redacted.");
         }
 
         if (decision.RequiresExplicitApproval)
@@ -198,13 +212,59 @@ public sealed class ContextPreviewBuilder
             warnings.Add("This context requires explicit user approval before storage or provider use.");
         }
 
+        var consentState = DetermineConsentState(decision, contextEvent.UserApproved);
+        var willBeStored = decision.IsAllowed && (!decision.RequiresExplicitApproval || contextEvent.UserApproved);
+        var metadata = BuildPrivacyMetadata(decision, redaction, consentState);
+
         return new ContextPreview(
             contextEvent,
             decision,
-            redactedContent,
-            decision.IsAllowed && !decision.RequiresExplicitApproval,
+            redaction.RedactedText,
+            willBeStored,
             decision.RequiresExplicitApproval,
-            warnings);
+            warnings,
+            consentState,
+            redaction.Findings,
+            metadata);
+    }
+
+    private static ConsentState DetermineConsentState(CaptureDecision decision, bool userApproved)
+    {
+        if (!decision.IsAllowed)
+        {
+            return ConsentState.Blocked;
+        }
+
+        if (decision.RequiresExplicitApproval)
+        {
+            return userApproved ? ConsentState.Approved : ConsentState.Required;
+        }
+
+        return ConsentState.NotRequired;
+    }
+
+    private static IReadOnlyDictionary<string, string> BuildPrivacyMetadata(CaptureDecision decision, RedactionResult redaction, ConsentState consentState)
+    {
+        var metadata = new Dictionary<string, string>
+        {
+            ["consentState"] = consentState.ToString(),
+            ["redactionCount"] = redaction.Findings.Count.ToString(),
+            ["requiresApproval"] = decision.RequiresExplicitApproval.ToString()
+        };
+
+        if (decision.MatchedRule is not null)
+        {
+            metadata["matchedRuleId"] = decision.MatchedRule.Id;
+            metadata["matchedRuleSource"] = decision.MatchedRule.Source.ToString();
+            metadata["matchedRuleAction"] = decision.MatchedRule.Action.ToString();
+        }
+
+        if (redaction.Findings.Count > 0)
+        {
+            metadata["redactionKinds"] = string.Join(",", redaction.Findings.Select(f => f.Kind).Distinct());
+        }
+
+        return metadata;
     }
 }
 
