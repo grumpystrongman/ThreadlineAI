@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Threadline.Core;
 using Threadline.Infrastructure.Sqlite;
 
@@ -70,11 +71,13 @@ public sealed class SqliteThreadlineStoreTests : IDisposable
 
     public void Dispose()
     {
+        SqliteConnection.ClearAllPools();
+
         if (File.Exists(_databasePath))
         {
             File.Delete(_databasePath);
         }
     }
 
-    private SqliteThreadlineStore CreateStore() => new(new SqliteOptions($"Data Source={_databasePath}"));
+    private SqliteThreadlineStore CreateStore() => new(new SqliteOptions($"Data Source={_databasePath};Pooling=False"));
 }
