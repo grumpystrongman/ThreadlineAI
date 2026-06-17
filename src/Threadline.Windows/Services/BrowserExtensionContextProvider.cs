@@ -14,13 +14,16 @@ public sealed class BrowserExtensionContextProvider
 
     public async Task<SummarizedContext?> TryGetLatestAsync(string sessionId, ThreadlineTarget target, CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.GetAsync($"sessions/{sessionId}/events/recent?take=30", cancellationToken);
+        var response = await _httpClient.GetAsync($"sessions/{sessionId}/events/recent?take=50", cancellationToken);
         if (!response.IsSuccessStatusCode) return null;
 
         var events = await response.Content.ReadFromJsonAsync<List<ContextEventDto>>(_jsonOptions, cancellationToken) ?? [];
-        var browserEvent = events
+        var browserEvents = events
             .Where(item => item.Source.Equals("Browser", StringComparison.OrdinalIgnoreCase) || item.ContextType.Contains("browser", StringComparison.OrdinalIgnoreCase))
-            .FirstOrDefault();
+            .ToList();
+
+        var browserEvent = browserEvents.FirstOrDefault(item => item.ContextType.Equals("browser-selection", StringComparison.OrdinalIgnoreCase))
+            ?? browserEvents.FirstOrDefault();
 
         if (browserEvent is null) return null;
 
@@ -29,7 +32,8 @@ public sealed class BrowserExtensionContextProvider
         var title = lines.FirstOrDefault(line => line.StartsWith("Title:", StringComparison.OrdinalIgnoreCase)) ?? $"Title: {target.Title}";
         var url = lines.FirstOrDefault(line => line.StartsWith("URL:", StringComparison.OrdinalIgnoreCase)) ?? string.Empty;
         var preview = BuildPreview(lines);
-        var keyDetails = new List<string> { title, url, extraction, preview }.Where(item => !string.IsNullOrWhiteSpace(item)).ToList();
+        var contextType = $"Context type: {browserEvent.ContextType}";
+        var keyDetails = new List<string> { title, url, extraction, contextType, preview }.Where(item => !string.IsNullOrWhiteSpace(item)).ToList();
 
         return new SummarizedContext(
             target.Title,
