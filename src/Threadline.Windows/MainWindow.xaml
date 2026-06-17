@@ -30,7 +30,7 @@
         <TextBlock x:Name="CurrentWindowText" Text="No target window." TextWrapping="Wrap" />
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Button Content="Refresh Open Apps" Click="RefreshOpenWindows_Click" />
-          <Button Content="Focus Selected App" Click="FocusSelectedWindow_Click" />
+          <Button Content="Use Selected App" Click="UseSelectedWindow_Click" />
           <Button Content="Attach Target" Click="AttachWindow_Click" />
           <Button Content="Capture Selected App" Click="PreviewNativeUi_Click" />
           <Button Content="Preview Context" Click="PreviewWindow_Click" />
