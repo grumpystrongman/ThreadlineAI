@@ -9,17 +9,19 @@ The project is provider-agnostic. OpenAI, Anthropic Claude, Gemini, DeepSeek, Op
 ThreadlineAI is in early alpha engineering.
 
 - Phase 0/1: scaffold and engineering foundation are complete.
-- Phase 2: core domain and local service spine are complete enough for adapter and UI wiring.
-- Phase 3: local service/context broker hardening is underway, with optional protected local access, validation, adapter registration, and a smoke-test script.
-- The local service uses SQLite for sessions, context events, summaries, provider connection records, and audit events.
-- Context preview is a first-class concept and should be called before context is stored or sent to a model.
+- Phase 2: core domain and local service spine are complete.
+- Phase 3: local service/context broker hardening is complete enough for adapter and UI wiring.
+- Phase 4: privacy, redaction, consent, and privacy-safe audit metadata are in place.
+- Phase 5: secure local provider credential storage is in place.
+- Phase 6: window attachment and action proposal service APIs are in place.
+- Phase 7: first Windows companion UI is in place for service connection, session start/use, foreground-window attachment, preview/store context, prompt composition, and action proposal tracking.
 
 ## What is in this scaffold
 
-- Core domain model for sessions, context events, capture rules, prompt composition, provider abstraction, provider connections, artifacts, audit events, context preview, and adapter registration.
-- Infrastructure for SQLite persistence, in-memory adapter registration, in-memory testing, and OpenAI-compatible HTTP providers.
+- Core domain model for sessions, context events, capture rules, prompt composition, provider abstraction, provider connections, artifacts, audit events, context preview, adapter registration, secure secret references, window attachment, and window actions.
+- Infrastructure for SQLite persistence, in-memory adapter registration, in-memory testing, secure local secret storage, in-memory window attachment runtime state, and OpenAI-compatible HTTP providers.
 - Local service API for adapters and the Windows shell.
-- Windows app shell scaffold for the future slide-out panel, active-window monitoring, and hotkey support.
+- Windows companion UI scaffold wired to the local service for session, window attachment, context preview/storage, prompt composition, and action proposal flows.
 - Browser extension skeleton for Chrome/Edge context capture through native messaging.
 - PowerShell transcript adapter scripts.
 - Privacy/security design notes and implementation roadmap.
@@ -31,10 +33,12 @@ The first useful MVP should let a Windows user:
 1. Install ThreadlineAI.
 2. Configure an LLM provider.
 3. Start or resume a named session.
-4. Capture approved context from Chrome/Edge selected text, active window metadata, and PowerShell transcript output.
-5. Preview the context that will be sent.
-6. Ask questions about the current window or full active session.
-7. Pause capture, block apps/domains, and export a session summary.
+4. Attach Threadline to the current Windows foreground window.
+5. Capture approved context from Chrome/Edge selected text, active window metadata, PowerShell transcript output, and eventually UI Automation text.
+6. Preview the context that will be sent or stored.
+7. Ask questions about the current window or full active session.
+8. Approve safe actions such as inserting text, pasting generated content, or running supported app-specific actions.
+9. Pause capture, block apps/domains, and export a session summary.
 
 ## Repository layout
 
@@ -43,7 +47,7 @@ src/
   Threadline.Core/           Domain model, abstractions, prompt composition, privacy rules
   Threadline.Infrastructure/ Storage and provider implementations
   Threadline.Service/        Local HTTP API for adapters and app shell
-  Threadline.Windows/        Windows shell/panel scaffold
+  Threadline.Windows/        Windows companion shell/panel scaffold
 adapters/
   browser-extension/         Chrome/Edge extension scaffold
   powershell/                PowerShell transcript adapter scripts
@@ -69,6 +73,12 @@ tests/
 ./eng/test.ps1
 ```
 
+Build the Windows companion UI separately:
+
+```powershell
+./eng/build-windows.ps1
+```
+
 Run the local service:
 
 ```powershell
@@ -89,4 +99,4 @@ ThreadlineAI should never behave like invisible spyware. Capture should be visib
 
 ## License
 
-No license has been selected yet. Choose a license before public distribution or external contribution.
+Internal prototype unless otherwise specified.
