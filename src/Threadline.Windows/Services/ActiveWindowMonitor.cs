@@ -15,7 +15,7 @@ public sealed record ActiveWindowSnapshot(
     public string ApplicationName => string.IsNullOrWhiteSpace(ProcessName) ? "Unknown" : ProcessName;
 
     public string ToDisplayText() =>
-        $"Window: {WindowTitle ?? "Unknown"}\nProcess: {ProcessName ?? "Unknown"}\nPID: {ProcessId?.ToString() ?? "Unknown"}\nCaptured: {CapturedAt:t}";
+        $"Window: {WindowTitle ?? "Unknown"}\nProcess: {ProcessName ?? "Unknown"}\nPID: {ProcessId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Unknown"}\nCaptured: {CapturedAt:t}";
 }
 
 public sealed class ActiveWindowMonitor
@@ -23,8 +23,15 @@ public sealed class ActiveWindowMonitor
     public ActiveWindowSnapshot GetActiveWindowSnapshot()
     {
         var handle = GetForegroundWindow();
-        var title = GetWindowTitle(handle);
+        var currentProcessId = Environment.ProcessId;
         var process = GetProcess(handle);
+        if (process?.Id == currentProcessId)
+        {
+            handle = FindNextVisibleAppWindow(currentProcessId) ?? handle;
+            process = GetProcess(handle);
+        }
+
+        var title = GetWindowTitle(handle);
         return new ActiveWindowSnapshot(
             handle,
             title,
@@ -32,6 +39,25 @@ public sealed class ActiveWindowMonitor
             process?.Id,
             TryGetExecutablePath(process),
             DateTimeOffset.Now);
+    }
+
+    private static nint? FindNextVisibleAppWindow(int currentProcessId)
+    {
+        nint? candidate = null;
+        EnumWindows((handle, _) =>
+        {
+            if (candidate is not null) return false;
+            if (!IsWindowVisible(handle)) return true;
+            if (GetWindow(handle, 4) != nint.Zero) return true;
+            var title = GetWindowTitle(handle);
+            if (string.IsNullOrWhiteSpace(title)) return true;
+            var process = GetProcess(handle);
+            if (process is null || process.Id == currentProcessId) return true;
+            candidate = handle;
+            return false;
+        }, nint.Zero);
+
+        return candidate;
     }
 
     private static string? GetWindowTitle(nint handle)
@@ -55,8 +81,13 @@ public sealed class ActiveWindowMonitor
         try { return process.MainModule?.FileName; } catch { return null; }
     }
 
+    private delegate bool EnumWindowsProc(nint hwnd, nint lParam);
+
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(nint hWnd, StringBuilder lpString, int nMaxCount);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowTextLength(nint hWnd);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint hWnd, out uint lpdwProcessId);
+    [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowsProc callback, nint lParam);
+    [DllImport("user32.dll")] private static extern bool IsWindowVisible(nint hWnd);
+    [DllImport("user32.dll")] private static extern nint GetWindow(nint hWnd, uint command);
 }
