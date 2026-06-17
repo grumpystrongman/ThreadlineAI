@@ -26,13 +26,14 @@ public sealed class NativeUiAutomationReader
     private const int MaxCharacters = 16000;
     private static readonly Guid AccessibleInterfaceId = new("618736e0-3c3d-11cf-810c-00aa00389b71");
 
-    public NativeUiAutomationResult ReadForegroundWindow()
+    public NativeUiAutomationResult ReadForegroundWindow() => ReadWindow(GetForegroundWindow());
+
+    public NativeUiAutomationResult ReadWindow(nint handle)
     {
         var warnings = new List<string>();
-        var handle = GetForegroundWindow();
-        if (handle == IntPtr.Zero)
+        if (handle == nint.Zero)
         {
-            return Failure("Unknown", "unknown", 0, warnings, "No foreground window handle was available.");
+            return Failure("Unknown", "unknown", 0, warnings, "No window handle was available.");
         }
 
         _ = GetWindowThreadProcessId(handle, out var processId);
@@ -155,7 +156,6 @@ public sealed class NativeUiAutomationReader
         }
         catch (Exception ex) when (ex is COMException or RuntimeBinderException or InvalidCastException)
         {
-            // Ignore volatile or inaccessible child elements.
         }
     }
 
@@ -167,7 +167,7 @@ public sealed class NativeUiAutomationReader
 
     private static string Normalize(string? value) => string.IsNullOrWhiteSpace(value) ? string.Empty : value.ReplaceLineEndings(" ").Trim();
 
-    private static string ReadWindowTitle(IntPtr handle)
+    private static string ReadWindowTitle(nint handle)
     {
         var builder = new StringBuilder(512);
         _ = GetWindowText(handle, builder, builder.Capacity);
@@ -188,16 +188,16 @@ public sealed class NativeUiAutomationReader
     }
 
     [DllImport("user32.dll")]
-    private static extern IntPtr GetForegroundWindow();
+    private static extern nint GetForegroundWindow();
 
     [DllImport("user32.dll")]
-    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+    private static extern uint GetWindowThreadProcessId(nint hWnd, out uint processId);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
+    private static extern int GetWindowText(nint hWnd, StringBuilder text, int count);
 
     [DllImport("oleacc.dll")]
-    private static extern int AccessibleObjectFromWindow(IntPtr hwnd, uint objectId, ref Guid interfaceId, [MarshalAs(UnmanagedType.IDispatch)] out object? accessibleObject);
+    private static extern int AccessibleObjectFromWindow(nint hwnd, uint objectId, ref Guid interfaceId, [MarshalAs(UnmanagedType.IDispatch)] out object? accessibleObject);
 
     [DllImport("oleacc.dll")]
     private static extern int AccessibleChildren([MarshalAs(UnmanagedType.IDispatch)] object accessibleObject, int childStart, int childCount, [Out, MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 2)] object[] children, ref int obtainedCount);
