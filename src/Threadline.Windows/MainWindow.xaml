@@ -9,6 +9,8 @@
       <TextBlock x:Name="ServiceStatusText" Text="Service: unknown" VerticalAlignment="Center" />
       <Button Content="Check Service" Click="CheckService_Click" />
       <Button Content="Start Session" Click="StartSession_Click" />
+      <Button Content="New Chat" Click="NewChat_Click" />
+      <Button Content="Clear Shared Context" Click="ClearSharedContext_Click" />
       <Button Content="Use Active Session" Click="UseActiveSession_Click" />
       <ComboBox x:Name="ProviderBox" Width="150" SelectedIndex="5">
         <ComboBoxItem Content="OpenAI" />
