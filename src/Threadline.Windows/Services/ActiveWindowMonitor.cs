@@ -4,9 +4,18 @@ using System.Text;
 
 namespace Threadline.Windows.Services;
 
-public sealed record ActiveWindowSnapshot(nint Handle, string? WindowTitle, string? ProcessName, DateTimeOffset CapturedAt)
+public sealed record ActiveWindowSnapshot(
+    nint Handle,
+    string? WindowTitle,
+    string? ProcessName,
+    int? ProcessId,
+    string? ExecutablePath,
+    DateTimeOffset CapturedAt)
 {
-    public string ToDisplayText() => $"Window: {WindowTitle ?? "Unknown"}\nProcess: {ProcessName ?? "Unknown"}\nCaptured: {CapturedAt:t}";
+    public string ApplicationName => string.IsNullOrWhiteSpace(ProcessName) ? "Unknown" : ProcessName;
+
+    public string ToDisplayText() =>
+        $"Window: {WindowTitle ?? "Unknown"}\nProcess: {ProcessName ?? "Unknown"}\nPID: {ProcessId?.ToString() ?? "Unknown"}\nCaptured: {CapturedAt:t}";
 }
 
 public sealed class ActiveWindowMonitor
@@ -15,8 +24,14 @@ public sealed class ActiveWindowMonitor
     {
         var handle = GetForegroundWindow();
         var title = GetWindowTitle(handle);
-        var processName = GetProcessName(handle);
-        return new ActiveWindowSnapshot(handle, title, processName, DateTimeOffset.Now);
+        var process = GetProcess(handle);
+        return new ActiveWindowSnapshot(
+            handle,
+            title,
+            process?.ProcessName,
+            process?.Id,
+            TryGetExecutablePath(process),
+            DateTimeOffset.Now);
     }
 
     private static string? GetWindowTitle(nint handle)
@@ -27,11 +42,17 @@ public sealed class ActiveWindowMonitor
         return GetWindowText(handle, builder, builder.Capacity) > 0 ? builder.ToString() : null;
     }
 
-    private static string? GetProcessName(nint handle)
+    private static Process? GetProcess(nint handle)
     {
         _ = GetWindowThreadProcessId(handle, out var processId);
         if (processId == 0) return null;
-        try { using var process = Process.GetProcessById((int)processId); return process.ProcessName; } catch { return null; }
+        try { return Process.GetProcessById((int)processId); } catch { return null; }
+    }
+
+    private static string? TryGetExecutablePath(Process? process)
+    {
+        if (process is null) return null;
+        try { return process.MainModule?.FileName; } catch { return null; }
     }
 
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
