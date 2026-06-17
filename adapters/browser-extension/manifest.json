@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ThreadlineAI Context Adapter",
   "description": "Captures approved browser context for the active ThreadlineAI session.",
-  "version": "0.2.0",
+  "version": "10.8.2",
   "permissions": ["activeTab", "scripting", "tabs", "contextMenus", "storage", "notifications"],
   "host_permissions": ["<all_urls>", "http://localhost:5057/*", "http://127.0.0.1:5057/*"],
   "background": { "service_worker": "dist/background.js", "type": "module" },
