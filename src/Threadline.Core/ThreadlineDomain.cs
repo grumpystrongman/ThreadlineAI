@@ -164,7 +164,15 @@ public enum AuditEventType
     AdapterHeartbeat,
     SecretStored,
     SecretDeleted,
-    SecretRead
+    SecretRead,
+    WindowAttached,
+    WindowDetached,
+    WindowContextPreviewed,
+    WindowActionProposed,
+    WindowActionApproved,
+    WindowActionCompleted,
+    WindowActionFailed,
+    WindowActionCancelled
 }
 
 public sealed record AuditEvent(
