@@ -16,6 +16,8 @@ public sealed record ActiveWindowSnapshot(
 
     public string ToDisplayText() =>
         $"Window: {WindowTitle ?? "Unknown"}\nProcess: {ProcessName ?? "Unknown"}\nPID: {ProcessId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Unknown"}\nCaptured: {CapturedAt:t}";
+
+    public override string ToString() => $"{ApplicationName} — {WindowTitle ?? "Untitled"}";
 }
 
 public sealed class ActiveWindowMonitor
@@ -48,7 +50,6 @@ public sealed class ActiveWindowMonitor
         {
             if (candidate is not null) return false;
             if (!IsWindowVisible(handle)) return true;
-            if (GetWindow(handle, 4) != nint.Zero) return true;
             var title = GetWindowTitle(handle);
             if (string.IsNullOrWhiteSpace(title)) return true;
             var process = GetProcess(handle);
@@ -89,5 +90,4 @@ public sealed class ActiveWindowMonitor
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint hWnd, out uint lpdwProcessId);
     [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowsProc callback, nint lParam);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(nint hWnd);
-    [DllImport("user32.dll")] private static extern nint GetWindow(nint hWnd, uint command);
 }
