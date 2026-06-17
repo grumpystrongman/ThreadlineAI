@@ -20,11 +20,36 @@ public sealed record ThreadlineTarget(
     string Confidence,
     string Guidance)
 {
-    public override string ToString()
+    public string DisplayLabel => BuildDisplayLabel();
+
+    public override string ToString() => DisplayLabel;
+
+    private string BuildDisplayLabel()
     {
-        var marker = Kind == ThreadlineTargetKind.Window ? "Window" : Kind.ToString();
-        var active = IsActive ? "active" : "available";
-        return $"{Window.ApplicationName} [{marker}, {active}] — {Title}";
+        if (Kind == ThreadlineTargetKind.Window)
+        {
+            return $"▸ {Window.ApplicationName} — {Title}  [Native window]";
+        }
+
+        var providerBadge = ProviderKey switch
+        {
+            "browser-extension" => "Browser provider",
+            "notepad-tabs" => "Notepad tab provider",
+            "native-ui" => "Native UI",
+            _ => ProviderKey
+        };
+
+        var state = CanReadBody ? "ready" : "needs provider";
+        var icon = Kind switch
+        {
+            ThreadlineTargetKind.BrowserTab => "🌐",
+            ThreadlineTargetKind.Tab => "↳",
+            ThreadlineTargetKind.Document => "📄",
+            ThreadlineTargetKind.ShellTab => "⌁",
+            _ => "↳"
+        };
+
+        return $"   {icon} {Title}  [{providerBadge}; {state}]";
     }
 }
 
