@@ -3,6 +3,7 @@ using Threadline.Core;
 using Threadline.Infrastructure;
 using Threadline.Infrastructure.Security;
 using Threadline.Infrastructure.Sqlite;
+using Threadline.Infrastructure.Windowing;
 using Threadline.Service;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,6 +24,7 @@ builder.Services.AddSingleton<IProviderConnectionRepository>(sp => sp.GetRequire
 builder.Services.AddSingleton<IAuditRepository>(sp => sp.GetRequiredService<SqliteThreadlineStore>());
 builder.Services.AddSingleton<IThreadlineStoreInitializer>(sp => sp.GetRequiredService<SqliteThreadlineStore>());
 builder.Services.AddSingleton<IAdapterRegistry, InMemoryAdapterRegistry>();
+builder.Services.AddSingleton<IWindowAttachmentRepository, InMemoryWindowAttachmentRepository>();
 builder.Services.AddSingleton<ISecretStore>(_ => new DpapiProtectedSecretStore(builder.Configuration["Threadline:SecretStorePath"]));
 
 builder.Services.AddSingleton<IClock, SystemClock>();
@@ -32,6 +34,7 @@ builder.Services.AddSingleton<ContextPreviewBuilder>();
 builder.Services.AddSingleton<SessionService>();
 builder.Services.AddSingleton<ProviderConnectionService>();
 builder.Services.AddSingleton<SecretService>();
+builder.Services.AddSingleton<WindowAttachmentService>();
 builder.Services.AddSingleton<PromptComposer>();
 
 var app = builder.Build();
