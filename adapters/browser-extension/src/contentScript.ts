@@ -1,15 +1,36 @@
-function getVisibleText(): string {
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-  const parts: string[] = [];
-  let node: Node | null;
-  while ((node = walker.nextNode())) {
-    const value = node.textContent?.replace(/\s+/g, ' ').trim();
-    if (value && value.length > 2) parts.push(value);
-    if (parts.join(' ').length > 8000) break;
-  }
-  return parts.join('\n');
+type ThreadlinePageContext = {
+  title: string;
+  url: string;
+  selection: string;
+  visibleText: string;
+  capturedAt: string;
+  metadata: Record<string, string>;
+};
+
+function compact(value: string | null | undefined): string {
+  return value?.replace(/\s+/g, ' ').trim() ?? '';
 }
+
+function collectPageText(maxCharacters = 12000): string {
+  const bodyText = compact(document.body?.innerText);
+  return bodyText.slice(0, maxCharacters);
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type !== 'THREADLINE_GET_VISIBLE_TEXT') return;
-  sendResponse({ title: document.title, url: location.href, content: getVisibleText(), capturedAt: new Date().toISOString() });
+  if (message?.type !== 'THREADLINE_GET_PAGE_CONTEXT') return false;
+
+  const context: ThreadlinePageContext = {
+    title: document.title,
+    url: location.href,
+    selection: compact(window.getSelection()?.toString()),
+    visibleText: collectPageText(message.maxCharacters ?? 12000),
+    capturedAt: new Date().toISOString(),
+    metadata: {
+      origin: location.origin,
+      host: location.host
+    }
+  };
+
+  sendResponse(context);
+  return true;
 });
