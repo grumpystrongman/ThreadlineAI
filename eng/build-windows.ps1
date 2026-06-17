@@ -16,10 +16,18 @@ function Invoke-CheckedCommand {
   }
 }
 
+function Get-DotnetSdkBasePath {
+  $basePathLine = dotnet --info | Select-String -Pattern '^\s*Base Path:\s*(.+)$' | Select-Object -First 1
+  if ($null -eq $basePathLine) {
+    throw 'Could not determine the .NET SDK Base Path from dotnet --info.'
+  }
+
+  return $basePathLine.Matches[0].Groups[1].Value.Trim()
+}
+
 function Test-WindowsAppSdkBuildTasks {
-  $dotnetRoot = Split-Path -Parent (Split-Path -Parent (Get-Command dotnet).Source)
-  $sdkVersion = (dotnet --version).Trim()
-  $priTaskPath = Join-Path $dotnetRoot "sdk\$sdkVersion\Microsoft\VisualStudio\v17.0\AppxPackage\Microsoft.Build.Packaging.Pri.Tasks.dll"
+  $sdkBasePath = Get-DotnetSdkBasePath
+  $priTaskPath = Join-Path $sdkBasePath 'Microsoft\VisualStudio\v17.0\AppxPackage\Microsoft.Build.Packaging.Pri.Tasks.dll'
 
   if (-not (Test-Path $priTaskPath)) {
     Write-Host ''
@@ -32,6 +40,7 @@ function Test-WindowsAppSdkBuildTasks {
     Write-Host '  - Universal Windows Platform development / Windows application development tools' -ForegroundColor Yellow
     Write-Host '  - Windows 10/11 SDK and MSIX packaging tools' -ForegroundColor Yellow
     Write-Host ''
+    Write-Host 'VS Code is fine as the editor, but WinUI still needs these Visual Studio build tools.' -ForegroundColor Yellow
     Write-Host 'After install, reopen PowerShell and rerun ./eng/build-windows.ps1.' -ForegroundColor Yellow
     throw 'Missing Visual Studio Windows App SDK packaging build tasks required for WinUI.'
   }
