@@ -25,7 +25,7 @@ public sealed class ContextSummarizer
     private static readonly string[] NoiseTerms =
     [
         "minimize", "maximize", "close", "system", "application", "non client", "input sink", "vertical", "horizontal",
-        "context help", "title bar", "menu bar", "scroll bar", "restore", "ribbon", "status bar", "toolbar"
+        "context help", "title bar", "menu bar", "scroll bar", "restore", "ribbon", "status bar", "toolbar", "ime"
     ];
 
     public SummarizedContext SummarizeNativeUi(NativeUiAutomationResult result)
@@ -47,11 +47,11 @@ public sealed class ContextSummarizer
         var ambiguous = IsAmbiguousTabbedCapture(result, cleanedLines);
         if (ambiguous)
         {
-            warnings.Add("This native capture appears to include multiple tabs or document surfaces. Threadline can identify the active window/tab title, but the body text may belong to another tab. Use selected text, clipboard capture, or an app-specific adapter for reliable tab content.");
+            warnings.Add("This native capture is tab-ambiguous. Threadline can identify the active Notepad window/tab title, but Windows exposed body text that may belong to another tab. Use selected text, clipboard capture, or a future tab picker for reliable document content.");
         }
 
         var keyDetails = ambiguous
-            ? cleanedLines.Where(line => LooksLikeTitleOrTab(line, title)).Take(8).ToList()
+            ? [title]
             : cleanedLines.Take(12).ToList();
         var summary = BuildSummary(result, cleanedLines, ambiguous);
         if (cleanedLines.Count == 0)
@@ -84,23 +84,10 @@ public sealed class ContextSummarizer
 
     private static bool IsAmbiguousTabbedCapture(NativeUiAutomationResult result, IReadOnlyList<string> cleanedLines)
     {
-        if (!string.Equals(result.ProcessName, "Notepad", StringComparison.OrdinalIgnoreCase) &&
-            !cleanedLines.Any(line => TabLine.IsMatch(line)))
-        {
-            return false;
-        }
-
-        var tabLikeLines = cleanedLines.Count(line => TabLine.IsMatch(line) || line.EndsWith(".txt", StringComparison.OrdinalIgnoreCase));
-        if (tabLikeLines >= 2) return true;
-        if (cleanedLines.Count > 20 && string.Equals(result.ProcessName, "Notepad", StringComparison.OrdinalIgnoreCase)) return true;
+        if (string.Equals(result.ProcessName, "Notepad", StringComparison.OrdinalIgnoreCase)) return true;
+        if (result.WindowTitle.EndsWith(" - Notepad", StringComparison.OrdinalIgnoreCase)) return true;
+        if (cleanedLines.Any(line => TabLine.IsMatch(line))) return true;
         return false;
-    }
-
-    private static bool LooksLikeTitleOrTab(string line, string? title)
-    {
-        if (!string.IsNullOrWhiteSpace(title) && title.Contains(line, StringComparison.OrdinalIgnoreCase)) return true;
-        if (!string.IsNullOrWhiteSpace(title) && line.Contains(title, StringComparison.OrdinalIgnoreCase)) return true;
-        return TabLine.IsMatch(line) || line.EndsWith(".txt", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string BuildSummary(NativeUiAutomationResult result, IReadOnlyList<string> cleanedLines, bool ambiguous)
@@ -113,7 +100,7 @@ public sealed class ContextSummarizer
 
         if (ambiguous)
         {
-            return $"Threadline identified the active window/tab as '{title}', but the native UI capture appears to include multiple tabs or document bodies. To avoid summarizing the wrong tab, Threadline is not treating the captured body text as authoritative.";
+            return $"Threadline identified the active window/tab as '{title}', but this app's native UI capture may contain content from other tabs or document bodies. Threadline is not summarizing the body text because it may be from the wrong tab.";
         }
 
         var joined = string.Join(" ", cleanedLines.Take(8));
