@@ -145,23 +145,71 @@ async function fetchGoogleDocsExport(documentId: string, format: 'html' | 'txt')
 }
 
 function parseGoogleDocsHtmlExport(html: string, maxCharacters: number): BrowserSnapshot {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-  const compact = (value: string | null | undefined) => value?.replace(/\s+/g, ' ').trim() ?? '';
-  const bodyText = compact(doc.body?.innerText || doc.body?.textContent).slice(0, maxCharacters);
-  const headings = Array.from(doc.querySelectorAll('h1,h2,h3,h4')).map(element => compact(element.textContent)).filter(Boolean).slice(0, 60);
-  const links = Array.from(doc.querySelectorAll('a[href]')).map(anchor => ({ text: compact(anchor.textContent), href: (anchor as HTMLAnchorElement).href || anchor.getAttribute('href') || '' })).filter(item => item.href).slice(0, 120);
-  const images = Array.from(doc.querySelectorAll('img')).map(image => ({ alt: compact((image as HTMLImageElement).alt), src: (image as HTMLImageElement).src || image.getAttribute('src') || '' })).filter(item => item.alt || item.src).slice(0, 120);
-  const tables = Array.from(doc.querySelectorAll('table')).map(table => compact((table as HTMLElement).innerText || table.textContent)).filter(Boolean).slice(0, 40);
+  const stripped = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ');
+  const plainText = decodeHtml(stripped.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim().slice(0, maxCharacters);
+  const headings = extractTaggedText(stripped, ['h1', 'h2', 'h3', 'h4'], 60);
+  const links = extractLinks(stripped, 120);
+  const images = extractImages(stripped, 120);
+  const tables = extractTaggedText(stripped, ['table'], 40);
   return {
-    plainText: bodyText,
+    plainText,
     headings,
     links,
     images,
     tables,
-    warnings: [],
+    warnings: ['Parsed HTML export without DOMParser.'],
     extractionMode: 'google-docs-html-export'
   };
+}
+
+function extractTaggedText(html: string, tags: string[], limit: number): string[] {
+  const results: string[] = [];
+  for (const tag of tags) {
+    const expression = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi');
+    let match: RegExpExecArray | null;
+    while ((match = expression.exec(html)) && results.length < limit) {
+      const text = decodeHtml(match[1].replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+      if (text) results.push(text);
+    }
+  }
+  return results;
+}
+
+function extractLinks(html: string, limit: number): Array<{ text: string; href: string }> {
+  const results: Array<{ text: string; href: string }> = [];
+  const expression = /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = expression.exec(html)) && results.length < limit) {
+    const href = decodeHtml(match[1]).trim();
+    const text = decodeHtml(match[2].replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+    if (href) results.push({ text, href });
+  }
+  return results;
+}
+
+function extractImages(html: string, limit: number): Array<{ alt: string; src: string }> {
+  const results: Array<{ alt: string; src: string }> = [];
+  const expression = /<img\b[^>]*>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = expression.exec(html)) && results.length < limit) {
+    const tag = match[0];
+    const src = decodeHtml((tag.match(/\bsrc=["']([^"']+)["']/i)?.[1] ?? '').trim());
+    const alt = decodeHtml((tag.match(/\balt=["']([^"']*)["']/i)?.[1] ?? '').trim());
+    if (src || alt) results.push({ alt, src });
+  }
+  return results;
+}
+
+function decodeHtml(value: string): string {
+  return value
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
 }
 
 export function buildBrowserContent(context: ThreadlinePageContext, mode: BrowserContextMode): string {
