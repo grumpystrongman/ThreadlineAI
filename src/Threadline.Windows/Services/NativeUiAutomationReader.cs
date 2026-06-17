@@ -1,3 +1,4 @@
+using Microsoft.CSharp.RuntimeBinder;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -86,7 +87,7 @@ public sealed class NativeUiAutomationReader
         {
             var item = queue.Dequeue();
             AddAccessibleText(item, 0, lines, seen);
-            EnqueueChildren(item, queue, warnings);
+            EnqueueChildren(item, queue, warnings, lines, seen);
         }
 
         if (lines.Count >= MaxItems)
@@ -98,7 +99,7 @@ public sealed class NativeUiAutomationReader
         return content.Length > MaxCharacters ? content[..MaxCharacters] : content;
     }
 
-    private static void EnqueueChildren(object accessibleObject, Queue<object> queue, List<string> warnings)
+    private static void EnqueueChildren(object accessibleObject, Queue<object> queue, List<string> warnings, List<string> lines, HashSet<string> seen)
     {
         try
         {
@@ -122,7 +123,7 @@ public sealed class NativeUiAutomationReader
 
                 if (child is int childId)
                 {
-                    AddAccessibleText(accessibleObject, childId, queue: null, warnings: null);
+                    AddAccessibleText(accessibleObject, childId, lines, seen);
                     continue;
                 }
 
@@ -133,11 +134,6 @@ public sealed class NativeUiAutomationReader
         {
             warnings.Add("A native UI element could not be enumerated.");
         }
-    }
-
-    private static void AddAccessibleText(object accessibleObject, int childId, List<string>? queue, HashSet<string>? warnings)
-    {
-        // This overload exists only to keep child-id enumeration resilient. It intentionally no-ops.
     }
 
     private static void AddAccessibleText(object accessibleObject, int childId, List<string> lines, HashSet<string> seen)
