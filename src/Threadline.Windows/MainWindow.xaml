@@ -49,9 +49,7 @@
         <ListView x:Name="TimelineList" MinHeight="440" />
       </StackPanel>
       <Grid Grid.Column="2" RowDefinitions="*,Auto,Auto" RowSpacing="10">
-        <ScrollViewer>
-          <TextBlock x:Name="ChatTranscript" Text="Start or use a session, pick an open app, then ask Threadline about that target." TextWrapping="Wrap" />
-        </ScrollViewer>
+        <TextBox x:Name="ChatTranscript" Text="Start or use a session, pick an open app, then ask Threadline about that target." TextWrapping="Wrap" AcceptsReturn="True" IsReadOnly="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
         <TextBox x:Name="QuestionBox" Grid.Row="1" PlaceholderText="Ask about the selected app or session..." AcceptsReturn="True" MinHeight="72" TextWrapping="Wrap" />
         <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
           <Button Content="Ask / Compose Prompt" Click="Ask_Click" />
