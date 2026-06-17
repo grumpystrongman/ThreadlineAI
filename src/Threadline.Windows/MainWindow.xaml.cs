@@ -67,15 +67,18 @@ public sealed partial class MainWindow : Window
     private async Task AttachWindowAsync()
     {
         EnsureSession();
-        RefreshActiveWindow();
+        AddTimeline("Target attach armed. Focus the target window now.");
+        AppendTranscript("Attach Target", "You have 3 seconds to click or Alt+Tab into the target app window.");
+        await Task.Delay(TimeSpan.FromSeconds(3));
+        _lastForegroundWindow = _activeWindowMonitor.GetActiveWindowSnapshot();
         if (_lastForegroundWindow is null)
         {
-            throw new InvalidOperationException("No foreground window snapshot is available.");
+            throw new InvalidOperationException("No target window snapshot is available.");
         }
 
         _attachment = await _client.AttachWindowAsync(_session!.Id, _lastForegroundWindow);
         CurrentWindowText.Text = FormatAttachment(_attachment);
-        AddTimeline($"Attached window {_attachment.Snapshot.ApplicationName}: {_attachment.Snapshot.WindowTitle}");
+        AddTimeline($"Attached target window {_attachment.Snapshot.ApplicationName}: {_attachment.Snapshot.WindowTitle}");
     }
 
     private async Task PreviewWindowAsync()
