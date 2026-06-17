@@ -5,9 +5,10 @@ namespace Threadline.Windows;
 
 public sealed partial class MainWindow
 {
-    private readonly OpenWindowCatalog _openWindowCatalog = new();
+    private readonly TabTargetRegistry _tabTargetRegistry = new();
     private readonly AppCaptureRouter _appCaptureRouter = new();
     private ActiveWindowSnapshot? _selectedTargetWindow;
+    private ThreadlineTarget? _selectedThreadlineTarget;
 
     private void RefreshOpenWindows_Click(object sender, RoutedEventArgs e)
     {
@@ -19,50 +20,63 @@ public sealed partial class MainWindow
         await RunUiActionAsync(async () =>
         {
             EnsureSession();
-            if (OpenWindowsList.SelectedItem is not ActiveWindowSnapshot selected)
+            if (OpenWindowsList.SelectedItem is not ThreadlineTarget selected)
             {
-                throw new InvalidOperationException("Select an open app window first.");
+                throw new InvalidOperationException("Select an open app or tab first.");
             }
 
-            _selectedTargetWindow = selected;
-            _lastForegroundWindow = selected;
-            CurrentWindowText.Text = "Selected target:\n" + selected.ToDisplayText();
-            _attachment = await _client.AttachWindowAsync(_session!.Id, selected);
+            _selectedThreadlineTarget = selected;
+            _selectedTargetWindow = selected.Window;
+            _lastForegroundWindow = selected.Window;
+            CurrentWindowText.Text = $"Selected target:\n{selected}\n\n{selected.Window.ToDisplayText()}";
+            _attachment = await _client.AttachWindowAsync(_session!.Id, selected.Window);
 
-            var plan = _appCaptureRouter.PlanFor(selected);
-            AppendTranscript("Capture Plan", $"Provider: {plan.DisplayName}\nCan capture now: {plan.CanCaptureNow}\nDescription: {plan.Description}\nGuidance: {plan.Guidance}");
+            if (!selected.CanReadBody)
+            {
+                _lastContextSummary = new SummarizedContext(
+                    selected.Title,
+                    selected.ProviderKey,
+                    selected.Guidance,
+                    [selected.ToString()],
+                    [$"Provider confidence: {selected.Confidence}. Body capture is not available for this target yet."],
+                    selected.Window.ToDisplayText());
+                AppendTranscript("Selected Target Preview", _lastContextSummary.ToPromptContext());
+                AddTimeline($"Selected target {selected.Title}; provider needed: {selected.ProviderKey}");
+                return;
+            }
 
+            var plan = _appCaptureRouter.PlanFor(selected.Window);
             if (plan.CanCaptureNow)
             {
-                _lastNativeUiResult = _nativeUiAutomationReader.ReadWindow(selected.Handle);
+                _lastNativeUiResult = _nativeUiAutomationReader.ReadWindow(selected.Window.Handle);
                 _lastContextSummary = _contextSummarizer.SummarizeNativeUi(_lastNativeUiResult);
-                AppendTranscript("Selected App Preview", _lastContextSummary.ToPromptContext());
-                AddTimeline($"Selected and captured {selected.ApplicationName}: {selected.WindowTitle}");
+                AppendTranscript("Selected Target Preview", _lastContextSummary.ToPromptContext());
+                AddTimeline($"Selected and captured {selected.Title}");
             }
             else
             {
                 _lastContextSummary = new SummarizedContext(
-                    selected.WindowTitle ?? selected.ApplicationName,
+                    selected.Title,
                     plan.DisplayName,
                     plan.Guidance,
                     [selected.ToString()],
                     ["Capture provider is planned but not implemented yet."],
-                    selected.ToDisplayText());
-                AppendTranscript("Selected App Preview", _lastContextSummary.ToPromptContext());
-                AddTimeline($"Selected {selected.ApplicationName}; provider required: {plan.DisplayName}");
+                    selected.Window.ToDisplayText());
+                AppendTranscript("Selected Target Preview", _lastContextSummary.ToPromptContext());
+                AddTimeline($"Selected {selected.Title}; provider required: {plan.DisplayName}");
             }
         });
     }
 
     private void LoadOpenWindows()
     {
-        var windows = _openWindowCatalog.ListOpenWindows();
+        var targets = _tabTargetRegistry.ListTargets();
         OpenWindowsList.Items.Clear();
-        foreach (var window in windows)
+        foreach (var target in targets)
         {
-            OpenWindowsList.Items.Add(window);
+            OpenWindowsList.Items.Add(target);
         }
 
-        AddTimeline($"Found {windows.Count} open app window(s).");
+        AddTimeline($"Found {targets.Count} app/window/tab target(s).");
     }
 }
