@@ -20,6 +20,32 @@ public sealed record AppendContextEventRequest(
         ContextEvent.Create(sessionId, Source, ContextType, Content, timestamp, ApplicationName, ProcessName, WindowTitle, Uri, Sensitivity, UserApproved, Metadata);
 }
 
+public sealed record AttachWindowRequest(
+    string ApplicationName,
+    string ProcessName,
+    string WindowTitle,
+    int? ProcessId = null,
+    string? ExecutablePath = null,
+    string? Uri = null,
+    bool IsForeground = true,
+    IReadOnlyDictionary<string, string>? Metadata = null)
+{
+    public WindowSnapshot ToSnapshot(DateTimeOffset timestamp) =>
+        WindowSnapshot.Create(timestamp, ApplicationName, ProcessName, WindowTitle, ProcessId, ExecutablePath, Uri, IsForeground, Metadata);
+}
+
+public sealed record StoreWindowContextRequest(bool UserApproved = true);
+
+public sealed record ProposeWindowActionRequest(
+    WindowActionKind Kind,
+    string Description,
+    string Payload,
+    bool UserApproved = false,
+    string? AttachmentId = null,
+    WindowActionRisk Risk = WindowActionRisk.Medium);
+
+public sealed record CompleteWindowActionRequest(string? ResultMessage = null, bool Failed = false);
+
 public sealed record ComposePromptRequest(string Question, string? CurrentWindow = null, int? TakeRecentEvents = 20);
 
 public sealed record SaveSummaryRequest(string Summary);
