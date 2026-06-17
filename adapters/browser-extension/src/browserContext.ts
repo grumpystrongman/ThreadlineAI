@@ -159,7 +159,7 @@ function parseGoogleDocsHtmlExport(html: string, maxCharacters: number): Browser
     links,
     images,
     tables,
-    warnings: ['Parsed HTML export without DOMParser.'],
+    warnings: ['Parsed HTML export using lightweight parser.'],
     extractionMode: 'google-docs-html-export'
   };
 }
@@ -168,10 +168,11 @@ function extractTaggedText(html: string, tags: string[], limit: number): string[
   const results: string[] = [];
   for (const tag of tags) {
     const expression = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi');
-    let match: RegExpExecArray | null;
-    while ((match = expression.exec(html)) && results.length < limit) {
+    let match = expression.exec(html);
+    while (match && results.length < limit) {
       const text = decodeHtml(match[1].replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
       if (text) results.push(text);
+      match = expression.exec(html);
     }
   }
   return results;
@@ -180,11 +181,12 @@ function extractTaggedText(html: string, tags: string[], limit: number): string[
 function extractLinks(html: string, limit: number): Array<{ text: string; href: string }> {
   const results: Array<{ text: string; href: string }> = [];
   const expression = /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-  let match: RegExpExecArray | null;
-  while ((match = expression.exec(html)) && results.length < limit) {
+  let match = expression.exec(html);
+  while (match && results.length < limit) {
     const href = decodeHtml(match[1]).trim();
     const text = decodeHtml(match[2].replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
     if (href) results.push({ text, href });
+    match = expression.exec(html);
   }
   return results;
 }
@@ -192,12 +194,13 @@ function extractLinks(html: string, limit: number): Array<{ text: string; href: 
 function extractImages(html: string, limit: number): Array<{ alt: string; src: string }> {
   const results: Array<{ alt: string; src: string }> = [];
   const expression = /<img\b[^>]*>/gi;
-  let match: RegExpExecArray | null;
-  while ((match = expression.exec(html)) && results.length < limit) {
+  let match = expression.exec(html);
+  while (match && results.length < limit) {
     const tag = match[0];
     const src = decodeHtml((tag.match(/\bsrc=["']([^"']+)["']/i)?.[1] ?? '').trim());
     const alt = decodeHtml((tag.match(/\balt=["']([^"']*)["']/i)?.[1] ?? '').trim());
     if (src || alt) results.push({ alt, src });
+    match = expression.exec(html);
   }
   return results;
 }
