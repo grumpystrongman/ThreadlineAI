@@ -94,14 +94,17 @@ public sealed partial class MainWindow : Window
         AppendTranscript("Threadline", $"Stored current-window context:\n{stored.Content}");
     }
 
-    private Task PreviewNativeUiAsync()
+    private async Task PreviewNativeUiAsync()
     {
         EnsureSession();
-        RefreshActiveWindow();
+        AddTimeline("Native UI capture armed. Focus the target window now.");
+        AppendTranscript("Native UI Capture", "You have 3 seconds to click or Alt+Tab into the target app window.");
+        await Task.Delay(TimeSpan.FromSeconds(3));
         _lastNativeUiResult = _nativeUiAutomationReader.ReadForegroundWindow();
+        _lastForegroundWindow = _activeWindowMonitor.GetActiveWindowSnapshot();
+        CurrentWindowText.Text = _lastForegroundWindow.ToDisplayText();
         AppendTranscript("Native UI Preview", _lastNativeUiResult.ToDisplayText());
-        AddTimeline(_lastNativeUiResult.Success ? "Previewed native UI Automation context." : "Native UI Automation preview found no readable context.");
-        return Task.CompletedTask;
+        AddTimeline(_lastNativeUiResult.Success ? "Previewed target native UI context." : "Target native UI preview found no readable context.");
     }
 
     private async Task AskAsync()
