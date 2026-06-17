@@ -8,12 +8,14 @@ public sealed partial class MainWindow : Window
 {
     private readonly ActiveWindowMonitor _activeWindowMonitor = new();
     private readonly NativeUiAutomationReader _nativeUiAutomationReader = new();
+    private readonly ContextSummarizer _contextSummarizer = new();
     private readonly ThreadlineLocalClient _client = new();
     private ActiveWindowSnapshot? _lastForegroundWindow;
     private ThreadlineSessionDto? _session;
     private WindowAttachmentDto? _attachment;
     private WindowActionDto? _lastAction;
     private NativeUiAutomationResult? _lastNativeUiResult;
+    private SummarizedContext? _lastContextSummary;
 
     public MainWindow()
     {
@@ -68,7 +70,7 @@ public sealed partial class MainWindow : Window
     {
         EnsureSession();
         AddTimeline("Target attach armed. Focus the target window now.");
-        AppendTranscript("Attach Target", "You have 3 seconds to click or Alt+Tab into the target app window.");
+        AppendTranscript("Attach Target", "Focus the target app within 3 seconds.");
         await Task.Delay(TimeSpan.FromSeconds(3));
         _lastForegroundWindow = _activeWindowMonitor.GetActiveWindowSnapshot();
         if (_lastForegroundWindow is null)
@@ -101,13 +103,14 @@ public sealed partial class MainWindow : Window
     {
         EnsureSession();
         AddTimeline("Native UI capture armed. Focus the target window now.");
-        AppendTranscript("Native UI Capture", "You have 3 seconds to click or Alt+Tab into the target app window.");
+        AppendTranscript("Native UI Capture", "Focus the target app within 3 seconds.");
         await Task.Delay(TimeSpan.FromSeconds(3));
         _lastNativeUiResult = _nativeUiAutomationReader.ReadForegroundWindow();
         _lastForegroundWindow = _activeWindowMonitor.GetActiveWindowSnapshot();
         CurrentWindowText.Text = _lastForegroundWindow.ToDisplayText();
-        AppendTranscript("Native UI Preview", _lastNativeUiResult.ToDisplayText());
-        AddTimeline(_lastNativeUiResult.Success ? "Previewed target native UI context." : "Target native UI preview found no readable context.");
+        _lastContextSummary = _contextSummarizer.SummarizeNativeUi(_lastNativeUiResult);
+        AppendTranscript("Native UI Summary", _lastContextSummary.ToPromptContext());
+        AddTimeline(_lastNativeUiResult.Success ? "Summarized target native UI context." : "Target native UI preview found no readable context.");
     }
 
     private async Task AskAsync()
@@ -116,14 +119,16 @@ public sealed partial class MainWindow : Window
         var question = QuestionBox.Text?.Trim();
         if (string.IsNullOrWhiteSpace(question)) return;
 
-        var currentWindow = _lastNativeUiResult is { Success: true }
-            ? _lastNativeUiResult.ToDisplayText()
-            : _attachment is not null ? FormatAttachment(_attachment) : _lastForegroundWindow?.ToDisplayText();
+        var currentWindow = _lastContextSummary is not null
+            ? _lastContextSummary.ToPromptContext()
+            : _lastNativeUiResult is { Success: true }
+                ? _contextSummarizer.SummarizeNativeUi(_lastNativeUiResult).ToPromptContext()
+                : _attachment is not null ? FormatAttachment(_attachment) : _lastForegroundWindow?.ToDisplayText();
         AppendTranscript("You", question);
         var messages = await _client.ComposePromptAsync(_session!.Id, question, currentWindow);
         AppendTranscript("Threadline Prompt", string.Join("\n\n---\n\n", messages.Select(message => $"{message.Role}:\n{message.Content}")));
         QuestionBox.Text = string.Empty;
-        AddTimeline("Composed session prompt.");
+        AddTimeline("Composed session prompt with summarized context.");
     }
 
     private async Task ProposeInsertActionAsync()
