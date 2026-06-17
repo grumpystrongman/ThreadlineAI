@@ -39,6 +39,43 @@ $eventBody = @{
 $event = Invoke-RestMethod -Method Post -Uri "$BaseUrl/sessions/$($session.id)/events" -Headers $headers -ContentType 'application/json' -Body $eventBody
 $event | Format-List
 
+Write-Host 'Attaching simulated active window...'
+$windowBody = @{
+  applicationName = 'PowerShell'
+  processName = 'pwsh'
+  windowTitle = 'Threadline Phase 6 Smoke Test'
+  processId = $PID
+  isForeground = $true
+  metadata = @{ source = 'smoke-test' }
+} | ConvertTo-Json -Depth 4
+$windowAttachment = Invoke-RestMethod -Method Post -Uri "$BaseUrl/sessions/$($session.id)/windows/attach" -Headers $headers -ContentType 'application/json' -Body $windowBody
+$windowAttachment | Format-List
+
+Write-Host 'Previewing attached-window context...'
+$windowPreviewBody = @{ userApproved = $true } | ConvertTo-Json
+$windowPreview = Invoke-RestMethod -Method Post -Uri "$BaseUrl/sessions/$($session.id)/windows/current/preview" -Headers $headers -ContentType 'application/json' -Body $windowPreviewBody
+$windowPreview | Format-List
+
+Write-Host 'Storing attached-window context...'
+$storedWindowContext = Invoke-RestMethod -Method Post -Uri "$BaseUrl/sessions/$($session.id)/windows/current/store" -Headers $headers -ContentType 'application/json' -Body $windowPreviewBody
+$storedWindowContext | Format-List
+
+Write-Host 'Proposing approved insert action...'
+$actionBody = @{
+  kind = 'InsertText'
+  description = 'Insert generated smoke-test text into attached window'
+  payload = 'Threadline smoke-test insertion payload'
+  userApproved = $true
+  risk = 'Medium'
+} | ConvertTo-Json
+$action = Invoke-RestMethod -Method Post -Uri "$BaseUrl/sessions/$($session.id)/actions" -Headers $headers -ContentType 'application/json' -Body $actionBody
+$action | Format-List
+
+Write-Host 'Completing insert action...'
+$completeBody = @{ resultMessage = 'Smoke test marked action complete.'; failed = $false } | ConvertTo-Json
+$completedAction = Invoke-RestMethod -Method Post -Uri "$BaseUrl/actions/$($action.id)/complete" -Headers $headers -ContentType 'application/json' -Body $completeBody
+$completedAction | Format-List
+
 Write-Host 'Saving provider credential through protected store...'
 $credentialBody = @{
   secretValue = 'smoke-test-provider-secret-12345'
@@ -70,6 +107,6 @@ $heartbeat = Invoke-RestMethod -Method Post -Uri "$BaseUrl/adapters/$($adapter.i
 $heartbeat | Format-List
 
 Write-Host 'Reading recent audit events...'
-Invoke-RestMethod -Method Get -Uri "$BaseUrl/audit/recent?take=15" -Headers $headers | Format-Table
+Invoke-RestMethod -Method Get -Uri "$BaseUrl/audit/recent?take=20" -Headers $headers | Format-Table
 
 Write-Host 'Smoke test complete.'
