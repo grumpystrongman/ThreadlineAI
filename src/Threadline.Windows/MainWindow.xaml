@@ -19,7 +19,6 @@
         <ComboBoxItem Content="Local" />
       </ComboBox>
     </StackPanel>
-
     <Grid Grid.Row="1" ColumnDefinitions="2*,3*" ColumnSpacing="16">
       <StackPanel Spacing="8">
         <TextBlock Text="Session" FontSize="16" FontWeight="SemiBold" />
@@ -31,6 +30,7 @@
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Button Content="Refresh Open Apps" Click="RefreshOpenWindows_Click" />
           <Button Content="Use Selected App" Click="UseSelectedWindow_Click" />
+          <Button Content="Use Copied Text" Click="UseCopiedText_Click" />
           <Button Content="Attach Selected App" Click="AttachSelectedWindow_Click" />
           <Button Content="Capture Selected App" Click="CaptureSelectedWindow_Click" />
           <Button Content="Preview Context" Click="PreviewWindow_Click" />
@@ -38,7 +38,6 @@
         </StackPanel>
       </StackPanel>
     </Grid>
-
     <Grid Grid.Row="2" ColumnDefinitions="2*,2*,3*" ColumnSpacing="16">
       <StackPanel Spacing="8">
         <TextBlock Text="Open Apps" FontSize="18" FontWeight="SemiBold" />
