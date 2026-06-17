@@ -10,6 +10,32 @@ public sealed partial class MainWindow
 
     private void RefreshOpenWindows_Click(object sender, RoutedEventArgs e)
     {
+        LoadOpenWindows();
+    }
+
+    private async void UseSelectedWindow_Click(object sender, RoutedEventArgs e)
+    {
+        await RunUiActionAsync(async () =>
+        {
+            EnsureSession();
+            if (OpenWindowsList.SelectedItem is not ActiveWindowSnapshot selected)
+            {
+                throw new InvalidOperationException("Select an open app window first.");
+            }
+
+            _selectedTargetWindow = selected;
+            _lastForegroundWindow = selected;
+            CurrentWindowText.Text = "Selected target:\n" + selected.ToDisplayText();
+            _attachment = await _client.AttachWindowAsync(_session!.Id, selected);
+            _lastNativeUiResult = _nativeUiAutomationReader.ReadWindow(selected.Handle);
+            _lastContextSummary = _contextSummarizer.SummarizeNativeUi(_lastNativeUiResult);
+            AppendTranscript("Selected App Preview", _lastContextSummary.ToPromptContext());
+            AddTimeline($"Selected, attached, and summarized {selected.ApplicationName}: {selected.WindowTitle}");
+        });
+    }
+
+    private void LoadOpenWindows()
+    {
         var windows = _openWindowCatalog.ListOpenWindows();
         OpenWindowsList.Items.Clear();
         foreach (var window in windows)
@@ -18,19 +44,5 @@ public sealed partial class MainWindow
         }
 
         AddTimeline($"Found {windows.Count} open app window(s).");
-    }
-
-    private void UseSelectedWindow_Click(object sender, RoutedEventArgs e)
-    {
-        if (OpenWindowsList.SelectedItem is not ActiveWindowSnapshot selected)
-        {
-            AddTimeline("Select an open app window first.");
-            return;
-        }
-
-        _selectedTargetWindow = selected;
-        _lastForegroundWindow = selected;
-        CurrentWindowText.Text = "Selected target:\n" + selected.ToDisplayText();
-        AddTimeline($"Selected target {selected.ApplicationName}: {selected.WindowTitle}");
     }
 }
