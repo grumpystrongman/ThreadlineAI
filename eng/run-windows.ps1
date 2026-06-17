@@ -8,43 +8,49 @@ Write-Host 'Building Windows companion with Visual Studio MSBuild...'
 
 $repoRoot = Resolve-Path "$PSScriptRoot\.."
 $releaseRoot = Join-Path $repoRoot 'src\Threadline.Windows\bin\Release'
+$preferredExe = Join-Path $releaseRoot 'net8.0-windows10.0.19041.0\win-x64\Threadline.Windows.exe'
 $logPath = Join-Path $env:LOCALAPPDATA 'ThreadlineAI\logs\Threadline.Windows.log'
 
-Write-Host "Searching for Threadline.Windows.exe under: $releaseRoot"
-$candidates = @(Get-ChildItem $releaseRoot -Recurse -Filter 'Threadline.Windows.exe' -ErrorAction SilentlyContinue |
-  Where-Object { $_.FullName -notmatch '\\ref\\|\\refint\\|\\obj\\' } |
-  Select-Object *, @{ Name = 'IsWinX64'; Expression = { $_.FullName -match '\\win-x64\\' } } |
-  Sort-Object @{ Expression = 'IsWinX64'; Descending = $true }, @{ Expression = 'LastWriteTime'; Descending = $true })
+Write-Host "Preferred Windows companion executable: $preferredExe"
+if (-not (Test-Path $preferredExe)) {
+  Write-Host "Preferred executable was not found. Searching under: $releaseRoot" -ForegroundColor Yellow
+  $fallback = Get-ChildItem $releaseRoot -Recurse -Filter 'Threadline.Windows.exe' -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -notmatch '\\ref\\|\\refint\\|\\obj\\' } |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
 
-if ($candidates.Count -eq 0) {
-  throw "Windows companion executable was not found under: $releaseRoot"
+  if ($null -eq $fallback) {
+    throw "Windows companion executable was not found under: $releaseRoot"
+  }
+
+  $preferredExe = $fallback.FullName
 }
 
-Write-Host 'Found executable candidates:'
-foreach ($candidate in $candidates) {
-  $label = if ($candidate.IsWinX64) { 'preferred' } else { 'fallback' }
-  Write-Host " - [$label] $($candidate.FullName) [$($candidate.LastWriteTime)]"
-}
-
-$exe = $candidates | Select-Object -First 1
-Write-Host "Launching Threadline Windows companion: $($exe.FullName)"
+Write-Host "Launching Threadline Windows companion: $preferredExe"
 Write-Host "Startup log: $logPath"
 
 $existing = @(Get-Process Threadline.Windows -ErrorAction SilentlyContinue)
 if ($existing.Count -gt 0) {
-  Write-Host "Existing Threadline.Windows process(es) detected: $($existing.Id -join ', ')"
+  Write-Host "Stopping existing Threadline.Windows process(es): $($existing.Id -join ', ')" -ForegroundColor Yellow
+  $existing | Stop-Process -Force
+  Start-Sleep -Seconds 1
 }
 
-$process = Start-Process -FilePath $exe.FullName -WorkingDirectory $exe.DirectoryName -PassThru
-Start-Sleep -Seconds 3
+if (Test-Path $logPath) {
+  Remove-Item $logPath -Force -ErrorAction SilentlyContinue
+}
+
+$workingDirectory = Split-Path -Parent $preferredExe
+$process = Start-Process -FilePath $preferredExe -WorkingDirectory $workingDirectory -PassThru
+Start-Sleep -Seconds 4
 
 $running = Get-Process -Id $process.Id -ErrorAction SilentlyContinue
 if ($null -eq $running -or $running.HasExited) {
   $exitCode = if ($null -ne $running) { $running.ExitCode } else { $process.ExitCode }
   Write-Host "Threadline.Windows exited immediately with code $exitCode." -ForegroundColor Yellow
   if (Test-Path $logPath) {
-    Write-Host 'Last 120 lines from startup log:' -ForegroundColor Yellow
-    Get-Content $logPath -Tail 120
+    Write-Host 'Last 160 lines from startup log:' -ForegroundColor Yellow
+    Get-Content $logPath -Tail 160
   }
   else {
     Write-Host 'No startup log was found.' -ForegroundColor Yellow
