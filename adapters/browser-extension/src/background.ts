@@ -9,7 +9,7 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   try {
     if (!tab) throw new Error('No tab was available from context menu.');
-    if (info.menuItemId === 'threadline-send-selection') await sendBrowserContext(tab, 'selection');
+    if (info.menuItemId === 'threadline-send-selection') await sendBrowserContext(tab, 'selection', info.selectionText);
     if (info.menuItemId === 'threadline-send-page') await sendBrowserContext(tab, 'page');
   } catch (error) {
     console.error(error);
