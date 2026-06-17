@@ -1,6 +1,6 @@
 {
   "name": "threadline-browser-extension",
-  "version": "0.1.0",
+  "version": "10.8.2",
   "private": true,
   "type": "module",
   "scripts": { "build": "tsc -p tsconfig.json" },
