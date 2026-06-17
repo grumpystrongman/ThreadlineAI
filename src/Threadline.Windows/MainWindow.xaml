@@ -26,28 +26,33 @@
         <TextBlock x:Name="SessionText" Text="No active Threadline session." TextWrapping="Wrap" />
       </StackPanel>
       <StackPanel Grid.Column="1" Spacing="8">
-        <TextBlock Text="Attached Window" FontSize="16" FontWeight="SemiBold" />
-        <TextBlock x:Name="CurrentWindowText" Text="No attached window." TextWrapping="Wrap" />
+        <TextBlock Text="Target Window" FontSize="16" FontWeight="SemiBold" />
+        <TextBlock x:Name="CurrentWindowText" Text="No target window." TextWrapping="Wrap" />
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <Button Content="Refresh Target" Click="RefreshWindow_Click" />
-          <Button Content="Attach Target in 3s" Click="AttachWindow_Click" />
-          <Button Content="Preview Window Context" Click="PreviewWindow_Click" />
-          <Button Content="Store Window Context" Click="StoreWindow_Click" />
-          <Button Content="Capture Native UI in 3s" Click="PreviewNativeUi_Click" />
+          <Button Content="Refresh Open Apps" Click="RefreshOpenWindows_Click" />
+          <Button Content="Focus Selected App" Click="FocusSelectedWindow_Click" />
+          <Button Content="Attach Target" Click="AttachWindow_Click" />
+          <Button Content="Capture Selected App" Click="PreviewNativeUi_Click" />
+          <Button Content="Preview Context" Click="PreviewWindow_Click" />
+          <Button Content="Store Context" Click="StoreWindow_Click" />
         </StackPanel>
       </StackPanel>
     </Grid>
 
-    <Grid Grid.Row="2" ColumnDefinitions="2*,3*" ColumnSpacing="16">
+    <Grid Grid.Row="2" ColumnDefinitions="2*,2*,3*" ColumnSpacing="16">
       <StackPanel Spacing="8">
+        <TextBlock Text="Open Apps" FontSize="18" FontWeight="SemiBold" />
+        <ListView x:Name="OpenWindowsList" MinHeight="440" SelectionMode="Single" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Spacing="8">
         <TextBlock Text="Timeline" FontSize="18" FontWeight="SemiBold" />
         <ListView x:Name="TimelineList" MinHeight="440" />
       </StackPanel>
-      <Grid Grid.Column="1" RowDefinitions="*,Auto,Auto" RowSpacing="10">
+      <Grid Grid.Column="2" RowDefinitions="*,Auto,Auto" RowSpacing="10">
         <ScrollViewer>
-          <TextBlock x:Name="ChatTranscript" Text="Start or use a session, attach a window, then ask Threadline about the active session." TextWrapping="Wrap" />
+          <TextBlock x:Name="ChatTranscript" Text="Start or use a session, pick an open app, then ask Threadline about that target." TextWrapping="Wrap" />
         </ScrollViewer>
-        <TextBox x:Name="QuestionBox" Grid.Row="1" PlaceholderText="Ask about this session or attached window..." AcceptsReturn="True" MinHeight="72" TextWrapping="Wrap" />
+        <TextBox x:Name="QuestionBox" Grid.Row="1" PlaceholderText="Ask about the selected app or session..." AcceptsReturn="True" MinHeight="72" TextWrapping="Wrap" />
         <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
           <Button Content="Ask / Compose Prompt" Click="Ask_Click" />
           <Button Content="Propose Insert Action" Click="ProposeInsert_Click" />
