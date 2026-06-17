@@ -27,6 +27,11 @@ try {
     Invoke-CheckedCommand npm install
   }
 
+  Write-Host 'Cleaning browser extension dist...'
+  if (Test-Path 'dist') {
+    Remove-Item -Recurse -Force 'dist'
+  }
+
   Write-Host 'Building browser extension...'
   Invoke-CheckedCommand npm run build
   Write-Host "Browser extension build complete: $extensionRoot"
