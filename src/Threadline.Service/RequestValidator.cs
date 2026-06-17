@@ -50,6 +50,51 @@ public static class RequestValidator
         return null;
     }
 
+    public static IResult? ValidateWindow(AttachWindowRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.ApplicationName))
+        {
+            return Results.BadRequest(new { error = "Window application name is required." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.ProcessName))
+        {
+            return Results.BadRequest(new { error = "Window process name is required." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.WindowTitle))
+        {
+            return Results.BadRequest(new { error = "Window title is required." });
+        }
+
+        return null;
+    }
+
+    public static IResult? ValidateWindowAction(ProposeWindowActionRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Description))
+        {
+            return Results.BadRequest(new { error = "Window action description is required." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Payload))
+        {
+            return Results.BadRequest(new { error = "Window action payload is required." });
+        }
+
+        return null;
+    }
+
+    public static IResult? ValidateActionId(string? actionId)
+    {
+        if (string.IsNullOrWhiteSpace(actionId) || !actionId.StartsWith("act_", StringComparison.Ordinal))
+        {
+            return Results.BadRequest(new { error = "A valid Threadline window action id is required." });
+        }
+
+        return null;
+    }
+
     public static IResult? ValidateQuestion(string? question)
     {
         if (string.IsNullOrWhiteSpace(question))
