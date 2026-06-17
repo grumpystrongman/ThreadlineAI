@@ -15,7 +15,7 @@ export async function getPageContext(tabId: number): Promise<ThreadlinePageConte
   const settings = await getSettings();
   const injected = await chrome.scripting.executeScript({
     target: { tabId },
-    func: (maxCharacters: number) => {
+    func: async (maxCharacters: number) => {
       const compact = (value: string | null | undefined) => value?.replace(/\s+/g, ' ').trim() ?? '';
       const read = (selector: string) => Array.from(document.querySelectorAll(selector)).map(element => compact((element as HTMLElement).innerText || element.textContent)).filter(Boolean).join('\n');
       const cleanGoogleChrome = (value: string) => value
@@ -23,7 +23,7 @@ export async function getPageContext(tabId: number): Promise<ThreadlinePageConte
         .replace(/\bFile\b\s*\bEdit\b\s*\bView\b\s*\bInsert\b\s*\bFormat\b\s*\bTools\b\s*\bExtensions\b\s*\bHelp\b/gi, ' ')
         .replace(/\bNormal text\b.*?\bShow tabs & outlines\b/gi, ' ')
         .replace(/\bTurn on screen reader support\b.*?\bBanner hidden\b/gi, ' ')
-        .replace(/\b\d\b(?:\s+\b\d\b){8,}/g, ' ')
+        .replace(/\b\d\b(?:\s+\b\d\b){4,}/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 
@@ -33,9 +33,26 @@ export async function getPageContext(tabId: number): Promise<ThreadlinePageConte
       let extractionMode = 'body';
 
       if (host === 'docs.google.com' && location.pathname.includes('/document/')) {
-        const docsText = read('.kix-lineview-content, .kix-wordhtmlgenerator-word-node, .docs-editor-container [aria-label], [role="textbox"]');
-        extracted = cleanGoogleChrome(docsText || compact(document.body?.innerText));
-        extractionMode = 'google-docs';
+        const docId = location.pathname.match(/\/document\/d\/([^/]+)/)?.[1] ?? '';
+        if (docId) {
+          try {
+            const response = await fetch(`/document/d/${docId}/export?format=txt`, { credentials: 'include' });
+            const exported = await response.text();
+            const looksLikeHtml = /^\s*</.test(exported) || exported.includes('<html');
+            if (response.ok && exported.trim() && !looksLikeHtml) {
+              extracted = compact(exported);
+              extractionMode = 'google-docs-export';
+            }
+          } catch {
+            extracted = '';
+          }
+        }
+
+        if (!extracted) {
+          const docsText = read('.kix-lineview-content, .kix-wordhtmlgenerator-word-node, .docs-editor-container [aria-label], [role="textbox"]');
+          extracted = cleanGoogleChrome(docsText || compact(document.body?.innerText));
+          extractionMode = 'google-docs-dom';
+        }
       } else if (host === 'mail.google.com') {
         const gmailText = read('[role="main"], .aeF, .AO');
         extracted = compact(gmailText || document.body?.innerText);
@@ -69,7 +86,7 @@ export async function getPageContext(tabId: number): Promise<ThreadlinePageConte
 export function buildBrowserContent(context: ThreadlinePageContext, mode: BrowserContextMode): string {
   const selected = context.selection?.trim();
   const body = mode === 'selection' && selected ? selected : context.visibleText;
-  return [`Title: ${context.title}`, `URL: ${context.url}`, '', body].join('\n').trim();
+  return [`Title: ${context.title}`, `URL: ${context.url}`, `Extraction: ${context.metadata?.extractionMode ?? 'unknown'}`, '', body].join('\n').trim();
 }
 
 export async function sendBrowserContext(tab: chrome.tabs.Tab, mode: BrowserContextMode): Promise<void> {
