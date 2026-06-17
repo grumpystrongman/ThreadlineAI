@@ -33,6 +33,7 @@
           <Button Content="Attach Window" Click="AttachWindow_Click" />
           <Button Content="Preview Window Context" Click="PreviewWindow_Click" />
           <Button Content="Store Window Context" Click="StoreWindow_Click" />
+          <Button Content="Preview Native UI" Click="PreviewNativeUi_Click" />
         </StackPanel>
       </StackPanel>
     </Grid>
