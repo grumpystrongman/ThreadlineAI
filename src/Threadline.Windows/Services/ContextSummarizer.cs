@@ -68,6 +68,39 @@ public sealed class ContextSummarizer
             result.ToDisplayText());
     }
 
+    public SummarizedContext SummarizePlainText(string title, string source, string text)
+    {
+        var cleanedLines = text
+            .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var keyDetails = cleanedLines.Take(12).ToList();
+        var summaryText = string.Join(" ", cleanedLines.Take(10));
+        if (summaryText.Length > 1200)
+        {
+            summaryText = summaryText[..1200].TrimEnd() + "...";
+        }
+
+        if (string.IsNullOrWhiteSpace(summaryText))
+        {
+            summaryText = "The approved text source was empty.";
+        }
+        else
+        {
+            summaryText = $"Threadline captured approved text from {source}. The content appears to focus on: {summaryText}";
+        }
+
+        return new SummarizedContext(
+            title,
+            source,
+            summaryText,
+            keyDetails,
+            [],
+            text);
+    }
+
     private static IEnumerable<string> CleanLines(string content)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
