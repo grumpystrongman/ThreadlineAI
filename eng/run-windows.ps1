@@ -13,7 +13,8 @@ $logPath = Join-Path $env:LOCALAPPDATA 'ThreadlineAI\logs\Threadline.Windows.log
 Write-Host "Searching for Threadline.Windows.exe under: $releaseRoot"
 $candidates = @(Get-ChildItem $releaseRoot -Recurse -Filter 'Threadline.Windows.exe' -ErrorAction SilentlyContinue |
   Where-Object { $_.FullName -notmatch '\\ref\\|\\refint\\|\\obj\\' } |
-  Sort-Object @{ Expression = { if ($_.FullName -match '\\win-x64\\') { 0 } else { 1 } } }, LastWriteTime -Descending)
+  Select-Object *, @{ Name = 'IsWinX64'; Expression = { $_.FullName -match '\\win-x64\\' } } |
+  Sort-Object @{ Expression = 'IsWinX64'; Descending = $true }, @{ Expression = 'LastWriteTime'; Descending = $true })
 
 if ($candidates.Count -eq 0) {
   throw "Windows companion executable was not found under: $releaseRoot"
@@ -21,7 +22,8 @@ if ($candidates.Count -eq 0) {
 
 Write-Host 'Found executable candidates:'
 foreach ($candidate in $candidates) {
-  Write-Host " - $($candidate.FullName) [$($candidate.LastWriteTime)]"
+  $label = if ($candidate.IsWinX64) { 'preferred' } else { 'fallback' }
+  Write-Host " - [$label] $($candidate.FullName) [$($candidate.LastWriteTime)]"
 }
 
 $exe = $candidates | Select-Object -First 1
