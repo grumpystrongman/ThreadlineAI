@@ -7,11 +7,13 @@ namespace Threadline.Windows;
 public sealed partial class MainWindow : Window
 {
     private readonly ActiveWindowMonitor _activeWindowMonitor = new();
+    private readonly NativeUiAutomationReader _nativeUiAutomationReader = new();
     private readonly ThreadlineLocalClient _client = new();
     private ActiveWindowSnapshot? _lastForegroundWindow;
     private ThreadlineSessionDto? _session;
     private WindowAttachmentDto? _attachment;
     private WindowActionDto? _lastAction;
+    private NativeUiAutomationResult? _lastNativeUiResult;
 
     public MainWindow()
     {
@@ -27,6 +29,7 @@ public sealed partial class MainWindow : Window
     private async void AttachWindow_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(AttachWindowAsync);
     private async void PreviewWindow_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(PreviewWindowAsync);
     private async void StoreWindow_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(StoreWindowAsync);
+    private async void PreviewNativeUi_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(PreviewNativeUiAsync);
     private async void Ask_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(AskAsync);
     private async void ProposeInsert_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(ProposeInsertActionAsync);
     private async void CompleteLastAction_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(CompleteLastActionAsync);
@@ -91,13 +94,25 @@ public sealed partial class MainWindow : Window
         AppendTranscript("Threadline", $"Stored current-window context:\n{stored.Content}");
     }
 
+    private Task PreviewNativeUiAsync()
+    {
+        EnsureSession();
+        RefreshActiveWindow();
+        _lastNativeUiResult = _nativeUiAutomationReader.ReadForegroundWindow();
+        AppendTranscript("Native UI Preview", _lastNativeUiResult.ToDisplayText());
+        AddTimeline(_lastNativeUiResult.Success ? "Previewed native UI Automation context." : "Native UI Automation preview found no readable context.");
+        return Task.CompletedTask;
+    }
+
     private async Task AskAsync()
     {
         EnsureSession();
         var question = QuestionBox.Text?.Trim();
         if (string.IsNullOrWhiteSpace(question)) return;
 
-        var currentWindow = _attachment is not null ? FormatAttachment(_attachment) : _lastForegroundWindow?.ToDisplayText();
+        var currentWindow = _lastNativeUiResult is { Success: true }
+            ? _lastNativeUiResult.ToDisplayText()
+            : _attachment is not null ? FormatAttachment(_attachment) : _lastForegroundWindow?.ToDisplayText();
         AppendTranscript("You", question);
         var messages = await _client.ComposePromptAsync(_session!.Id, question, currentWindow);
         AppendTranscript("Threadline Prompt", string.Join("\n\n---\n\n", messages.Select(message => $"{message.Role}:\n{message.Content}")));
