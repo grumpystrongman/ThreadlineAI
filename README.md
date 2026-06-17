@@ -15,6 +15,7 @@ ThreadlineAI is in early alpha engineering.
 - Phase 5: secure local provider credential storage is in place.
 - Phase 6: window attachment and action proposal service APIs are in place.
 - Phase 7: first Windows companion UI is in place for service connection, session start/use, foreground-window attachment, preview/store context, prompt composition, and action proposal tracking.
+- Phase 8: browser extension bridge is in place for user-triggered page/selection capture into the active Threadline session through the local service.
 
 ## What is in this scaffold
 
@@ -22,7 +23,7 @@ ThreadlineAI is in early alpha engineering.
 - Infrastructure for SQLite persistence, in-memory adapter registration, in-memory testing, secure local secret storage, in-memory window attachment runtime state, and OpenAI-compatible HTTP providers.
 - Local service API for adapters and the Windows shell.
 - Windows companion UI scaffold wired to the local service for session, window attachment, context preview/storage, prompt composition, and action proposal flows.
-- Browser extension skeleton for Chrome/Edge context capture through native messaging.
+- Browser extension bridge for Chrome/Edge user-triggered page and selected-text capture into the active Threadline session.
 - PowerShell transcript adapter scripts.
 - Privacy/security design notes and implementation roadmap.
 
@@ -77,6 +78,12 @@ Build the Windows companion UI separately:
 
 ```powershell
 ./eng/build-windows.ps1
+```
+
+Build the browser extension:
+
+```powershell
+./eng/build-browser-extension.ps1
 ```
 
 Run the local service:
