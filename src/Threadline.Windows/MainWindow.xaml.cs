@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Threadline.Windows.Services;
 
 namespace Threadline.Windows;
@@ -6,14 +7,178 @@ namespace Threadline.Windows;
 public sealed partial class MainWindow : Window
 {
     private readonly ActiveWindowMonitor _activeWindowMonitor = new();
-    public MainWindow() { InitializeComponent(); RefreshActiveWindow(); }
-    private void StartSession_Click(object sender, RoutedEventArgs e) { TimelineList.Items.Add($"{DateTimeOffset.Now:t} Session started"); RefreshActiveWindow(); }
-    private void Ask_Click(object sender, RoutedEventArgs e)
+    private readonly ThreadlineLocalClient _client = new();
+    private ActiveWindowSnapshot? _lastForegroundWindow;
+    private ThreadlineSessionDto? _session;
+    private WindowAttachmentDto? _attachment;
+    private WindowActionDto? _lastAction;
+
+    public MainWindow()
     {
+        InitializeComponent();
+        RefreshActiveWindow();
+        _ = CheckServiceAsync();
+    }
+
+    private async void CheckService_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(CheckServiceAsync);
+    private async void StartSession_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(StartSessionAsync);
+    private async void UseActiveSession_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(UseActiveSessionAsync);
+    private void RefreshWindow_Click(object sender, RoutedEventArgs e) => RefreshActiveWindow();
+    private async void AttachWindow_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(AttachWindowAsync);
+    private async void PreviewWindow_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(PreviewWindowAsync);
+    private async void StoreWindow_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(StoreWindowAsync);
+    private async void Ask_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(AskAsync);
+    private async void ProposeInsert_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(ProposeInsertActionAsync);
+    private async void CompleteLastAction_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(CompleteLastActionAsync);
+    private void ClearTranscript_Click(object sender, RoutedEventArgs e) => ChatTranscript.Text = "Transcript cleared.";
+
+    private async Task CheckServiceAsync()
+    {
+        var health = await _client.GetHealthAsync();
+        ServiceStatusText.Text = $"Service: {health.Status} / {health.Storage}";
+        AddTimeline($"Service connected: {health.Service}");
+    }
+
+    private async Task StartSessionAsync()
+    {
+        var provider = GetSelectedProvider();
+        _session = await _client.StartSessionAsync($"Windows companion session {DateTimeOffset.Now:g}", provider);
+        SessionText.Text = $"{_session.Name}\nID: {_session.Id}\nProvider: {_session.ActiveProvider ?? provider}\nStatus: {_session.Status}";
+        AddTimeline($"Started session {_session.Id}");
+    }
+
+    private async Task UseActiveSessionAsync()
+    {
+        _session = await _client.GetActiveSessionAsync();
+        if (_session is null)
+        {
+            SessionText.Text = "No active Threadline session found.";
+            AddTimeline("No active session found.");
+            return;
+        }
+
+        SessionText.Text = $"{_session.Name}\nID: {_session.Id}\nProvider: {_session.ActiveProvider ?? "None"}\nStatus: {_session.Status}";
+        AddTimeline($"Using active session {_session.Id}");
+    }
+
+    private async Task AttachWindowAsync()
+    {
+        EnsureSession();
+        RefreshActiveWindow();
+        if (_lastForegroundWindow is null)
+        {
+            throw new InvalidOperationException("No foreground window snapshot is available.");
+        }
+
+        _attachment = await _client.AttachWindowAsync(_session!.Id, _lastForegroundWindow);
+        CurrentWindowText.Text = FormatAttachment(_attachment);
+        AddTimeline($"Attached window {_attachment.Snapshot.ApplicationName}: {_attachment.Snapshot.WindowTitle}");
+    }
+
+    private async Task PreviewWindowAsync()
+    {
+        EnsureSession();
+        var preview = await _client.PreviewCurrentWindowAsync(_session!.Id, userApproved: true);
+        AppendTranscript("Threadline Preview", $"Will store: {preview.WillBeStored}\nConsent: {preview.ConsentState}\nContent:\n{preview.RedactedContent}\nWarnings: {string.Join("; ", preview.Warnings)}");
+        AddTimeline("Previewed attached-window context.");
+    }
+
+    private async Task StoreWindowAsync()
+    {
+        EnsureSession();
+        var stored = await _client.StoreCurrentWindowAsync(_session!.Id, userApproved: true);
+        AddTimeline($"Stored attached-window context {stored.Id}");
+        AppendTranscript("Threadline", $"Stored current-window context:\n{stored.Content}");
+    }
+
+    private async Task AskAsync()
+    {
+        EnsureSession();
         var question = QuestionBox.Text?.Trim();
         if (string.IsNullOrWhiteSpace(question)) return;
-        ChatTranscript.Text += $"\n\nYou: {question}\nThreadline: Local service integration is the next implementation step.";
+
+        var currentWindow = _attachment is not null ? FormatAttachment(_attachment) : _lastForegroundWindow?.ToDisplayText();
+        AppendTranscript("You", question);
+        var messages = await _client.ComposePromptAsync(_session!.Id, question, currentWindow);
+        AppendTranscript("Threadline Prompt", string.Join("\n\n---\n\n", messages.Select(message => $"{message.Role}:\n{message.Content}")));
         QuestionBox.Text = string.Empty;
+        AddTimeline("Composed session prompt.");
     }
-    private void RefreshActiveWindow() => CurrentWindowText.Text = _activeWindowMonitor.GetActiveWindowSnapshot().ToDisplayText();
+
+    private async Task ProposeInsertActionAsync()
+    {
+        EnsureSession();
+        var payload = QuestionBox.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            payload = "Threadline generated text placeholder.";
+        }
+
+        _lastAction = await _client.ProposeInsertActionAsync(_session!.Id, payload, userApproved: true);
+        AddTimeline($"Proposed and approved action {_lastAction.Id}: {_lastAction.Kind}");
+        AppendTranscript("Threadline Action", $"Action {_lastAction.Id}\nStatus: {_lastAction.Status}\nPayload:\n{_lastAction.Payload}");
+    }
+
+    private async Task CompleteLastActionAsync()
+    {
+        if (_lastAction is null)
+        {
+            AddTimeline("No action to complete.");
+            return;
+        }
+
+        _lastAction = await _client.CompleteActionAsync(_lastAction.Id, "Completed from Windows companion UI.");
+        AddTimeline($"Completed action {_lastAction.Id}");
+        AppendTranscript("Threadline Action", $"Action {_lastAction.Id} marked {_lastAction.Status}.");
+    }
+
+    private void RefreshActiveWindow()
+    {
+        _lastForegroundWindow = _activeWindowMonitor.GetActiveWindowSnapshot();
+        CurrentWindowText.Text = _attachment is null
+            ? _lastForegroundWindow.ToDisplayText()
+            : FormatAttachment(_attachment) + "\n\nForeground now:\n" + _lastForegroundWindow.ToDisplayText();
+    }
+
+    private async Task RunUiActionAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            ServiceStatusText.Text = "Service/action error";
+            AddTimeline("Error: " + ex.Message);
+            AppendTranscript("Error", ex.Message);
+        }
+    }
+
+    private void EnsureSession()
+    {
+        if (_session is null)
+        {
+            throw new InvalidOperationException("Start or load an active session first.");
+        }
+    }
+
+    private string GetSelectedProvider()
+    {
+        if (ProviderBox.SelectedItem is ComboBoxItem item && item.Content is not null)
+        {
+            return item.Content.ToString() ?? "Local";
+        }
+
+        return "Local";
+    }
+
+    private static string FormatAttachment(WindowAttachmentDto attachment) =>
+        $"Attached: {attachment.Snapshot.ApplicationName}\nProcess: {attachment.Snapshot.ProcessName}\nWindow: {attachment.Snapshot.WindowTitle}\nStatus: {attachment.Status}\nAttachment: {attachment.Id}";
+
+    private void AddTimeline(string message) => TimelineList.Items.Add($"{DateTimeOffset.Now:t} {message}");
+
+    private void AppendTranscript(string speaker, string message)
+    {
+        ChatTranscript.Text += $"\n\n{speaker}:\n{message}";
+    }
 }
