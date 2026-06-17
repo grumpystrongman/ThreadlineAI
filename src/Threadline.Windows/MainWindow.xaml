@@ -30,16 +30,12 @@
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Button Content="Refresh Open Apps" Click="RefreshOpenWindows_Click" />
           <Button Content="Use Selected App" Click="UseSelectedWindow_Click" />
-          <Button Content="Attach Selected App" Click="AttachSelectedWindow_Click" />
-          <Button Content="Capture Selected App" Click="CaptureSelectedWindow_Click" />
-          <Button Content="Preview Context" Click="PreviewWindow_Click" />
-          <Button Content="Store Context" Click="StoreWindow_Click" />
         </StackPanel>
       </StackPanel>
     </Grid>
     <Grid Grid.Row="2" ColumnDefinitions="2*,2*,3*" ColumnSpacing="16">
       <StackPanel Spacing="8">
-        <TextBlock Text="Open Apps" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock Text="Open Apps and Tabs" FontSize="18" FontWeight="SemiBold" />
         <ListView x:Name="OpenWindowsList" MinHeight="440" SelectionMode="Single" />
       </StackPanel>
       <StackPanel Grid.Column="1" Spacing="8">
@@ -48,7 +44,7 @@
       </StackPanel>
       <Grid Grid.Column="2" RowDefinitions="*,Auto,Auto" RowSpacing="10">
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-          <TextBox x:Name="ChatTranscript" Text="Start or use a session, pick an open app, then ask Threadline about that target." TextWrapping="Wrap" AcceptsReturn="True" IsReadOnly="True" />
+          <TextBox x:Name="ChatTranscript" Text="Start or use a session, pick an open app/tab, then ask Threadline about that target." TextWrapping="Wrap" AcceptsReturn="True" IsReadOnly="True" />
         </ScrollViewer>
         <TextBox x:Name="QuestionBox" Grid.Row="1" PlaceholderText="Ask about the selected app or session..." AcceptsReturn="True" MinHeight="72" TextWrapping="Wrap" />
         <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
