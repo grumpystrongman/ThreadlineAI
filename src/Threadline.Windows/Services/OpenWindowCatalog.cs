@@ -6,6 +6,11 @@ namespace Threadline.Windows.Services;
 
 public sealed class OpenWindowCatalog
 {
+    private static readonly string[] PreferredProcesses =
+    [
+        "notepad", "chrome", "msedge", "onenote", "code", "windowsterminal", "powershell", "pwsh", "cmd", "winword", "excel", "powerpnt"
+    ];
+
     public IReadOnlyList<ActiveWindowSnapshot> ListOpenWindows()
     {
         var currentProcessId = Environment.ProcessId;
@@ -24,9 +29,17 @@ public sealed class OpenWindowCatalog
         return windows
             .GroupBy(window => window.Handle)
             .Select(group => group.First())
-            .OrderBy(window => window.ApplicationName, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(window => GetPriority(window.ProcessName))
+            .ThenBy(window => window.ApplicationName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(window => window.WindowTitle, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private static int GetPriority(string? processName)
+    {
+        if (string.IsNullOrWhiteSpace(processName)) return 100;
+        var index = Array.FindIndex(PreferredProcesses, process => string.Equals(process, processName, StringComparison.OrdinalIgnoreCase));
+        return index < 0 ? 100 : index;
     }
 
     private static string? GetWindowTitle(nint handle)
