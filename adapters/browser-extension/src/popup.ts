@@ -1,12 +1,12 @@
 type PopupResponse = { ok: boolean; error?: string; health?: unknown };
 
-const status = document.querySelector<HTMLParagraphElement>('#status')!;
+const statusElement = document.querySelector<HTMLParagraphElement>('#status')!;
 const testConnection = document.querySelector<HTMLButtonElement>('#testConnection')!;
 const sendPage = document.querySelector<HTMLButtonElement>('#sendPage')!;
 const sendSelection = document.querySelector<HTMLButtonElement>('#sendSelection')!;
 
 function setStatus(message: string): void {
-  status.textContent = message;
+  statusElement.textContent = message;
 }
 
 function sendMessage(message: unknown): Promise<PopupResponse> {
