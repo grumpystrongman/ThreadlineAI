@@ -13,10 +13,36 @@ export type BrowserContextMode = 'selection' | 'page';
 
 export async function getPageContext(tabId: number): Promise<ThreadlinePageContext> {
   const settings = await getSettings();
-  return await chrome.tabs.sendMessage(tabId, {
-    type: 'THREADLINE_GET_PAGE_CONTEXT',
-    maxCharacters: settings.maxCharacters
-  });
+  try {
+    return await chrome.tabs.sendMessage(tabId, {
+      type: 'THREADLINE_GET_PAGE_CONTEXT',
+      maxCharacters: settings.maxCharacters
+    });
+  } catch {
+    const injected = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (maxCharacters: number) => {
+        const compact = (value: string | null | undefined) => value?.replace(/\s+/g, ' ').trim() ?? '';
+        const bodyText = compact(document.body?.innerText).slice(0, maxCharacters);
+        return {
+          title: document.title,
+          url: location.href,
+          selection: compact(window.getSelection()?.toString()),
+          visibleText: bodyText,
+          capturedAt: new Date().toISOString(),
+          metadata: {
+            origin: location.origin,
+            host: location.host
+          }
+        };
+      },
+      args: [settings.maxCharacters]
+    });
+
+    const context = injected[0]?.result as ThreadlinePageContext | undefined;
+    if (!context) throw new Error('Browser page context could not be collected from this tab. Try a normal https:// page and reload the tab after loading the extension.');
+    return context;
+  }
 }
 
 export function buildBrowserContent(context: ThreadlinePageContext, mode: BrowserContextMode): string {
@@ -27,6 +53,10 @@ export function buildBrowserContent(context: ThreadlinePageContext, mode: Browse
 
 export async function sendBrowserContext(tab: chrome.tabs.Tab, mode: BrowserContextMode): Promise<void> {
   if (!tab.id) throw new Error('No active tab id was available.');
+  if (!tab.url || !/^https?:\/\//i.test(tab.url)) {
+    throw new Error('Threadline can only capture normal http/https pages. Browser settings, extension pages, new-tab pages, and store pages are blocked by the browser.');
+  }
+
   const sessionId = await getActiveSessionId();
   const pageContext = await getPageContext(tab.id);
   const content = buildBrowserContent(pageContext, mode);
