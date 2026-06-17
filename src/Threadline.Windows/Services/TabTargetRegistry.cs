@@ -5,7 +5,7 @@ public enum ThreadlineTargetKind
     Window,
     Tab,
     Document,
-    TerminalTab,
+    ShellTab,
     BrowserTab
 }
 
@@ -40,8 +40,7 @@ public sealed class TabTargetRegistry
     private readonly IReadOnlyList<ITabProvider> _providers =
     [
         new NotepadTabProvider(),
-        new BrowserTabProvider(),
-        new TerminalTabProvider()
+        new BrowserTabProvider()
     ];
 
     public IReadOnlyList<ThreadlineTarget> ListTargets()
