@@ -16,6 +16,7 @@ ThreadlineAI is in early alpha engineering.
 - Phase 6: window attachment and action proposal service APIs are in place.
 - Phase 7: first Windows companion UI is in place for service connection, session start/use, foreground-window attachment, preview/store context, prompt composition, and action proposal tracking.
 - Phase 8: browser extension bridge is in place for user-triggered page/selection capture into the active Threadline session through the local service.
+- Phase 9: PowerShell terminal adapter is in place for explicit terminal context capture, command-output capture, and command action tracking.
 
 ## What is in this scaffold
 
@@ -24,7 +25,7 @@ ThreadlineAI is in early alpha engineering.
 - Local service API for adapters and the Windows shell.
 - Windows companion UI scaffold wired to the local service for session, window attachment, context preview/storage, prompt composition, and action proposal flows.
 - Browser extension bridge for Chrome/Edge user-triggered page and selected-text capture into the active Threadline session.
-- PowerShell transcript adapter scripts.
+- PowerShell terminal adapter module for user-triggered terminal notes, transcript excerpts, command-output capture, and action tracking.
 - Privacy/security design notes and implementation roadmap.
 
 ## Target MVP
@@ -51,7 +52,7 @@ src/
   Threadline.Windows/        Windows companion shell/panel scaffold
 adapters/
   browser-extension/         Chrome/Edge extension scaffold
-  powershell/                PowerShell transcript adapter scripts
+  powershell/                PowerShell terminal adapter module
 docs/
   Architecture, provider, privacy, roadmap, and service API notes
 tests/
@@ -84,6 +85,12 @@ Build the browser extension:
 
 ```powershell
 ./eng/build-browser-extension.ps1
+```
+
+Run the PowerShell adapter smoke test after starting the local service:
+
+```powershell
+./eng/smoke-powershell-adapter.ps1 -BaseUrl http://localhost:5057
 ```
 
 Run the local service:
