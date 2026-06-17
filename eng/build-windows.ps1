@@ -16,34 +16,70 @@ function Invoke-CheckedCommand {
   }
 }
 
-function Get-DotnetSdkBasePath {
-  $basePathLine = dotnet --info | Select-String -Pattern '^\s*Base Path:\s*(.+)$' | Select-Object -First 1
-  if ($null -eq $basePathLine) {
-    throw 'Could not determine the .NET SDK Base Path from dotnet --info.'
+function Get-VisualStudioInstallPath {
+  $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+  if (-not (Test-Path $vswhere)) {
+    return $null
   }
 
-  return $basePathLine.Matches[0].Groups[1].Value.Trim()
+  $installPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
+  if ([string]::IsNullOrWhiteSpace($installPath)) {
+    return $null
+  }
+
+  return $installPath.Trim()
+}
+
+function Get-VisualStudioMsBuildPath {
+  $installPath = Get-VisualStudioInstallPath
+  if ([string]::IsNullOrWhiteSpace($installPath)) {
+    return $null
+  }
+
+  $candidates = @(
+    (Join-Path $installPath 'MSBuild\Current\Bin\MSBuild.exe'),
+    (Join-Path $installPath 'MSBuild\Current\Bin\amd64\MSBuild.exe')
+  )
+
+  foreach ($candidate in $candidates) {
+    if (Test-Path $candidate) {
+      return $candidate
+    }
+  }
+
+  return $null
 }
 
 function Test-WindowsAppSdkBuildTasks {
-  $sdkBasePath = Get-DotnetSdkBasePath
-  $priTaskPath = Join-Path $sdkBasePath 'Microsoft\VisualStudio\v17.0\AppxPackage\Microsoft.Build.Packaging.Pri.Tasks.dll'
-
-  if (-not (Test-Path $priTaskPath)) {
-    Write-Host ''
-    Write-Host 'Threadline.Windows uses WinUI 3 / Windows App SDK.' -ForegroundColor Yellow
-    Write-Host 'This machine is missing the Visual Studio Windows app packaging PRI build task:' -ForegroundColor Yellow
-    Write-Host "  $priTaskPath" -ForegroundColor Yellow
-    Write-Host ''
-    Write-Host 'Install or modify Visual Studio 2022 / Build Tools with these workloads/components:' -ForegroundColor Yellow
-    Write-Host '  - .NET desktop development' -ForegroundColor Yellow
-    Write-Host '  - Universal Windows Platform development / Windows application development tools' -ForegroundColor Yellow
-    Write-Host '  - Windows 10/11 SDK and MSIX packaging tools' -ForegroundColor Yellow
-    Write-Host ''
-    Write-Host 'VS Code is fine as the editor, but WinUI still needs these Visual Studio build tools.' -ForegroundColor Yellow
-    Write-Host 'After install, reopen PowerShell and rerun ./eng/build-windows.ps1.' -ForegroundColor Yellow
-    throw 'Missing Visual Studio Windows App SDK packaging build tasks required for WinUI.'
+  $installPath = Get-VisualStudioInstallPath
+  $vsPriTaskPath = $null
+  if (-not [string]::IsNullOrWhiteSpace($installPath)) {
+    $vsPriTaskPath = Join-Path $installPath 'MSBuild\Microsoft\VisualStudio\v17.0\AppxPackage\Microsoft.Build.Packaging.Pri.Tasks.dll'
   }
+
+  if ($vsPriTaskPath -and (Test-Path $vsPriTaskPath)) {
+    return
+  }
+
+  Write-Host ''
+  Write-Host 'Threadline.Windows uses WinUI 3 / Windows App SDK.' -ForegroundColor Yellow
+  Write-Host 'This machine is missing the Visual Studio Windows app packaging PRI build task.' -ForegroundColor Yellow
+  if ($vsPriTaskPath) {
+    Write-Host 'Expected Visual Studio task path:' -ForegroundColor Yellow
+    Write-Host "  $vsPriTaskPath" -ForegroundColor Yellow
+  }
+  else {
+    Write-Host 'No Visual Studio / Build Tools MSBuild installation was found by vswhere.' -ForegroundColor Yellow
+  }
+  Write-Host ''
+  Write-Host 'Install or modify Visual Studio 2022 / Build Tools with these workloads/components:' -ForegroundColor Yellow
+  Write-Host '  - .NET desktop development' -ForegroundColor Yellow
+  Write-Host '  - Universal Windows Platform development / Windows application development tools' -ForegroundColor Yellow
+  Write-Host '  - Windows 10/11 SDK and MSIX packaging tools' -ForegroundColor Yellow
+  Write-Host ''
+  Write-Host 'VS Code is fine as the editor, but WinUI still needs these Visual Studio build tools.' -ForegroundColor Yellow
+  Write-Host 'After install, reopen PowerShell and rerun ./eng/build-windows.ps1.' -ForegroundColor Yellow
+  throw 'Missing Visual Studio Windows App SDK packaging build tasks required for WinUI.'
 }
 
 Write-Host 'Checking .NET SDK availability...'
@@ -52,10 +88,17 @@ Invoke-CheckedCommand dotnet --list-sdks
 Write-Host 'Checking WinUI / Windows App SDK build prerequisites...'
 Test-WindowsAppSdkBuildTasks
 
+$msbuild = Get-VisualStudioMsBuildPath
+if ([string]::IsNullOrWhiteSpace($msbuild)) {
+  throw 'Visual Studio MSBuild.exe was not found. Install Visual Studio 2022 Build Tools or Visual Studio Community with Windows app development tools.'
+}
+
+Write-Host "Using Visual Studio MSBuild: $msbuild"
+
 Write-Host 'Restoring Threadline Windows companion...'
-Invoke-CheckedCommand dotnet restore src/Threadline.Windows/Threadline.Windows.csproj
+Invoke-CheckedCommand $msbuild src/Threadline.Windows/Threadline.Windows.csproj /t:Restore /p:Configuration=Release
 
 Write-Host 'Building Threadline Windows companion...'
-Invoke-CheckedCommand dotnet build src/Threadline.Windows/Threadline.Windows.csproj --configuration Release --no-restore
+Invoke-CheckedCommand $msbuild src/Threadline.Windows/Threadline.Windows.csproj /p:Configuration=Release /p:Restore=false
 
 Write-Host 'Windows companion build complete.'
