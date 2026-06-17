@@ -1,6 +1,7 @@
 using Threadline.Core;
 using Threadline.Infrastructure;
 using Threadline.Infrastructure.Security;
+using Threadline.Infrastructure.Windowing;
 
 namespace Threadline.Service;
 
@@ -97,6 +98,100 @@ public static class ThreadlineEndpointMappings
             var events = await repository.GetRecentEventsAsync(sessionId, request.TakeRecentEvents ?? 20, ct);
             var summary = await repository.GetLatestSummaryAsync(sessionId, ct);
             return Results.Ok(promptComposer.Compose(new ThreadlinePromptContext(request.Question.Trim(), request.CurrentWindow, summary, events)));
+        });
+
+        api.MapPost("/sessions/{sessionId}/windows/attach", async (string sessionId, AttachWindowRequest request, WindowAttachmentService windows, IClock clock, CancellationToken ct) =>
+        {
+            var invalidSession = RequestValidator.ValidateSessionId(sessionId);
+            if (invalidSession is not null) return invalidSession;
+            var invalidWindow = RequestValidator.ValidateWindow(request);
+            if (invalidWindow is not null) return invalidWindow;
+
+            var attachment = await windows.AttachAsync(sessionId, request.ToSnapshot(clock.UtcNow), ct);
+            return Results.Created($"/sessions/{sessionId}/windows/{attachment.Id}", attachment);
+        });
+
+        api.MapGet("/sessions/{sessionId}/windows/current", async (string sessionId, WindowAttachmentService windows, CancellationToken ct) =>
+        {
+            var invalidSession = RequestValidator.ValidateSessionId(sessionId);
+            if (invalidSession is not null) return invalidSession;
+
+            var active = await windows.GetActiveAsync(sessionId, ct);
+            IResult result = active is null ? Results.NotFound() : Results.Ok(active);
+            return result;
+        });
+
+        api.MapDelete("/sessions/{sessionId}/windows/current", async (string sessionId, WindowAttachmentService windows, CancellationToken ct) =>
+        {
+            var invalidSession = RequestValidator.ValidateSessionId(sessionId);
+            if (invalidSession is not null) return invalidSession;
+
+            var detached = await windows.DetachAsync(sessionId, ct);
+            IResult result = detached is null ? Results.NotFound() : Results.Ok(detached);
+            return result;
+        });
+
+        api.MapGet("/sessions/{sessionId}/windows", async (string sessionId, int? take, WindowAttachmentService windows, CancellationToken ct) =>
+        {
+            var invalidSession = RequestValidator.ValidateSessionId(sessionId);
+            if (invalidSession is not null) return invalidSession;
+
+            return Results.Ok(await windows.ListAttachmentsAsync(sessionId, take ?? 20, ct));
+        });
+
+        api.MapPost("/sessions/{sessionId}/windows/current/preview", async (string sessionId, StoreWindowContextRequest request, WindowAttachmentService windows, CancellationToken ct) =>
+        {
+            var invalidSession = RequestValidator.ValidateSessionId(sessionId);
+            if (invalidSession is not null) return invalidSession;
+
+            return Results.Ok(await windows.PreviewActiveWindowContextAsync(sessionId, request.UserApproved, ct));
+        });
+
+        api.MapPost("/sessions/{sessionId}/windows/current/store", async (string sessionId, StoreWindowContextRequest request, WindowAttachmentService windows, CancellationToken ct) =>
+        {
+            var invalidSession = RequestValidator.ValidateSessionId(sessionId);
+            if (invalidSession is not null) return invalidSession;
+
+            var saved = await windows.StoreActiveWindowContextAsync(sessionId, request.UserApproved, ct);
+            return Results.Json(saved, statusCode: StatusCodes.Status202Accepted);
+        });
+
+        api.MapPost("/sessions/{sessionId}/actions", async (string sessionId, ProposeWindowActionRequest request, WindowAttachmentService windows, CancellationToken ct) =>
+        {
+            var invalidSession = RequestValidator.ValidateSessionId(sessionId);
+            if (invalidSession is not null) return invalidSession;
+            var invalidAction = RequestValidator.ValidateWindowAction(request);
+            if (invalidAction is not null) return invalidAction;
+
+            var action = await windows.ProposeActionAsync(sessionId, request.Kind, request.Description, request.Payload, request.UserApproved, request.AttachmentId, request.Risk, ct);
+            return Results.Created($"/sessions/{sessionId}/actions/{action.Id}", action);
+        });
+
+        api.MapGet("/sessions/{sessionId}/actions", async (string sessionId, int? take, WindowAttachmentService windows, CancellationToken ct) =>
+        {
+            var invalidSession = RequestValidator.ValidateSessionId(sessionId);
+            if (invalidSession is not null) return invalidSession;
+
+            return Results.Ok(await windows.ListActionsAsync(sessionId, take ?? 20, ct));
+        });
+
+        api.MapPost("/actions/{actionId}/approve", async (string actionId, WindowAttachmentService windows, CancellationToken ct) =>
+        {
+            var invalidAction = RequestValidator.ValidateActionId(actionId);
+            if (invalidAction is not null) return invalidAction;
+
+            return Results.Ok(await windows.ApproveActionAsync(actionId, ct));
+        });
+
+        api.MapPost("/actions/{actionId}/complete", async (string actionId, CompleteWindowActionRequest request, WindowAttachmentService windows, CancellationToken ct) =>
+        {
+            var invalidAction = RequestValidator.ValidateActionId(actionId);
+            if (invalidAction is not null) return invalidAction;
+
+            var action = request.Failed
+                ? await windows.FailActionAsync(actionId, request.ResultMessage ?? "Window action failed.", ct)
+                : await windows.CompleteActionAsync(actionId, request.ResultMessage, ct);
+            return Results.Ok(action);
         });
 
         api.MapGet("/providers", async (ProviderConnectionService providers, CancellationToken ct) =>
