@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ThreadlineAI Options</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main>
+    <h1>ThreadlineAI Browser Bridge</h1>
+    <label>
+      Local service URL
+      <input id="baseUrl" type="url" placeholder="http://localhost:5057" />
+    </label>
+    <label>
+      Local access token, optional
+      <input id="localAccessToken" type="password" />
+    </label>
+    <label>
+      Max characters per capture
+      <input id="maxCharacters" type="number" min="1000" max="50000" step="1000" />
+    </label>
+    <button id="save">Save</button>
+    <p id="status">Ready.</p>
+  </main>
+  <script type="module" src="dist/options.js"></script>
+</body>
+</html>
