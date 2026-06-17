@@ -8,6 +8,13 @@ public partial class App : Application
 
     public App()
     {
+        UnhandledException += (_, args) =>
+        {
+            LogMessage("WinUI unhandled exception captured.");
+            LogException(args.Exception);
+            args.Handled = false;
+        };
+
         AppDomain.CurrentDomain.UnhandledException += (_, args) => LogException(args.ExceptionObject as Exception ?? new InvalidOperationException("Unknown non-Exception failure."));
         TaskScheduler.UnobservedTaskException += (_, args) =>
         {
@@ -33,6 +40,7 @@ public partial class App : Application
         {
             LogMessage("Application launch started.");
             _window = new MainWindow();
+            LogMessage("Main window constructed.");
             _window.Activate();
             LogMessage("Main window activated.");
         }
