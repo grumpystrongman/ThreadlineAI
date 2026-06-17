@@ -17,16 +17,44 @@ export async function getPageContext(tabId: number): Promise<ThreadlinePageConte
     target: { tabId },
     func: (maxCharacters: number) => {
       const compact = (value: string | null | undefined) => value?.replace(/\s+/g, ' ').trim() ?? '';
-      const bodyText = compact(document.body?.innerText).slice(0, maxCharacters);
+      const read = (selector: string) => Array.from(document.querySelectorAll(selector)).map(element => compact((element as HTMLElement).innerText || element.textContent)).filter(Boolean).join('\n');
+      const cleanGoogleChrome = (value: string) => value
+        .replace(/\bShare\b.*?\bEditing\b/gi, ' ')
+        .replace(/\bFile\b\s*\bEdit\b\s*\bView\b\s*\bInsert\b\s*\bFormat\b\s*\bTools\b\s*\bExtensions\b\s*\bHelp\b/gi, ' ')
+        .replace(/\bNormal text\b.*?\bShow tabs & outlines\b/gi, ' ')
+        .replace(/\bTurn on screen reader support\b.*?\bBanner hidden\b/gi, ' ')
+        .replace(/\b\d\b(?:\s+\b\d\b){8,}/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      const host = location.host;
+      const selectedText = compact(window.getSelection()?.toString());
+      let extracted = '';
+      let extractionMode = 'body';
+
+      if (host === 'docs.google.com' && location.pathname.includes('/document/')) {
+        const docsText = read('.kix-lineview-content, .kix-wordhtmlgenerator-word-node, .docs-editor-container [aria-label], [role="textbox"]');
+        extracted = cleanGoogleChrome(docsText || compact(document.body?.innerText));
+        extractionMode = 'google-docs';
+      } else if (host === 'mail.google.com') {
+        const gmailText = read('[role="main"], .aeF, .AO');
+        extracted = compact(gmailText || document.body?.innerText);
+        extractionMode = 'gmail';
+      } else {
+        const mainText = read('main, article, [role="main"]');
+        extracted = compact(mainText || document.body?.innerText);
+      }
+
       return {
         title: document.title,
         url: location.href,
-        selection: compact(window.getSelection()?.toString()),
-        visibleText: bodyText,
+        selection: selectedText,
+        visibleText: extracted.slice(0, maxCharacters),
         capturedAt: new Date().toISOString(),
         metadata: {
           origin: location.origin,
-          host: location.host
+          host,
+          extractionMode
         }
       };
     },
@@ -67,7 +95,8 @@ export async function sendBrowserContext(tab: chrome.tabs.Tab, mode: BrowserCont
     metadata: {
       adapter: 'ThreadlineAI Browser Extension',
       capturedAt: pageContext.capturedAt,
-      mode
+      mode,
+      extractionMode: pageContext.metadata?.extractionMode ?? 'unknown'
     }
   });
 
