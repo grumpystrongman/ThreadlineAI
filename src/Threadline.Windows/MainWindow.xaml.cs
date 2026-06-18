@@ -121,16 +121,12 @@ public sealed partial class MainWindow : Window
         var question = QuestionBox.Text?.Trim();
         if (string.IsNullOrWhiteSpace(question)) return;
 
-        var currentWindow = _lastContextSummary is not null
-            ? _lastContextSummary.ToPromptContext()
-            : _lastNativeUiResult is { Success: true }
-                ? _contextSummarizer.SummarizeNativeUi(_lastNativeUiResult).ToPromptContext()
-                : _attachment is not null ? FormatAttachment(_attachment) : _lastForegroundWindow?.ToDisplayText();
+        var currentWindow = await ResolveContextForAskAsync();
         AppendTranscript("You", question);
         var messages = await _client.ComposePromptAsync(_session!.Id, question, currentWindow);
         AppendTranscript("Threadline Prompt", string.Join("\n\n---\n\n", messages.Select(message => $"{message.Role}:\n{message.Content}")));
         QuestionBox.Text = string.Empty;
-        AddTimeline("Composed session prompt with summarized context.");
+        AddTimeline("Composed session prompt with full resolved context.");
     }
 
     private async Task ProposeInsertActionAsync()
