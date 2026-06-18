@@ -44,17 +44,10 @@
 
     <Grid Grid.Row="3" RowDefinitions="Auto,*" RowSpacing="6" MinHeight="360">
       <TextBlock Text="Conversation" FontSize="16" FontWeight="SemiBold" />
-      <TextBox x:Name="ChatTranscript"
-               Grid.Row="1"
-               Text="Start or use a session, pick an app/tab, then ask Threadline about that target."
-               TextWrapping="Wrap"
-               AcceptsReturn="True"
-               IsReadOnly="True"
-               Padding="8,8,8,28"
-               VerticalAlignment="Stretch"
-               ScrollViewer.VerticalScrollBarVisibility="Visible"
-               ScrollViewer.VerticalScrollMode="Enabled"
-               ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+      <ListView x:Name="TranscriptList"
+                Grid.Row="1"
+                SelectionMode="None"
+                Padding="0,0,0,12" />
     </Grid>
 
     <TextBox x:Name="QuestionBox" Grid.Row="4" PlaceholderText="Ask about the selected app, tab, document, or session..." AcceptsReturn="True" MinHeight="78" TextWrapping="Wrap" />
