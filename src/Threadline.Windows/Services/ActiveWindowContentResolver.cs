@@ -6,6 +6,11 @@ public sealed class ActiveWindowContentResolver
     private readonly NativeUiAutomationReader _nativeUiAutomationReader = new();
     private readonly ContextSummarizer _contextSummarizer = new();
     private readonly ActiveWindowDiagnostics _diagnostics = new();
+    private static readonly string[] ChromeNoise =
+    [
+        "non client", "input sink", "system", "ime", "minimize", "maximize", "context help", "close",
+        "application", "vertical", "horizontal", "scroll", "menu", "title bar", "toolbar", "status bar"
+    ];
 
     public async Task<SummarizedContext> ResolveAsync(string sessionId, ThreadlineTarget target, CancellationToken cancellationToken = default)
     {
@@ -43,11 +48,23 @@ public sealed class ActiveWindowContentResolver
             || target.Title.Contains(windowTitle, StringComparison.OrdinalIgnoreCase);
         if (!titleMatches && !target.IsActive) return null;
 
-        var lines = native.Content
+        var allLines = native.Content
             .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(line => !string.IsNullOrWhiteSpace(line))
-            .Take(12)
             .ToList();
+
+        var bodyLines = allLines
+            .Select(CleanNativeLine)
+            .Where(line => line.Length >= 3)
+            .Where(line => !line.All(char.IsDigit))
+            .Where(line => !ChromeNoise.Any(noise => line.Contains(noise, StringComparison.OrdinalIgnoreCase)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (bodyLines.Count == 0 || string.Join(" ", bodyLines).Length < 40)
+        {
+            return null;
+        }
 
         var details = new List<string>
         {
@@ -56,17 +73,33 @@ public sealed class ActiveWindowContentResolver
             $"Confidence: guarded",
             $"Target: {target}",
             $"Native text length: {native.Content.Length}",
-            $"Native line preview count: {lines.Count}"
+            $"Native raw line count: {allLines.Count}",
+            $"Native body line count: {bodyLines.Count}"
         };
-        details.AddRange(lines);
+        details.AddRange(bodyLines.Take(12));
 
         return new SummarizedContext(
             target.Title,
             "notepad-guarded-native-ui",
-            "Threadline captured Notepad text through guarded native UI because the selected tab matched the active Notepad window.",
+            "Threadline captured likely Notepad document text through guarded native UI after filtering window chrome.",
             details,
             ["Guarded capture: Notepad body text came from Windows native UI, not a formal Notepad document API."],
-            native.Content);
+            string.Join(Environment.NewLine, bodyLines));
+    }
+
+    private static string CleanNativeLine(string line)
+    {
+        var value = line.Trim();
+        if (value.StartsWith("[", StringComparison.Ordinal))
+        {
+            var close = value.IndexOf(']');
+            if (close >= 0 && close + 1 < value.Length)
+            {
+                value = value[(close + 1)..].Trim();
+            }
+        }
+
+        return value.Trim(':', ' ');
     }
 
     private static SummarizedContext NotepadNeedsProviderContext(ThreadlineTarget target, IReadOnlyList<string> diagnostics)
