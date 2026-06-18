@@ -9,6 +9,7 @@
         <TextBlock Text="ThreadlineAI" FontSize="22" FontWeight="SemiBold" />
         <TextBlock Text="Context follows your active work." Opacity="0.72" />
         <TextBlock x:Name="ServiceStatusText" Text="Service: unknown" Opacity="0.72" />
+        <TextBlock x:Name="SessionText" Text="No active Threadline session." TextWrapping="Wrap" MaxLines="3" Opacity="0.72" />
       </StackPanel>
       <ComboBox x:Name="ProviderBox" Grid.Column="1" Width="126" SelectedIndex="5" VerticalAlignment="Top">
         <ComboBoxItem Content="OpenAI" />
