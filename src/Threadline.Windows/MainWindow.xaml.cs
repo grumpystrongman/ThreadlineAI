@@ -6,6 +6,9 @@ namespace Threadline.Windows;
 
 public sealed partial class MainWindow : Window
 {
+    private const int MaxTranscriptCharacters = 24000;
+    private const int MaxTranscriptMessageCharacters = 3000;
+
     private readonly ActiveWindowMonitor _activeWindowMonitor = new();
     private readonly NativeUiAutomationReader _nativeUiAutomationReader = new();
     private readonly ContextSummarizer _contextSummarizer = new();
@@ -121,10 +124,11 @@ public sealed partial class MainWindow : Window
         var question = QuestionBox.Text?.Trim();
         if (string.IsNullOrWhiteSpace(question)) return;
 
+        AddTimeline("Resolving context for Ask...");
         var currentWindow = await ResolveContextForAskAsync();
         AppendTranscript("You", question);
         var messages = await _client.ComposePromptAsync(_session!.Id, question, currentWindow);
-        AppendTranscript("Threadline Prompt", string.Join("\n\n---\n\n", messages.Select(message => $"{message.Role}:\n{message.Content}")));
+        AppendTranscript("Threadline", $"Prompt composed with {messages.Count} message(s). Full context was included internally but not dumped into this transcript.");
         QuestionBox.Text = string.Empty;
         AddTimeline("Composed session prompt with full resolved context.");
     }
@@ -206,6 +210,22 @@ public sealed partial class MainWindow : Window
 
     private void AppendTranscript(string speaker, string message)
     {
-        ChatTranscript.Text += $"\n\n{speaker}:\n{message}";
+        var safeMessage = TrimForTranscript(message);
+        ChatTranscript.Text += $"\n\n{speaker}:\n{safeMessage}";
+        if (ChatTranscript.Text.Length > MaxTranscriptCharacters)
+        {
+            ChatTranscript.Text = "...[older transcript trimmed]\n" + ChatTranscript.Text[^MaxTranscriptCharacters..];
+        }
+
+        ChatTranscript.SelectionStart = ChatTranscript.Text.Length;
+        ChatTranscript.SelectionLength = 0;
+    }
+
+    private static string TrimForTranscript(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+        var trimmed = value.Trim();
+        if (trimmed.Length <= MaxTranscriptMessageCharacters) return trimmed;
+        return trimmed[..MaxTranscriptMessageCharacters].TrimEnd() + "\n...[trimmed in transcript]";
     }
 }
