@@ -22,6 +22,7 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         ConfigureSidecarWindow();
         RefreshActiveWindow();
+        StartAutoFollow();
         _ = CheckServiceAsync();
     }
 
