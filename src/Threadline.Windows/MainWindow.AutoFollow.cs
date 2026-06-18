@@ -59,6 +59,7 @@ public sealed partial class MainWindow
 
         _lastAutoFollowTargetId = activeTarget.Id;
         CurrentWindowText.Text = BuildTargetStatus(activeTarget, "Following active app");
+        AddTimeline($"Following: {activeTarget.Window.ApplicationName} — {activeTarget.Title}");
     }
 
     private static string BuildTargetStatus(ThreadlineTarget target, string mode)
