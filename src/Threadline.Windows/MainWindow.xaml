@@ -42,9 +42,17 @@
       </StackPanel>
     </Border>
 
-    <Grid Grid.Row="3" RowDefinitions="Auto,*" RowSpacing="6">
+    <Grid Grid.Row="3" RowDefinitions="Auto,*" RowSpacing="6" MinHeight="280">
       <TextBlock Text="Conversation" FontSize="16" FontWeight="SemiBold" />
-      <TextBox x:Name="ChatTranscript" Grid.Row="1" Text="Start or use a session, pick an app/tab, then ask Threadline about that target." TextWrapping="Wrap" AcceptsReturn="True" IsReadOnly="True" MinHeight="260" />
+      <TextBox x:Name="ChatTranscript"
+               Grid.Row="1"
+               Text="Start or use a session, pick an app/tab, then ask Threadline about that target."
+               TextWrapping="Wrap"
+               AcceptsReturn="True"
+               IsReadOnly="True"
+               Padding="8,8,8,24"
+               ScrollViewer.VerticalScrollBarVisibility="Auto"
+               ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
     </Grid>
 
     <TextBox x:Name="QuestionBox" Grid.Row="4" PlaceholderText="Ask about the selected app, tab, document, or session..." AcceptsReturn="True" MinHeight="78" TextWrapping="Wrap" />
