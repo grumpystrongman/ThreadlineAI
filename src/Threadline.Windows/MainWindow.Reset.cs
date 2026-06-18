@@ -10,8 +10,9 @@ public sealed partial class MainWindow
         {
             ClearLocalWorkingState();
             TimelineList.Items.Clear();
+            TranscriptList.Items.Clear();
             await StartSessionAsync();
-            ChatTranscript.Text = "New Threadline chat started. Pick an open app/tab, then ask Threadline about that target.";
+            AppendTranscript("Threadline", "New Threadline chat started. Pick an open app/tab, then ask Threadline about that target.");
             AddTimeline("New chat started and local UI cleared.");
         });
     }
@@ -19,7 +20,8 @@ public sealed partial class MainWindow
     private void ClearSharedContext_Click(object sender, RoutedEventArgs e)
     {
         ClearLocalWorkingState();
-        ChatTranscript.Text = "Shared local context cleared. Start New Chat for a clean service session.";
+        TranscriptList.Items.Clear();
+        AppendTranscript("Threadline", "Shared local context cleared. Start New Chat for a clean service session.");
         CurrentWindowText.Text = "No target window.";
         AddTimeline("Cleared local shared context.");
     }
