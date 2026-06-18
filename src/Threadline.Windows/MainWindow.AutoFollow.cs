@@ -9,26 +9,48 @@ public sealed partial class MainWindow
     private bool _isTargetLocked;
     private string? _lastAutoFollowTargetId;
     private ThreadlineTarget? _lastFollowTarget;
+    private ThreadlineTarget? _lockedFollowTarget;
+    private bool _hasAnnouncedFirstFollowTarget;
 
     private void StartAutoFollow()
     {
         _autoFollowTimer.Interval = TimeSpan.FromSeconds(1);
         _autoFollowTimer.Tick += (_, _) => SafeRefreshFollowTargetCard();
         _autoFollowTimer.Start();
-        AddTimeline("Auto-follow is on. Switch to another app, then return here.");
-        AppendTranscript("Threadline Follow", "Auto-follow is on. I remember the last non-Threadline app you used, then keep showing it here when you return to the sidecar.");
+        AddTimeline("Follow mode is on. Switch to another app, then return here.");
+        AppendTranscript("Threadline Follow", "Follow mode is on. I remember the last non-Threadline app you used and keep it visible when you return to this sidecar.");
         SafeRefreshFollowTargetCard(force: true);
     }
 
     private void ToggleFollowLock_Click(object sender, RoutedEventArgs e)
     {
-        _isTargetLocked = !_isTargetLocked;
-        SafeRefreshFollowTargetCard(force: true);
-        var message = _isTargetLocked
-            ? "Locked to the current selected target. Click Follow / Lock again to resume following the last active app."
-            : "Following active apps again. Switch apps, then return here.";
-        AddTimeline(message);
-        AppendTranscript("Threadline Follow", message);
+        if (_isTargetLocked)
+        {
+            _isTargetLocked = false;
+            _lockedFollowTarget = null;
+            _lastAutoFollowTargetId = null;
+            SafeRefreshFollowTargetCard(force: true);
+            const string unlockMessage = "Unlocked. Following the last active app again.";
+            AddTimeline(unlockMessage);
+            AppendTranscript("Threadline Follow", unlockMessage);
+            return;
+        }
+
+        _lockedFollowTarget = _selectedThreadlineTarget ?? _lastFollowTarget;
+        if (_lockedFollowTarget is null)
+        {
+            const string noTargetMessage = "Nothing to lock yet. Switch to another app first, then return to Threadline.";
+            AddTimeline(noTargetMessage);
+            AppendTranscript("Threadline Follow", noTargetMessage);
+            SafeRefreshFollowTargetCard(force: true);
+            return;
+        }
+
+        _isTargetLocked = true;
+        CurrentWindowText.Text = BuildTargetStatus(_lockedFollowTarget, "Locked target");
+        var lockMessage = $"Locked target: {_lockedFollowTarget.Window.ApplicationName} — {_lockedFollowTarget.Title}";
+        AddTimeline(lockMessage);
+        AppendTranscript("Threadline Follow", lockMessage);
     }
 
     private void SafeRefreshFollowTargetCard(bool force = false)
@@ -45,16 +67,16 @@ public sealed partial class MainWindow
 
     private void RefreshFollowTargetCard(bool force = false)
     {
-        if (_isTargetLocked && _selectedThreadlineTarget is not null)
+        if (_isTargetLocked && _lockedFollowTarget is not null)
         {
-            CurrentWindowText.Text = BuildTargetStatus(_selectedThreadlineTarget, "Locked target");
+            CurrentWindowText.Text = BuildTargetStatus(_lockedFollowTarget, "Locked target");
             return;
         }
 
         var activeWindow = _activeWindowMonitor.GetActiveWindowSnapshot();
         if (activeWindow is null)
         {
-            if (force) CurrentWindowText.Text = "Mode: Following active app\nStatus: No foreground app detected yet.";
+            if (force) CurrentWindowText.Text = "Mode: Follow\nStatus: No foreground app detected yet.";
             return;
         }
 
@@ -66,7 +88,7 @@ public sealed partial class MainWindow
             }
             else if (force)
             {
-                CurrentWindowText.Text = "Mode: Following active app\nStatus: Switch to another app, then return to Threadline.";
+                CurrentWindowText.Text = "Mode: Follow\nStatus: Switch to another app, then return to Threadline.";
             }
             return;
         }
@@ -85,7 +107,12 @@ public sealed partial class MainWindow
         CurrentWindowText.Text = BuildTargetStatus(activeTarget, "Following active app");
         var followMessage = $"Following: {activeTarget.Window.ApplicationName} — {activeTarget.Title}";
         AddTimeline(followMessage);
-        AppendTranscript("Threadline Follow", followMessage);
+
+        if (!_hasAnnouncedFirstFollowTarget || force)
+        {
+            _hasAnnouncedFirstFollowTarget = true;
+            AppendTranscript("Threadline Follow", followMessage);
+        }
     }
 
     private ThreadlineTarget ResolveTargetForWindow(ActiveWindowSnapshot activeWindow)
