@@ -16,6 +16,15 @@ function Invoke-CheckedCommand {
   }
 }
 
+function Stop-ThreadlineWindowsCompanion {
+  $processes = Get-Process Threadline.Windows -ErrorAction SilentlyContinue
+  if ($processes) {
+    Write-Host 'Stopping running Threadline.Windows instances before build...'
+    $processes | Stop-Process -Force
+    Start-Sleep -Milliseconds 500
+  }
+}
+
 function Get-VisualStudioInstallPath {
   $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
   if (-not (Test-Path $vswhere)) {
@@ -81,6 +90,8 @@ function Test-WindowsAppSdkBuildTasks {
   Write-Host 'After install, reopen PowerShell and rerun ./eng/build-windows.ps1.' -ForegroundColor Yellow
   throw 'Missing Visual Studio Windows App SDK packaging build tasks required for WinUI.'
 }
+
+Stop-ThreadlineWindowsCompanion
 
 Write-Host 'Checking .NET SDK availability...'
 Invoke-CheckedCommand dotnet --list-sdks
