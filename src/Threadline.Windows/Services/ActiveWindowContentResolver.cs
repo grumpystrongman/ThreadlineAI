@@ -52,6 +52,6 @@ public sealed class ActiveWindowContentResolver
     {
         var details = new List<string> { $"Resolver route: {route}", $"Provider selected: {provider}", $"Confidence: {confidence}", $"Target: {target}" };
         details.AddRange(context.KeyDetails);
-        return new SummarizedContext(context.Title, context.Source, context.Summary, details, context.Warnings, context.RawContent);
+        return new SummarizedContext(context.Title, context.Source, context.Summary, details, context.Warnings, context.RawPreview);
     }
 }
