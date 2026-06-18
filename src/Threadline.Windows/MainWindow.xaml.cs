@@ -6,7 +6,7 @@ namespace Threadline.Windows;
 
 public sealed partial class MainWindow : Window
 {
-    private const int MaxTranscriptCharacters = 24000;
+    private const int MaxTranscriptItems = 80;
     private const int MaxTranscriptMessageCharacters = 3000;
 
     private readonly ActiveWindowMonitor _activeWindowMonitor = new();
@@ -24,6 +24,7 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         ConfigureSidecarWindow();
+        AppendTranscript("Threadline", "Start or use a session, pick an app/tab, then ask Threadline about that target.");
         RefreshActiveWindow();
         StartAutoFollow();
         _ = CheckServiceAsync();
@@ -40,7 +41,11 @@ public sealed partial class MainWindow : Window
     private async void Ask_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(AskAsync);
     private async void ProposeInsert_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(ProposeInsertActionAsync);
     private async void CompleteLastAction_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(CompleteLastActionAsync);
-    private void ClearTranscript_Click(object sender, RoutedEventArgs e) => ChatTranscript.Text = "Transcript cleared.";
+    private void ClearTranscript_Click(object sender, RoutedEventArgs e)
+    {
+        TranscriptList.Items.Clear();
+        AppendTranscript("Threadline", "Transcript cleared.");
+    }
 
     private async Task CheckServiceAsync()
     {
@@ -211,14 +216,24 @@ public sealed partial class MainWindow : Window
     private void AppendTranscript(string speaker, string message)
     {
         var safeMessage = TrimForTranscript(message);
-        ChatTranscript.Text += $"\n\n{speaker}:\n{safeMessage}";
-        if (ChatTranscript.Text.Length > MaxTranscriptCharacters)
+        var item = new TextBox
         {
-            ChatTranscript.Text = "...[older transcript trimmed]\n" + ChatTranscript.Text[^MaxTranscriptCharacters..];
+            Text = $"{speaker}:\n{safeMessage}",
+            IsReadOnly = true,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(8),
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+
+        TranscriptList.Items.Add(item);
+        while (TranscriptList.Items.Count > MaxTranscriptItems)
+        {
+            TranscriptList.Items.RemoveAt(0);
         }
 
-        ChatTranscript.SelectionStart = ChatTranscript.Text.Length;
-        ChatTranscript.SelectionLength = 0;
+        TranscriptList.ScrollIntoView(item);
     }
 
     private static string TrimForTranscript(string? value)
