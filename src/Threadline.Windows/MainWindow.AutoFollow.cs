@@ -118,8 +118,14 @@ public sealed partial class MainWindow
     private ThreadlineTarget ResolveTargetForWindow(ActiveWindowSnapshot activeWindow)
     {
         var targets = _tabTargetRegistry.ListTargets();
-        return targets.FirstOrDefault(target => target.Window.Handle == activeWindow.Handle && target.IsActive)
-            ?? targets.FirstOrDefault(target => target.Window.Handle == activeWindow.Handle)
+        var sameWindowTargets = targets
+            .Where(target => target.Window.Handle == activeWindow.Handle)
+            .ToList();
+
+        return sameWindowTargets.FirstOrDefault(target => target.Kind != ThreadlineTargetKind.Window && target.IsActive)
+            ?? sameWindowTargets.FirstOrDefault(target => target.Kind != ThreadlineTargetKind.Window)
+            ?? sameWindowTargets.FirstOrDefault(target => target.IsActive)
+            ?? sameWindowTargets.FirstOrDefault()
             ?? new ThreadlineTarget(
                 $"window:{activeWindow.Handle}",
                 ThreadlineTargetKind.Window,
@@ -142,12 +148,14 @@ public sealed partial class MainWindow
         var source = target.ProviderKey switch
         {
             "browser-extension" => "Browser extension",
-            "notepad-tabs" => "File-backed or provider required",
+            "notepad-tabs" => "Notepad file/provider resolver",
             "native-ui" => "Native UI fallback",
             _ => target.ProviderKey
         };
 
-        var readiness = target.CanReadBody ? "Ready" : "Needs provider or resolver";
+        var readiness = target.CanReadBody || target.ProviderKey == "notepad-tabs" || target.ProviderKey == "browser-extension"
+            ? "Ready to resolve on Ask"
+            : "Needs provider or resolver";
         return $"Mode: {mode}\nTarget: {target.Title}\nApp: {target.Window.ApplicationName}\nSource: {source}\nConfidence: {target.Confidence}\nStatus: {readiness}";
     }
 }
