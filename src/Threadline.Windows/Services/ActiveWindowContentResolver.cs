@@ -5,6 +5,7 @@ public sealed class ActiveWindowContentResolver
     private readonly BrowserExtensionContextProvider _browserProvider = new();
     private readonly NativeUiAutomationReader _nativeUiAutomationReader = new();
     private readonly ContextSummarizer _contextSummarizer = new();
+    private readonly ActiveWindowDiagnostics _diagnostics = new();
 
     public async Task<SummarizedContext> ResolveAsync(string sessionId, ThreadlineTarget target, CancellationToken cancellationToken = default)
     {
@@ -18,7 +19,7 @@ public sealed class ActiveWindowContentResolver
 
         if (target.ProviderKey.Equals("notepad-tabs", StringComparison.OrdinalIgnoreCase))
         {
-            return NotepadNeedsProviderContext(target);
+            return NotepadNeedsProviderContext(target, _diagnostics.Inspect(target));
         }
 
         if (!target.CanReadBody)
@@ -30,14 +31,18 @@ public sealed class ActiveWindowContentResolver
         return AddRoute(_contextSummarizer.SummarizeNativeUi(nativeResult), target, "native-ui", "generic fallback", nativeResult.Success ? "medium" : "low");
     }
 
-    private static SummarizedContext NotepadNeedsProviderContext(ThreadlineTarget target) =>
-        new(
+    private static SummarizedContext NotepadNeedsProviderContext(ThreadlineTarget target, IReadOnlyList<string> diagnostics)
+    {
+        var details = new List<string> { target.ToString(), "Resolver route: app-specific provider required", "Provider selected: notepad-active-document-needed", "Confidence: title-only" };
+        details.AddRange(diagnostics);
+        return new SummarizedContext(
             target.Title,
             "notepad-active-document-needed",
             "Threadline can identify this Notepad tab, but active document body capture is not implemented yet.",
-            [target.ToString(), "Resolver route: app-specific provider required", "Provider selected: notepad-active-document-needed", "Confidence: title-only"],
+            details,
             ["Generic native UI capture is tab-ambiguous for modern Notepad."],
             target.Window.ToDisplayText());
+    }
 
     private static SummarizedContext MissingProviderContext(ThreadlineTarget target, string summary, string warning) =>
         new(
