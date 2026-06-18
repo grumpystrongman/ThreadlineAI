@@ -9,7 +9,7 @@
         <TextBlock Text="ThreadlineAI" FontSize="22" FontWeight="SemiBold" />
         <TextBlock Text="Context follows your active work." Opacity="0.72" />
         <TextBlock x:Name="ServiceStatusText" Text="Service: unknown" Opacity="0.72" />
-        <TextBlock x:Name="SessionText" Text="No active Threadline session." TextWrapping="Wrap" MaxLines="3" Opacity="0.72" />
+        <TextBlock x:Name="SessionText" Text="No active Threadline session." TextWrapping="Wrap" MaxLines="2" Opacity="0.72" />
       </StackPanel>
       <ComboBox x:Name="ProviderBox" Grid.Column="1" Width="126" SelectedIndex="5" VerticalAlignment="Top">
         <ComboBoxItem Content="OpenAI" />
@@ -32,17 +32,17 @@
     <Border Grid.Row="2" BorderThickness="1" CornerRadius="8" Padding="8">
       <StackPanel Spacing="6">
         <TextBlock Text="Current Target" FontSize="15" FontWeight="SemiBold" />
-        <TextBlock x:Name="CurrentWindowText" Text="No target window." TextWrapping="Wrap" MaxLines="7" />
+        <TextBlock x:Name="CurrentWindowText" Text="No target window." TextWrapping="Wrap" MaxLines="6" />
         <StackPanel Orientation="Horizontal" Spacing="6">
           <Button Content="Refresh Apps" Click="RefreshOpenWindows_Click" />
           <Button Content="Use Selected" Click="UseSelectedTarget_Click" />
           <Button Content="Follow / Lock" Click="ToggleFollowLock_Click" />
         </StackPanel>
-        <ListView x:Name="OpenWindowsList" Height="118" SelectionMode="Single" />
+        <ListView x:Name="OpenWindowsList" Height="64" SelectionMode="Single" />
       </StackPanel>
     </Border>
 
-    <Grid Grid.Row="3" RowDefinitions="Auto,*" RowSpacing="6" MinHeight="280">
+    <Grid Grid.Row="3" RowDefinitions="Auto,*" RowSpacing="6" MinHeight="360">
       <TextBlock Text="Conversation" FontSize="16" FontWeight="SemiBold" />
       <TextBox x:Name="ChatTranscript"
                Grid.Row="1"
@@ -50,8 +50,10 @@
                TextWrapping="Wrap"
                AcceptsReturn="True"
                IsReadOnly="True"
-               Padding="8,8,8,24"
-               ScrollViewer.VerticalScrollBarVisibility="Auto"
+               Padding="8,8,8,28"
+               VerticalAlignment="Stretch"
+               ScrollViewer.VerticalScrollBarVisibility="Visible"
+               ScrollViewer.VerticalScrollMode="Enabled"
                ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
     </Grid>
 
