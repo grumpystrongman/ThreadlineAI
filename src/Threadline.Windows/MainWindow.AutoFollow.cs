@@ -11,17 +11,23 @@ public sealed partial class MainWindow
 
     private void StartAutoFollow()
     {
-        _autoFollowTimer.Interval = TimeSpan.FromSeconds(3);
+        _autoFollowTimer.Interval = TimeSpan.FromSeconds(2);
         _autoFollowTimer.Tick += (_, _) => RefreshFollowTargetCard();
         _autoFollowTimer.Start();
-        RefreshFollowTargetCard();
+        AddTimeline("Auto-follow is on. Switch to another app and wait up to 2 seconds.");
+        AppendTranscript("Threadline Follow", "Auto-follow is on. I will update the Current Target card when the foreground app changes. I will ignore Threadline itself so looking back at this panel does not erase the target.");
+        RefreshFollowTargetCard(force: true);
     }
 
     private void ToggleFollowLock_Click(object sender, RoutedEventArgs e)
     {
         _isTargetLocked = !_isTargetLocked;
         RefreshFollowTargetCard(force: true);
-        AddTimeline(_isTargetLocked ? "Context target locked." : "Following active app.");
+        var message = _isTargetLocked
+            ? "Locked to the current selected target. Click Follow / Lock again to resume following the foreground app."
+            : "Following the foreground app again. Switch apps and wait up to 2 seconds.";
+        AddTimeline(message);
+        AppendTranscript("Threadline Follow", message);
     }
 
     private void RefreshFollowTargetCard(bool force = false)
@@ -36,7 +42,7 @@ public sealed partial class MainWindow
         var activeWindow = _activeWindowMonitor.GetActiveWindowSnapshot();
         ThreadlineTarget? activeTarget = null;
 
-        if (activeWindow is not null)
+        if (activeWindow is not null && !IsThreadlineWindow(activeWindow))
         {
             activeTarget = targets.FirstOrDefault(target => target.Window.Handle == activeWindow.Handle && target.IsActive)
                 ?? targets.FirstOrDefault(target => target.Window.Handle == activeWindow.Handle)
@@ -52,15 +58,29 @@ public sealed partial class MainWindow
                     "Generic active window target. Threadline may use native UI fallback unless a better provider is available.");
         }
 
-        if (activeTarget is null) return;
+        if (activeTarget is null)
+        {
+            if (force)
+            {
+                CurrentWindowText.Text = "Mode: Following active app\nStatus: Waiting for a non-Threadline foreground app. Click another app and wait up to 2 seconds.";
+            }
+            return;
+        }
 
         _lastForegroundWindow = activeTarget.Window;
         if (!force && string.Equals(_lastAutoFollowTargetId, activeTarget.Id, StringComparison.OrdinalIgnoreCase)) return;
 
         _lastAutoFollowTargetId = activeTarget.Id;
         CurrentWindowText.Text = BuildTargetStatus(activeTarget, "Following active app");
-        AddTimeline($"Following: {activeTarget.Window.ApplicationName} — {activeTarget.Title}");
+        var followMessage = $"Following: {activeTarget.Window.ApplicationName} — {activeTarget.Title}";
+        AddTimeline(followMessage);
+        AppendTranscript("Threadline Follow", followMessage);
     }
+
+    private static bool IsThreadlineWindow(ActiveWindowSnapshot window) =>
+        string.Equals(window.ProcessName, "Threadline.Windows", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(window.ApplicationName, "ThreadlineAI Companion", StringComparison.OrdinalIgnoreCase) ||
+        (window.WindowTitle?.Contains("ThreadlineAI", StringComparison.OrdinalIgnoreCase) ?? false);
 
     private static string BuildTargetStatus(ThreadlineTarget target, string mode)
     {
