@@ -20,6 +20,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        ConfigureSidecarWindow();
         RefreshActiveWindow();
         _ = CheckServiceAsync();
     }
