@@ -49,7 +49,7 @@ public sealed partial class MainWindow : Window
     {
         var provider = GetSelectedProvider();
         _session = await _client.StartSessionAsync($"Windows companion session {DateTimeOffset.Now:g}", provider);
-        SessionText.Text = $"{_session.Name}\nID: {_session.Id}\nProvider: {_session.ActiveProvider ?? provider}\nStatus: {_session.Status}";
+        AppendTranscript("Threadline Session", FormatSession(_session));
         AddTimeline($"Started session {_session.Id}");
     }
 
@@ -58,12 +58,12 @@ public sealed partial class MainWindow : Window
         _session = await _client.GetActiveSessionAsync();
         if (_session is null)
         {
-            SessionText.Text = "No active Threadline session found.";
+            AppendTranscript("Threadline Session", "No active Threadline session found.");
             AddTimeline("No active session found.");
             return;
         }
 
-        SessionText.Text = $"{_session.Name}\nID: {_session.Id}\nProvider: {_session.ActiveProvider ?? "None"}\nStatus: {_session.Status}";
+        AppendTranscript("Threadline Session", FormatSession(_session));
         AddTimeline($"Using active session {_session.Id}");
     }
 
@@ -198,6 +198,9 @@ public sealed partial class MainWindow : Window
 
         return "Local";
     }
+
+    private static string FormatSession(ThreadlineSessionDto session) =>
+        $"{session.Name}\nID: {session.Id}\nProvider: {session.ActiveProvider ?? "None"}\nStatus: {session.Status}";
 
     private static string FormatAttachment(WindowAttachmentDto attachment) =>
         $"Attached: {attachment.Snapshot.ApplicationName}\nProcess: {attachment.Snapshot.ProcessName}\nWindow: {attachment.Snapshot.WindowTitle}\nStatus: {attachment.Status}\nAttachment: {attachment.Id}";
