@@ -19,7 +19,8 @@ public sealed class ActiveWindowContentResolver
 
         if (target.ProviderKey.Equals("notepad-tabs", StringComparison.OrdinalIgnoreCase))
         {
-            return NotepadNeedsProviderContext(target, _diagnostics.Inspect(target));
+            var notepad = TryResolveNotepadGuardedNative(target);
+            return notepad ?? NotepadNeedsProviderContext(target, _diagnostics.Inspect(target));
         }
 
         if (!target.CanReadBody)
@@ -29,6 +30,43 @@ public sealed class ActiveWindowContentResolver
 
         var nativeResult = _nativeUiAutomationReader.ReadWindow(target.Window.Handle);
         return AddRoute(_contextSummarizer.SummarizeNativeUi(nativeResult), target, "native-ui", "generic fallback", nativeResult.Success ? "medium" : "low");
+    }
+
+    private SummarizedContext? TryResolveNotepadGuardedNative(ThreadlineTarget target)
+    {
+        var native = _nativeUiAutomationReader.ReadWindow(target.Window.Handle);
+        if (!native.Success || string.IsNullOrWhiteSpace(native.Content)) return null;
+        if (native.Content.Length < 40) return null;
+
+        var windowTitle = target.Window.WindowTitle ?? string.Empty;
+        var titleMatches = windowTitle.Contains(target.Title, StringComparison.OrdinalIgnoreCase)
+            || target.Title.Contains(windowTitle, StringComparison.OrdinalIgnoreCase);
+        if (!titleMatches && !target.IsActive) return null;
+
+        var lines = native.Content
+            .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .Take(12)
+            .ToList();
+
+        var details = new List<string>
+        {
+            $"Resolver route: app-specific guarded native capture",
+            $"Provider selected: notepad-guarded-native-ui",
+            $"Confidence: guarded",
+            $"Target: {target}",
+            $"Native text length: {native.Content.Length}",
+            $"Native line preview count: {lines.Count}"
+        };
+        details.AddRange(lines);
+
+        return new SummarizedContext(
+            target.Title,
+            "notepad-guarded-native-ui",
+            "Threadline captured Notepad text through guarded native UI because the selected tab matched the active Notepad window.",
+            details,
+            ["Guarded capture: Notepad body text came from Windows native UI, not a formal Notepad document API."],
+            native.Content);
     }
 
     private static SummarizedContext NotepadNeedsProviderContext(ThreadlineTarget target, IReadOnlyList<string> diagnostics)
