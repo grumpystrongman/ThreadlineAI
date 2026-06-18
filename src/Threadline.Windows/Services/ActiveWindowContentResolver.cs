@@ -6,11 +6,7 @@ public sealed class ActiveWindowContentResolver
     private readonly NativeUiAutomationReader _nativeUiAutomationReader = new();
     private readonly ContextSummarizer _contextSummarizer = new();
     private readonly ActiveWindowDiagnostics _diagnostics = new();
-    private static readonly string[] ChromeNoise =
-    [
-        "non client", "input sink", "system", "ime", "minimize", "maximize", "context help", "close",
-        "application", "vertical", "horizontal", "scroll", "menu", "title bar", "toolbar", "status bar"
-    ];
+    private readonly FileBackedTextResolver _fileResolver = new();
 
     public async Task<SummarizedContext> ResolveAsync(string sessionId, ThreadlineTarget target, CancellationToken cancellationToken = default)
     {
@@ -24,8 +20,8 @@ public sealed class ActiveWindowContentResolver
 
         if (target.ProviderKey.Equals("notepad-tabs", StringComparison.OrdinalIgnoreCase))
         {
-            var notepad = TryResolveNotepadGuardedNative(target);
-            return notepad ?? NotepadNeedsProviderContext(target, _diagnostics.Inspect(target));
+            var fileBacked = TryResolveNotepadFileBacked(target);
+            return fileBacked ?? NotepadNeedsProviderContext(target, _diagnostics.Inspect(target));
         }
 
         if (!target.CanReadBody)
@@ -37,69 +33,29 @@ public sealed class ActiveWindowContentResolver
         return AddRoute(_contextSummarizer.SummarizeNativeUi(nativeResult), target, "native-ui", "generic fallback", nativeResult.Success ? "medium" : "low");
     }
 
-    private SummarizedContext? TryResolveNotepadGuardedNative(ThreadlineTarget target)
+    private SummarizedContext? TryResolveNotepadFileBacked(ThreadlineTarget target)
     {
-        var native = _nativeUiAutomationReader.ReadWindow(target.Window.Handle);
-        if (!native.Success || string.IsNullOrWhiteSpace(native.Content)) return null;
-        if (native.Content.Length < 40) return null;
+        var result = _fileResolver.TryResolve(target.Title);
+        if (!result.Success || string.IsNullOrWhiteSpace(result.Text)) return null;
 
-        var windowTitle = target.Window.WindowTitle ?? string.Empty;
-        var titleMatches = windowTitle.Contains(target.Title, StringComparison.OrdinalIgnoreCase)
-            || target.Title.Contains(windowTitle, StringComparison.OrdinalIgnoreCase);
-        if (!titleMatches && !target.IsActive) return null;
-
-        var allLines = native.Content
-            .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(line => !string.IsNullOrWhiteSpace(line))
-            .ToList();
-
-        var bodyLines = allLines
-            .Select(CleanNativeLine)
-            .Where(line => line.Length >= 3)
-            .Where(line => !line.All(char.IsDigit))
-            .Where(line => !ChromeNoise.Any(noise => line.Contains(noise, StringComparison.OrdinalIgnoreCase)))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        if (bodyLines.Count == 0 || string.Join(" ", bodyLines).Length < 40)
-        {
-            return null;
-        }
-
+        var summary = _contextSummarizer.SummarizePlainText(target.Title, "notepad-file-backed", result.Text);
         var details = new List<string>
         {
-            $"Resolver route: app-specific guarded native capture",
-            $"Provider selected: notepad-guarded-native-ui",
-            $"Confidence: guarded",
+            "Resolver route: file-backed Notepad tab",
+            "Provider selected: notepad-file-backed",
+            "Confidence: high when exact file match is unique",
             $"Target: {target}",
-            $"Native text length: {native.Content.Length}",
-            $"Native raw line count: {allLines.Count}",
-            $"Native body line count: {bodyLines.Count}"
+            $"File path: {result.Path}"
         };
-        details.AddRange(bodyLines.Take(12));
+        details.AddRange(summary.KeyDetails);
 
         return new SummarizedContext(
-            target.Title,
-            "notepad-guarded-native-ui",
-            "Threadline captured likely Notepad document text through guarded native UI after filtering window chrome.",
+            summary.Title,
+            summary.Source,
+            summary.Summary,
             details,
-            ["Guarded capture: Notepad body text came from Windows native UI, not a formal Notepad document API."],
-            string.Join(Environment.NewLine, bodyLines));
-    }
-
-    private static string CleanNativeLine(string line)
-    {
-        var value = line.Trim();
-        if (value.StartsWith("[", StringComparison.Ordinal))
-        {
-            var close = value.IndexOf(']');
-            if (close >= 0 && close + 1 < value.Length)
-            {
-                value = value[(close + 1)..].Trim();
-            }
-        }
-
-        return value.Trim(':', ' ');
+            result.Warnings,
+            summary.RawPreview);
     }
 
     private static SummarizedContext NotepadNeedsProviderContext(ThreadlineTarget target, IReadOnlyList<string> diagnostics)
@@ -109,9 +65,9 @@ public sealed class ActiveWindowContentResolver
         return new SummarizedContext(
             target.Title,
             "notepad-active-document-needed",
-            "Threadline can identify this Notepad tab, but active document body capture is not implemented yet.",
+            "Threadline can identify this Notepad tab, but active document body capture is not safely resolved yet.",
             details,
-            ["Generic native UI capture is tab-ambiguous for modern Notepad."],
+            ["Native UI body text is tab-ambiguous for modern Notepad. File-backed resolution needs a unique exact saved-file match."],
             target.Window.ToDisplayText());
     }
 
