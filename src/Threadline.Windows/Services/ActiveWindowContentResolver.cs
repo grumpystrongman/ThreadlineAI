@@ -11,7 +11,9 @@ public sealed class ActiveWindowContentResolver
         if (target.Kind == ThreadlineTargetKind.BrowserTab)
         {
             var browser = await _browserProvider.TryGetLatestAsync(sessionId, target, cancellationToken);
-            return browser ?? MissingProviderContext(target, "No browser page data is available in this session yet.", "Use the browser extension to send the page or selected text to ThreadlineAI.");
+            return browser is null
+                ? MissingProviderContext(target, "No browser page data is available in this session yet.", "Use the browser extension to send the page or selected text to ThreadlineAI.")
+                : AddRoute(browser, target, "browser-extension", "app-specific provider", "high");
         }
 
         if (target.ProviderKey.Equals("notepad-tabs", StringComparison.OrdinalIgnoreCase))
@@ -25,7 +27,7 @@ public sealed class ActiveWindowContentResolver
         }
 
         var nativeResult = _nativeUiAutomationReader.ReadWindow(target.Window.Handle);
-        return _contextSummarizer.SummarizeNativeUi(nativeResult);
+        return AddRoute(_contextSummarizer.SummarizeNativeUi(nativeResult), target, "native-ui", "generic fallback", nativeResult.Success ? "medium" : "low");
     }
 
     private static SummarizedContext NotepadNeedsProviderContext(ThreadlineTarget target) =>
@@ -33,7 +35,7 @@ public sealed class ActiveWindowContentResolver
             target.Title,
             "notepad-active-document-needed",
             "Threadline can identify this Notepad tab, but active document body capture is not implemented yet.",
-            [target.ToString(), "Next provider needed: active editor / file-backed Notepad document resolver."],
+            [target.ToString(), "Resolver route: app-specific provider required", "Provider selected: notepad-active-document-needed", "Confidence: title-only"],
             ["Generic native UI capture is tab-ambiguous for modern Notepad."],
             target.Window.ToDisplayText());
 
@@ -42,7 +44,14 @@ public sealed class ActiveWindowContentResolver
             target.Title,
             target.ProviderKey,
             summary,
-            [target.ToString()],
+            [target.ToString(), $"Resolver route: {target.ProviderKey}", $"Confidence: {target.Confidence}"],
             [warning],
             target.Window.ToDisplayText());
+
+    private static SummarizedContext AddRoute(SummarizedContext context, ThreadlineTarget target, string provider, string route, string confidence)
+    {
+        var details = new List<string> { $"Resolver route: {route}", $"Provider selected: {provider}", $"Confidence: {confidence}", $"Target: {target}" };
+        details.AddRange(context.KeyDetails);
+        return new SummarizedContext(context.Title, context.Source, context.Summary, details, context.Warnings, context.RawContent);
+    }
 }
