@@ -32,10 +32,11 @@
     <Border Grid.Row="2" BorderThickness="1" CornerRadius="8" Padding="8">
       <StackPanel Spacing="6">
         <TextBlock Text="Current Target" FontSize="15" FontWeight="SemiBold" />
-        <TextBlock x:Name="CurrentWindowText" Text="No target window." TextWrapping="Wrap" MaxLines="5" />
+        <TextBlock x:Name="CurrentWindowText" Text="No target window." TextWrapping="Wrap" MaxLines="7" />
         <StackPanel Orientation="Horizontal" Spacing="6">
           <Button Content="Refresh Apps" Click="RefreshOpenWindows_Click" />
           <Button Content="Use Selected" Click="UseSelectedTarget_Click" />
+          <Button Content="Follow / Lock" Click="ToggleFollowLock_Click" />
         </StackPanel>
         <ListView x:Name="OpenWindowsList" Height="118" SelectionMode="Single" />
       </StackPanel>
