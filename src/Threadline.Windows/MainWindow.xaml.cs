@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Threadline.Windows.Services;
@@ -9,6 +10,7 @@ public sealed partial class MainWindow : Window
     private const int MaxTranscriptItems = 80;
     private const int MaxTranscriptMessageCharacters = 3000;
 
+    private readonly ObservableCollection<string> _transcriptItems = new();
     private readonly ActiveWindowMonitor _activeWindowMonitor = new();
     private readonly NativeUiAutomationReader _nativeUiAutomationReader = new();
     private readonly ContextSummarizer _contextSummarizer = new();
@@ -23,6 +25,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        TranscriptList.ItemsSource = _transcriptItems;
         ConfigureSidecarWindow();
         AppendTranscript("Threadline", "Start or use a session, pick an app/tab, then ask Threadline about that target.");
         RefreshActiveWindow();
@@ -43,7 +46,7 @@ public sealed partial class MainWindow : Window
     private async void CompleteLastAction_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(CompleteLastActionAsync);
     private void ClearTranscript_Click(object sender, RoutedEventArgs e)
     {
-        TranscriptList.Items.Clear();
+        _transcriptItems.Clear();
         AppendTranscript("Threadline", "Transcript cleared.");
     }
 
@@ -132,13 +135,27 @@ public sealed partial class MainWindow : Window
         var question = QuestionBox.Text?.Trim();
         if (string.IsNullOrWhiteSpace(question)) return;
 
-        AddTimeline("Resolving context for Ask...");
-        var currentWindow = await ResolveContextForAskAsync();
-        AppendTranscript("You", question);
-        var messages = await _client.ComposePromptAsync(_session!.Id, question, currentWindow);
-        AppendTranscript("Threadline", $"Prompt composed with {messages.Count} message(s). Full context was included internally but not dumped into this transcript.");
         QuestionBox.Text = string.Empty;
-        AddTimeline("Composed session prompt with full resolved context.");
+        AppendTranscript("You", question);
+        AddTimeline("Resolving context for Ask...");
+
+        var currentWindow = await ResolveContextForAskAsync();
+        AddTimeline("Sending Ask request to provider path...");
+
+        try
+        {
+            var response = await _client.AskAsync(_session!.Id, question, currentWindow);
+            AppendTranscript("Threadline", string.IsNullOrWhiteSpace(response.Answer)
+                ? "The provider returned an empty answer."
+                : response.Answer);
+            AddTimeline("Received provider response.");
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("404", StringComparison.OrdinalIgnoreCase))
+        {
+            var messages = await _client.ComposePromptAsync(_session!.Id, question, currentWindow);
+            AppendTranscript("Threadline", $"The local service does not expose /ask yet. Prompt composition still works and produced {messages.Count} message(s), but provider response execution is not available from this service build.");
+            AddTimeline("Ask endpoint missing; composed prompt fallback completed.");
+        }
     }
 
     private async Task ProposeInsertActionAsync()
@@ -186,7 +203,7 @@ public sealed partial class MainWindow : Window
         {
             ServiceStatusText.Text = "Service/action error";
             AddTimeline("Error: " + ex.Message);
-            AppendTranscript("Error", ex.Message);
+            AppendTranscript("Threadline", "I hit a service/action error: " + ex.Message);
         }
     }
 
@@ -233,10 +250,10 @@ public sealed partial class MainWindow : Window
         var safeMessage = TrimForTranscript(message);
         var item = $"{speaker}\n{safeMessage}\n{DateTimeOffset.Now:t}";
 
-        TranscriptList.Items.Add(item);
-        while (TranscriptList.Items.Count > MaxTranscriptItems)
+        _transcriptItems.Add(item);
+        while (_transcriptItems.Count > MaxTranscriptItems)
         {
-            TranscriptList.Items.RemoveAt(0);
+            _transcriptItems.RemoveAt(0);
         }
 
         TranscriptList.UpdateLayout();
