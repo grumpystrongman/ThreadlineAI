@@ -57,7 +57,7 @@ Composes structured LLM messages using recent approved session events and the la
 POST /sessions/{sessionId}/ask
 ```
 
-Build 11.5 uses this endpoint as the sidecar's primary Ask path. The request mirrors prompt composition so the service can resolve the same approved context and then forward the composed messages to the active provider.
+Build 11.7 exposes this as the service-side real answer path. The request mirrors prompt composition so the service resolves the same approved context, builds the same structured messages, resolves the active session provider, calls the configured OpenAI-compatible provider, and returns the assistant answer.
 
 Request body:
 
@@ -77,11 +77,14 @@ Expected response body:
   "messages": [
     { "role": "system", "content": "..." },
     { "role": "user", "content": "..." }
-  ]
+  ],
+  "providerName": "OpenAI",
+  "model": "gpt-4.1-mini",
+  "durationMs": 742
 }
 ```
 
-The Windows sidecar should append the user question and assistant answer as separate transcript messages. Provider/configuration failures should return a non-success status with a useful error body so the UI can show a readable failure instead of crashing.
+The Windows sidecar appends the user question and assistant answer as separate transcript messages. Provider/configuration failures return a non-success status with a useful error body so the UI can show a readable failure instead of crashing. Provider calls are audit-logged with metadata such as provider, model, duration, message count, and answer length; secrets and prompt content are not written to audit metadata.
 
 ## Providers
 
@@ -89,6 +92,7 @@ The Windows sidecar should append the user question and assistant answer as sepa
 GET /providers
 GET /providers/{providerName}
 POST /providers
+POST /providers/{providerName}/credential
 ```
 
 Provider records store credential references, not raw secrets. Actual secret material must be stored in Windows Credential Manager, DPAPI-protected storage, or an enterprise vault in later phases.
