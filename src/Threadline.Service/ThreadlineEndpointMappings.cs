@@ -100,6 +100,24 @@ public static class ThreadlineEndpointMappings
             return Results.Ok(promptComposer.Compose(new ThreadlinePromptContext(request.Question.Trim(), request.CurrentWindow, summary, events)));
         });
 
+        api.MapPost("/sessions/{sessionId}/ask", async (string sessionId, ComposePromptRequest request, ThreadlineAskService askService, CancellationToken ct) =>
+        {
+            var invalidSession = RequestValidator.ValidateSessionId(sessionId);
+            if (invalidSession is not null) return invalidSession;
+
+            var invalidQuestion = RequestValidator.ValidateQuestion(request.Question);
+            if (invalidQuestion is not null) return invalidQuestion;
+
+            try
+            {
+                return Results.Ok(await askService.AskAsync(sessionId, request, ct));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
+            }
+        });
+
         api.MapPost("/sessions/{sessionId}/windows/attach", async (string sessionId, AttachWindowRequest request, WindowAttachmentService windows, IClock clock, CancellationToken ct) =>
         {
             var invalidSession = RequestValidator.ValidateSessionId(sessionId);
@@ -258,60 +276,14 @@ public static class ThreadlineEndpointMappings
             return Results.Created($"/providers/{saved.ProviderName}", new { provider = saved, credential = SecretDescriptorResponse.FromDescriptor(descriptor) });
         });
 
-        api.MapGet("/secrets/{*reference}", async (string reference, SecretService secrets, CancellationToken ct) =>
-        {
-            reference = Uri.UnescapeDataString(reference);
-            var invalidReference = RequestValidator.ValidateSecretReference(reference);
-            if (invalidReference is not null) return invalidReference;
-
-            var descriptor = await secrets.DescribeAsync(reference, ct);
-            IResult result = descriptor is null ? Results.NotFound() : Results.Ok(SecretDescriptorResponse.FromDescriptor(descriptor));
-            return result;
-        });
-
-        api.MapDelete("/secrets/{*reference}", async (string reference, SecretService secrets, CancellationToken ct) =>
-        {
-            reference = Uri.UnescapeDataString(reference);
-            var invalidReference = RequestValidator.ValidateSecretReference(reference);
-            if (invalidReference is not null) return invalidReference;
-
-            var deleted = await secrets.DeleteAsync(reference, ct);
-            IResult result = deleted ? Results.NoContent() : Results.NotFound();
-            return result;
-        });
-
-        api.MapGet("/audit/recent", async (string? sessionId, int? take, IAuditRepository audit, CancellationToken ct) =>
-            Results.Ok(await audit.GetRecentAuditEventsAsync(sessionId, take ?? 50, ct)));
-
-        api.MapGet("/adapters", async (IAdapterRegistry registry, CancellationToken ct) =>
-            Results.Ok(await registry.ListAsync(ct)));
-
-        api.MapPost("/adapters", async (RegisterAdapterRequest request, IAdapterRegistry registry, IAuditRepository audit, IClock clock, CancellationToken ct) =>
+        api.MapPost("/adapters", async (RegisterAdapterRequest request, IAdapterRegistry adapters, IClock clock, CancellationToken ct) =>
         {
             var invalidAdapter = RequestValidator.ValidateAdapter(request);
             if (invalidAdapter is not null) return invalidAdapter;
 
-            var registration = AdapterRegistration.Create(request.Kind, request.DisplayName, request.Permissions, clock.UtcNow, request.Version, request.Metadata);
-            var saved = await registry.RegisterAsync(registration, ct);
-            await audit.AppendAuditEventAsync(AuditEvent.Create(null, AuditEventType.AdapterRegistered, clock.UtcNow, $"Adapter registered: {saved.DisplayName}"), ct);
-            return Results.Created($"/adapters/{saved.Id}", saved);
-        });
-
-        api.MapPost("/adapters/{adapterId}/heartbeat", async (string adapterId, IAdapterRegistry registry, IAuditRepository audit, IClock clock, CancellationToken ct) =>
-        {
-            if (string.IsNullOrWhiteSpace(adapterId) || !adapterId.StartsWith("adp_", StringComparison.Ordinal))
-            {
-                return Results.BadRequest(new { error = "A valid Threadline adapter id is required." });
-            }
-
-            var updated = await registry.MarkSeenAsync(adapterId, clock.UtcNow, ct);
-            if (updated is null)
-            {
-                return Results.NotFound();
-            }
-
-            await audit.AppendAuditEventAsync(AuditEvent.Create(null, AuditEventType.AdapterHeartbeat, clock.UtcNow, $"Adapter heartbeat: {updated.DisplayName}"), ct);
-            return Results.Ok(updated);
+            var registered = AdapterRegistration.Create(request.Kind, request.DisplayName.Trim(), request.Permissions, clock.UtcNow, request.Version, request.Metadata);
+            await adapters.RegisterAsync(registered, ct);
+            return Results.Created($"/adapters/{registered.Id}", registered);
         });
 
         return app;
