@@ -8,13 +8,17 @@ public sealed record SummarizedContext(
     string Summary,
     IReadOnlyList<string> KeyDetails,
     IReadOnlyList<string> Warnings,
-    string RawPreview)
+    string RawPreview,
+    ContextConfidence Confidence = ContextConfidence.None,
+    ProcessIntelligence? Process = null,
+    CaptureDiagnostics? Diagnostics = null)
 {
     public string ToPromptContext()
     {
         var details = KeyDetails.Count == 0 ? "None detected." : string.Join(Environment.NewLine, KeyDetails.Select(detail => $"- {detail}"));
         var warnings = Warnings.Count == 0 ? "None." : string.Join(Environment.NewLine, Warnings.Select(warning => $"- {warning}"));
-        return $"Context summary: {Title}\nSource: {Source}\n\nSummary:\n{Summary}\n\nKey details:\n{details}\n\nWarnings:\n{warnings}";
+        var process = Process is null ? "Process intelligence: not available." : Process.ToDisplayText();
+        return $"Context summary: {Title}\nSource: {Source}\nConfidence: {Confidence}\n\nWhat Threadline can see:\n{process}\n\nSummary:\n{Summary}\n\nKey details:\n{details}\n\nWarnings:\n{warnings}";
     }
 }
 
@@ -38,7 +42,8 @@ public sealed class ContextSummarizer
                 "Threadline could not read useful native UI content from the target window.",
                 [],
                 result.Warnings,
-                result.ToDisplayText());
+                result.ToDisplayText(),
+                ContextConfidence.Low);
         }
 
         var cleanedLines = CleanLines(result.Content).ToList();
@@ -47,7 +52,7 @@ public sealed class ContextSummarizer
         var ambiguous = IsAmbiguousTabbedCapture(result, cleanedLines);
         if (ambiguous)
         {
-            warnings.Add("This native capture is tab-ambiguous. Threadline can identify the active Notepad window/tab title, but Windows exposed body text that may belong to another tab. Use selected text, clipboard capture, or a future tab picker for reliable document content.");
+            warnings.Add("This native capture is tab-ambiguous. Threadline can identify the active window or tab title, but Windows exposed body text that may belong to another tab.");
         }
 
         var keyDetails = ambiguous
@@ -59,13 +64,16 @@ public sealed class ContextSummarizer
             warnings.Add("Native UI capture contained only window chrome or low-value controls after cleanup.");
         }
 
+        var confidence = cleanedLines.Count == 0 || ambiguous ? ContextConfidence.Low : ContextConfidence.Medium;
+
         return new SummarizedContext(
             title,
             $"{result.ProcessName} native UI",
             summary,
             keyDetails,
             warnings,
-            result.ToDisplayText());
+            result.ToDisplayText(),
+            confidence);
     }
 
     public SummarizedContext SummarizePlainText(string title, string source, string text)
@@ -80,7 +88,7 @@ public sealed class ContextSummarizer
         var summaryText = string.Join(" ", cleanedLines.Take(10));
         if (summaryText.Length > 1200)
         {
-            summaryText = summaryText[..1200].TrimEnd() + "...";
+            summaryText = summaryText.Substring(0, 1200).TrimEnd() + "...";
         }
 
         if (string.IsNullOrWhiteSpace(summaryText))
@@ -98,7 +106,8 @@ public sealed class ContextSummarizer
             summaryText,
             keyDetails,
             [],
-            text);
+            text,
+            string.IsNullOrWhiteSpace(text) ? ContextConfidence.None : ContextConfidence.High);
     }
 
     private static IEnumerable<string> CleanLines(string content)
@@ -133,13 +142,13 @@ public sealed class ContextSummarizer
 
         if (ambiguous)
         {
-            return $"Threadline identified the active window/tab as '{title}', but this app's native UI capture may contain content from other tabs or document bodies. Threadline is not summarizing the body text because it may be from the wrong tab.";
+            return $"Threadline identified the active window or tab as '{title}', but this app's native UI capture may contain content from other tabs or document bodies. Threadline is not summarizing the body text because it may be from the wrong tab.";
         }
 
         var joined = string.Join(" ", cleanedLines.Take(8));
         if (joined.Length > 900)
         {
-            joined = joined[..900].TrimEnd() + "...";
+            joined = joined.Substring(0, 900).TrimEnd() + "...";
         }
 
         return $"Threadline captured readable content from '{title}'. The useful visible content appears to focus on: {joined}";
