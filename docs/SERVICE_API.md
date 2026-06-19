@@ -51,6 +51,38 @@ POST /sessions/{sessionId}/prompt
 
 Composes structured LLM messages using recent approved session events and the latest summary.
 
+## Ask response path
+
+```http
+POST /sessions/{sessionId}/ask
+```
+
+Build 11.5 uses this endpoint as the sidecar's primary Ask path. The request mirrors prompt composition so the service can resolve the same approved context and then forward the composed messages to the active provider.
+
+Request body:
+
+```json
+{
+  "question": "What should I do next?",
+  "currentWindow": "Optional resolved current-window context",
+  "takeRecentEvents": 20
+}
+```
+
+Expected response body:
+
+```json
+{
+  "answer": "Provider response text",
+  "messages": [
+    { "role": "system", "content": "..." },
+    { "role": "user", "content": "..." }
+  ]
+}
+```
+
+The Windows sidecar should append the user question and assistant answer as separate transcript messages. Provider/configuration failures should return a non-success status with a useful error body so the UI can show a readable failure instead of crashing.
+
 ## Providers
 
 ```http
