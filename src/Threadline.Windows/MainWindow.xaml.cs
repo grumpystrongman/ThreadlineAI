@@ -1,6 +1,5 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
 using Threadline.Windows.Services;
 
 namespace Threadline.Windows;
@@ -232,7 +231,7 @@ public sealed partial class MainWindow : Window
     private void AppendTranscript(string speaker, string message)
     {
         var safeMessage = TrimForTranscript(message);
-        var item = CreateTranscriptItem(speaker, safeMessage);
+        var item = $"{speaker}\n{safeMessage}\n{DateTimeOffset.Now:t}";
 
         TranscriptList.Items.Add(item);
         while (TranscriptList.Items.Count > MaxTranscriptItems)
@@ -242,54 +241,6 @@ public sealed partial class MainWindow : Window
 
         TranscriptList.UpdateLayout();
         TranscriptList.ScrollIntoView(item);
-    }
-
-    private static Border CreateTranscriptItem(string speaker, string message)
-    {
-        var speakerBlock = new TextBlock
-        {
-            Text = speaker,
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            Opacity = 0.9
-        };
-
-        var messageBox = new TextBox
-        {
-            Text = message,
-            IsReadOnly = true,
-            AcceptsReturn = true,
-            TextWrapping = TextWrapping.Wrap,
-            BorderThickness = new Thickness(0),
-            Padding = new Thickness(0),
-            Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
-            HorizontalAlignment = HorizontalAlignment.Stretch
-        };
-
-        var timeBlock = new TextBlock
-        {
-            Text = DateTimeOffset.Now.ToString("t"),
-            FontSize = 11,
-            Opacity = 0.55,
-            HorizontalAlignment = HorizontalAlignment.Right
-        };
-
-        var panel = new StackPanel
-        {
-            Spacing = 4,
-            HorizontalAlignment = HorizontalAlignment.Stretch
-        };
-        panel.Children.Add(speakerBlock);
-        panel.Children.Add(messageBox);
-        panel.Children.Add(timeBlock);
-
-        return new Border
-        {
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(10),
-            Margin = new Thickness(0, 4, 0, 4),
-            Child = panel,
-            HorizontalAlignment = HorizontalAlignment.Stretch
-        };
     }
 
     private static string TrimForTranscript(string? value)
