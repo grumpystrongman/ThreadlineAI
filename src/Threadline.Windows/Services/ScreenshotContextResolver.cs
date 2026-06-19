@@ -2,7 +2,7 @@ namespace Threadline.Windows.Services;
 
 public sealed class ScreenshotContextResolver
 {
-    public SummarizedContext ResolveFallback(ThreadlineTarget target, ProcessIntelligenceSnapshot processIntelligence, IReadOnlyList<string> priorAttempts)
+    public SummarizedContext ResolveFallback(ThreadlineTarget target, ProcessIntelligence processIntelligence, IReadOnlyList<string> priorAttempts)
     {
         var details = new List<string>
         {
@@ -12,7 +12,7 @@ public sealed class ScreenshotContextResolver
             "Chars extracted: 0",
             "Images found: 0",
             "Summary size: 0",
-            "Confidence: none",
+            "Confidence: Low",
             $"Target: {target}",
             processIntelligence.ToDisplayText()
         };
@@ -21,12 +21,11 @@ public sealed class ScreenshotContextResolver
         return new SummarizedContext(
             target.Title,
             "screenshot-resolver",
-            "Threadline reached the screenshot fallback, but OCR/image extraction is not configured in this build. Based on visible content, Threadline cannot safely claim document body text yet.",
+            "Threadline reached the screenshot fallback, but OCR and image extraction are not configured in this build. Based on visible window metadata only, Threadline cannot safely claim document body text yet.",
             details,
             ["Screenshot capture is the fallback path only. OCR, image extraction, and layout analysis still need the vision/OCR engine integration."],
             target.Window.ToDisplayText(),
-            ContextConfidence.None,
-            "screenshot-fallback",
+            ContextConfidence.Low,
             processIntelligence);
     }
 }
