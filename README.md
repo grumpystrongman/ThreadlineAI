@@ -22,6 +22,7 @@ ThreadlineAI is in early alpha engineering.
 - Build 11.8: the Windows sidecar now has a confidence-based deep active-app resolver with process intelligence, provider/UIA/file/screenshot pipeline ordering, a Current Context panel, and hidden diagnostics for selected targets.
 - Build 11.9: the sidecar now surfaces a visible context status pill, carries that status into Ask timeline/transcript messages, and resets bound transcript/context state safely when starting a new chat or clearing context.
 - Build 11.9.1: missing-Ask-endpoint fallback now reports the local resolved context visibility instead of only showing a service plumbing message.
+- Build 11.10: the sidecar moves Current Context above the conversation, frees the left column for Open Apps and Tabs, defaults the provider picker to OpenAI, and falls back to local visibility when Ask provider calls fail.
 
 ## What is in this scaffold
 
