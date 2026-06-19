@@ -39,7 +39,7 @@ public sealed partial class MainWindow
     {
         var status = BuildContextStatus(context);
         ContextStatusText.Text = status;
-        CurrentContextText.Text = $"Status:\n{status}\n\nSource:\n{context.Source}\n\nConfidence:\n{context.Confidence}\n\nSummary:\n{context.Summary}";
+        CurrentContextText.Text = $"Source: {context.Source} • Confidence: {context.Confidence}\nSummary: {context.Summary}";
         DiagnosticsText.Text = context.Diagnostics?.ToDisplayText() ?? "No diagnostics are available for the current context.";
     }
 
