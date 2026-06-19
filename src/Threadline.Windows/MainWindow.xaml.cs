@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using Threadline.Windows.Services;
 
 namespace Threadline.Windows;
@@ -58,6 +59,7 @@ public sealed partial class MainWindow : Window
     {
         var provider = GetSelectedProvider();
         _session = await _client.StartSessionAsync($"Windows companion session {DateTimeOffset.Now:g}", provider);
+        SessionText.Text = $"Session: {_session.Status} / {_session.ActiveProvider ?? "None"}";
         AppendTranscript("Threadline Session", FormatSession(_session));
         AddTimeline($"Started session {_session.Id}");
     }
@@ -67,11 +69,13 @@ public sealed partial class MainWindow : Window
         _session = await _client.GetActiveSessionAsync();
         if (_session is null)
         {
+            SessionText.Text = "No active Threadline session.";
             AppendTranscript("Threadline Session", "No active Threadline session found.");
             AddTimeline("No active session found.");
             return;
         }
 
+        SessionText.Text = $"Session: {_session.Status} / {_session.ActiveProvider ?? "None"}";
         AppendTranscript("Threadline Session", FormatSession(_session));
         AddTimeline($"Using active session {_session.Id}");
     }
@@ -211,21 +215,24 @@ public sealed partial class MainWindow : Window
     private static string FormatAttachment(WindowAttachmentDto attachment) =>
         $"Attached: {attachment.Snapshot.ApplicationName}\nProcess: {attachment.Snapshot.ProcessName}\nWindow: {attachment.Snapshot.WindowTitle}\nStatus: {attachment.Status}\nAttachment: {attachment.Id}";
 
-    private void AddTimeline(string message) => TimelineList.Items.Add($"{DateTimeOffset.Now:t} {message}");
+    private void AddTimeline(string message)
+    {
+        TimelineList.Items.Add($"{DateTimeOffset.Now:t} {message}");
+        while (TimelineList.Items.Count > 40)
+        {
+            TimelineList.Items.RemoveAt(0);
+        }
+
+        if (TimelineList.Items.Count > 0)
+        {
+            TimelineList.ScrollIntoView(TimelineList.Items[^1]);
+        }
+    }
 
     private void AppendTranscript(string speaker, string message)
     {
         var safeMessage = TrimForTranscript(message);
-        var item = new TextBox
-        {
-            Text = $"{speaker}:\n{safeMessage}",
-            IsReadOnly = true,
-            AcceptsReturn = true,
-            TextWrapping = TextWrapping.Wrap,
-            BorderThickness = new Thickness(0),
-            Padding = new Thickness(8),
-            HorizontalAlignment = HorizontalAlignment.Stretch
-        };
+        var item = CreateTranscriptItem(speaker, safeMessage);
 
         TranscriptList.Items.Add(item);
         while (TranscriptList.Items.Count > MaxTranscriptItems)
@@ -233,7 +240,56 @@ public sealed partial class MainWindow : Window
             TranscriptList.Items.RemoveAt(0);
         }
 
+        TranscriptList.UpdateLayout();
         TranscriptList.ScrollIntoView(item);
+    }
+
+    private static Border CreateTranscriptItem(string speaker, string message)
+    {
+        var speakerBlock = new TextBlock
+        {
+            Text = speaker,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Opacity = 0.9
+        };
+
+        var messageBox = new TextBox
+        {
+            Text = message,
+            IsReadOnly = true,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(0),
+            Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+
+        var timeBlock = new TextBlock
+        {
+            Text = DateTimeOffset.Now.ToString("t"),
+            FontSize = 11,
+            Opacity = 0.55,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+
+        var panel = new StackPanel
+        {
+            Spacing = 4,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        panel.Children.Add(speakerBlock);
+        panel.Children.Add(messageBox);
+        panel.Children.Add(timeBlock);
+
+        return new Border
+        {
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(10),
+            Margin = new Thickness(0, 4, 0, 4),
+            Child = panel,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
     }
 
     private static string TrimForTranscript(string? value)
