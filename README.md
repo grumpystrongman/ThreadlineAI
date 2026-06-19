@@ -114,11 +114,22 @@ ThreadlineAI should never behave like invisible spyware. Capture should be visib
 
 ## License
 
-Copyright (c) 2026 Jeff Barnes. All rights reserved.
+Business Source License 1.1
 
-This software and associated documentation files are proprietary and confidential. 
-Unauthorized copying, modification, distribution, or use of this file, via any medium, 
-is strictly prohibited. 
+Parameters:
+- Licensor: Jeff Barnes
+- Software: ThreadlineAI
+- Change Date: January 1, 2030
+- Change License: Apache License, Version 2.0
+- Additional Use Grant: You may make non-commercial use of the Licensed Work. 
+  Production use, commercial use, or embedding this code into any paid or enterprise 
+  offering is strictly prohibited without a separate commercial license from the Licensor.
 
-The source code is made publicly visible solely for architectural review, portfolio 
-demonstration, and employment evaluation purposes.
+Licensed Work is all files in this repository.
+
+Subject to the terms hereof, Licensor hereby grants you a non-exclusive, worldwide, 
+non-transferable, non-sublicensable, royalty-free license to use, copy, and modify 
+the Licensed Work solely for your non-commercial purposes. 
+
+On the Change Date, or upon an earlier public announcement by Licensor, the Licensed 
+Work converts automatically to the Change License.
