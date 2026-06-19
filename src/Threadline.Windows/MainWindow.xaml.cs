@@ -25,7 +25,6 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        TranscriptList.ItemsSource = _transcriptItems;
         ConfigureSidecarWindow();
         AppendTranscript("Threadline", "Start or use a session, pick an app/tab, then ask Threadline about that target.");
         RefreshActiveWindow();
@@ -46,7 +45,7 @@ public sealed partial class MainWindow : Window
     private async void CompleteLastAction_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(CompleteLastActionAsync);
     private void ClearTranscript_Click(object sender, RoutedEventArgs e)
     {
-        _transcriptItems.Clear();
+        TranscriptList.Items.Clear();
         AppendTranscript("Threadline", "Transcript cleared.");
     }
 
@@ -250,10 +249,10 @@ public sealed partial class MainWindow : Window
         var safeMessage = TrimForTranscript(message);
         var item = $"{speaker}\n{safeMessage}\n{DateTimeOffset.Now:t}";
 
-        _transcriptItems.Add(item);
-        while (_transcriptItems.Count > MaxTranscriptItems)
+        TranscriptList.Items.Add(item);
+        while (TranscriptList.Items.Count > MaxTranscriptItems)
         {
-            _transcriptItems.RemoveAt(0);
+            TranscriptList.Items.RemoveAt(0);
         }
 
         TranscriptList.UpdateLayout();
