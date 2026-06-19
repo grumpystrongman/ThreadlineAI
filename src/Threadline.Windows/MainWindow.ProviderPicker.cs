@@ -55,6 +55,13 @@ public sealed partial class MainWindow
     {
         var source = context.Source ?? string.Empty;
 
+        if (source.Contains("needed", StringComparison.OrdinalIgnoreCase) ||
+            source.Contains("missing", StringComparison.OrdinalIgnoreCase) ||
+            source.Contains("provider", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"Provider needed • {context.Confidence}";
+        }
+
         if (source.Contains("browser", StringComparison.OrdinalIgnoreCase))
         {
             return $"Browser • {context.Confidence}";
@@ -76,13 +83,6 @@ public sealed partial class MainWindow
             source.Contains("ocr", StringComparison.OrdinalIgnoreCase))
         {
             return $"Screenshot required • {context.Confidence}";
-        }
-
-        if (source.Contains("needed", StringComparison.OrdinalIgnoreCase) ||
-            source.Contains("missing", StringComparison.OrdinalIgnoreCase) ||
-            source.Contains("provider", StringComparison.OrdinalIgnoreCase))
-        {
-            return $"Provider needed • {context.Confidence}";
         }
 
         if (context.Confidence == ContextConfidence.None)
