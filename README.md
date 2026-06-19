@@ -114,4 +114,11 @@ ThreadlineAI should never behave like invisible spyware. Capture should be visib
 
 ## License
 
-Internal prototype unless otherwise specified.
+Copyright (c) 2026 Jeff Barnes. All rights reserved.
+
+This software and associated documentation files are proprietary and confidential. 
+Unauthorized copying, modification, distribution, or use of this file, via any medium, 
+is strictly prohibited. 
+
+The source code is made publicly visible solely for architectural review, portfolio 
+demonstration, and employment evaluation purposes.
