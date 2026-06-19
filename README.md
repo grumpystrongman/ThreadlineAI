@@ -20,13 +20,14 @@ ThreadlineAI is in early alpha engineering.
 - Build 11.5: Windows Ask routes to the provider-response contract and appends assistant answers into a stable chat transcript when the local service exposes `/sessions/{sessionId}/ask`; older service builds fall back to prompt composition with a readable transcript message.
 - Build 11.7: the local service now exposes `/sessions/{sessionId}/ask`, resolves the active configured provider, calls the OpenAI-compatible provider path, returns answer metadata, and audit-logs provider call start/completion/failure without storing secrets or prompt content.
 - Build 11.8: the Windows sidecar now has a confidence-based deep active-app resolver with process intelligence, provider/UIA/file/screenshot pipeline ordering, a Current Context panel, and hidden diagnostics for selected targets.
+- Build 11.9: the sidecar now surfaces a visible context status pill, carries that status into Ask timeline/transcript messages, and resets bound transcript/context state safely when starting a new chat or clearing context.
 
 ## What is in this scaffold
 
 - Core domain model for sessions, context events, capture rules, prompt composition, privacy rules, provider abstraction, provider connections, artifacts, audit events, context preview, adapter registration, secure secret references, window attachment, and window actions.
 - Infrastructure for SQLite persistence, in-memory adapter registration, in-memory testing, secure local secret storage, in-memory window attachment runtime state, and OpenAI-compatible HTTP providers.
 - Local service API for adapters, the Windows shell, and provider-backed Ask execution.
-- Windows companion UI scaffold wired to the local service for session, window attachment, context preview/storage, Ask response routing, prompt composition fallback, confidence-scored context resolution, diagnostics, and action proposal flows.
+- Windows companion UI scaffold wired to the local service for session, window attachment, context preview/storage, Ask response routing, prompt composition fallback, confidence-scored context resolution, visible context status, diagnostics, and action proposal flows.
 - Browser extension bridge for Chrome/Edge user-triggered page and selected-text capture into the active Threadline session.
 - PowerShell terminal adapter module for user-triggered terminal notes, transcript excerpts, command-output capture, and action tracking.
 - Privacy/security design notes and implementation roadmap.
