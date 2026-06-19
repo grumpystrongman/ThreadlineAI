@@ -158,12 +158,32 @@ public sealed partial class MainWindow : Window
                 : response.Answer);
             AddTimeline("Received provider response.");
         }
-        catch (ThreadlineEndpointNotFoundException)
+        catch (ThreadlineEndpointNotFoundException ex)
         {
-            var messages = await _client.ComposePromptAsync(_session!.Id, question, currentWindow);
-            UpdateTranscript(pendingMessage, BuildLocalAskFallbackMessage(messages.Count, currentWindow));
-            AddTimeline("Ask endpoint missing; local visibility fallback shown.");
+            await ShowLocalAskFallbackAsync(pendingMessage, currentWindow, "Ask endpoint missing", ex.Message);
         }
+        catch (InvalidOperationException ex) when (IsProviderExecutionFailure(ex))
+        {
+            await ShowLocalAskFallbackAsync(pendingMessage, currentWindow, "Provider not ready", ex.Message);
+        }
+    }
+
+    private async Task ShowLocalAskFallbackAsync(TranscriptMessage pendingMessage, string? currentWindow, string reason, string detail)
+    {
+        var messages = await _client.ComposePromptAsync(_session!.Id, QuestionBox.Text ?? string.Empty, currentWindow);
+        UpdateTranscript(pendingMessage, BuildLocalAskFallbackMessage(messages.Count, currentWindow, reason, detail));
+        AddTimeline($"{reason}; local visibility fallback shown.");
+    }
+
+    private static bool IsProviderExecutionFailure(InvalidOperationException ex)
+    {
+        var message = ex.Message ?? string.Empty;
+        return message.Contains("Threadline service returned 409", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("Provider '", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("provider", StringComparison.OrdinalIgnoreCase) &&
+               (message.Contains("not configured", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("not ready", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("missing", StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task ProposeInsertActionAsync()
@@ -315,10 +335,15 @@ public sealed partial class MainWindow : Window
         return builder.ToString();
     }
 
-    private string BuildLocalAskFallbackMessage(int composedMessageCount, string? currentWindow)
+    private string BuildLocalAskFallbackMessage(int composedMessageCount, string? currentWindow, string reason, string detail)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("Provider response execution is not available from the running local service build, but Threadline did resolve local context.");
+        builder.AppendLine("I could not get a provider-written answer, but Threadline did resolve local context.");
+        builder.AppendLine($"Reason: {reason}.");
+        if (!string.IsNullOrWhiteSpace(detail))
+        {
+            builder.AppendLine($"Detail: {SummarizeServiceError(detail)}");
+        }
 
         if (_lastContextSummary is not null)
         {
@@ -343,9 +368,9 @@ public sealed partial class MainWindow : Window
             {
                 builder.AppendLine();
                 builder.AppendLine("Key details I can use:");
-                foreach (var detail in _lastContextSummary.KeyDetails.Take(8))
+                foreach (var detailItem in _lastContextSummary.KeyDetails.Take(8))
                 {
-                    builder.AppendLine($"- {detail}");
+                    builder.AppendLine($"- {detailItem}");
                 }
             }
 
@@ -372,8 +397,16 @@ public sealed partial class MainWindow : Window
         }
 
         builder.AppendLine();
-        builder.AppendLine($"Prompt composition produced {composedMessageCount} message(s). To get a provider-written answer, restart/build the local service so `/sessions/{{sessionId}}/ask` is available.");
+        builder.AppendLine($"Prompt composition produced {composedMessageCount} message(s). Configure the active provider to get a full provider-written answer.");
         return builder.ToString();
+    }
+
+    private static string SummarizeServiceError(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+        var normalized = value.Replace("\r", " ").Replace("\n", " ").Trim();
+        if (normalized.Length <= 600) return normalized;
+        return normalized[..600].TrimEnd() + "...";
     }
 
     private static void SetClipboardText(string text)
