@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Threadline.Core;
 
@@ -197,19 +198,124 @@ public sealed class OpenAiCompatibleProvider : ILlmProvider
 
     public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken = default)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Post, new Uri(new Uri(_options.BaseUrl), "chat/completions"));
+        var model = string.IsNullOrWhiteSpace(request.Model) ? _options.DefaultModel : request.Model;
+        return ShouldUseResponsesApi(_options)
+            ? await CompleteWithResponsesApiAsync(request, model, cancellationToken)
+            : await CompleteWithChatCompletionsAsync(request, model, cancellationToken);
+    }
+
+    private async Task<LlmResponse> CompleteWithResponsesApiAsync(LlmRequest request, string model, CancellationToken cancellationToken)
+    {
+        using var message = CreateProviderRequest("responses");
+        message.Content = JsonContent.Create(new ResponsesApiRequest(model, request.Messages.Select(m => new ResponsesInputMessage(NormalizeResponsesRole(m.Role), m.Content)).ToArray(), request.MaxOutputTokens));
+
+        using var response = await _httpClient.SendAsync(message, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<ResponsesApiResponse>(cancellationToken: cancellationToken) ?? throw new InvalidOperationException("Provider returned an empty response.");
+        return new LlmResponse(Name, model, ExtractResponsesOutputText(payload), new Dictionary<string, string> { ["providerEndpoint"] = "responses" });
+    }
+
+    private async Task<LlmResponse> CompleteWithChatCompletionsAsync(LlmRequest request, string model, CancellationToken cancellationToken)
+    {
+        using var message = CreateProviderRequest("chat/completions");
+        message.Content = JsonContent.Create(new ChatCompletionRequest(model, request.Messages.Select(m => new ChatMessage(m.Role, m.Content)).ToArray(), request.Temperature, request.MaxOutputTokens));
+
+        using var response = await _httpClient.SendAsync(message, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<ChatCompletionResponse>(cancellationToken: cancellationToken) ?? throw new InvalidOperationException("Provider returned an empty response.");
+        return new LlmResponse(Name, model, payload.Choices.FirstOrDefault()?.Message?.Content ?? string.Empty, new Dictionary<string, string> { ["providerEndpoint"] = "chat/completions" });
+    }
+
+    private HttpRequestMessage CreateProviderRequest(string relativePath)
+    {
+        var message = new HttpRequestMessage(HttpMethod.Post, BuildEndpointUri(_options.BaseUrl, relativePath));
         if (!string.IsNullOrWhiteSpace(_options.ApiKey))
         {
             message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
         }
 
-        var model = string.IsNullOrWhiteSpace(request.Model) ? _options.DefaultModel : request.Model;
-        message.Content = JsonContent.Create(new ChatCompletionRequest(model, request.Messages.Select(m => new ChatMessage(m.Role, m.Content)).ToArray(), request.Temperature, request.MaxOutputTokens));
-        using var response = await _httpClient.SendAsync(message, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        var payload = await response.Content.ReadFromJsonAsync<ChatCompletionResponse>(cancellationToken: cancellationToken) ?? throw new InvalidOperationException("Provider returned an empty response.");
-        return new LlmResponse(Name, model, payload.Choices.FirstOrDefault()?.Message?.Content ?? string.Empty);
+        return message;
     }
+
+    private static Uri BuildEndpointUri(string baseUrl, string relativePath)
+    {
+        var normalizedBaseUrl = baseUrl.Trim();
+        if (!normalizedBaseUrl.EndsWith('/', StringComparison.Ordinal))
+        {
+            normalizedBaseUrl += "/";
+        }
+
+        return new Uri(new Uri(normalizedBaseUrl), relativePath);
+    }
+
+    private static bool ShouldUseResponsesApi(OpenAiCompatibleProviderOptions options)
+    {
+        if (options.ProviderName.Equals("OpenAI", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out var baseUri)
+            && baseUri.Host.Equals("api.openai.com", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeResponsesRole(string role) => role switch
+    {
+        "system" => "developer",
+        "developer" => "developer",
+        "assistant" => "assistant",
+        _ => "user"
+    };
+
+    private static string ExtractResponsesOutputText(ResponsesApiResponse payload)
+    {
+        if (!string.IsNullOrWhiteSpace(payload.OutputText))
+        {
+            return payload.OutputText;
+        }
+
+        if (payload.Output is null)
+        {
+            return string.Empty;
+        }
+
+        var parts = new List<string>();
+        foreach (var item in payload.Output)
+        {
+            if (item.Content is null)
+            {
+                continue;
+            }
+
+            foreach (var content in item.Content)
+            {
+                if (!string.IsNullOrWhiteSpace(content.Text))
+                {
+                    parts.Add(content.Text);
+                }
+            }
+        }
+
+        return string.Join(Environment.NewLine, parts);
+    }
+
+    private sealed record ResponsesApiRequest(
+        [property: JsonPropertyName("model")] string Model,
+        [property: JsonPropertyName("input")] IReadOnlyList<ResponsesInputMessage> Input,
+        [property: JsonPropertyName("max_output_tokens")] int? MaxOutputTokens);
+
+    private sealed record ResponsesInputMessage(
+        [property: JsonPropertyName("role")] string Role,
+        [property: JsonPropertyName("content")] string Content);
+
+    private sealed record ResponsesApiResponse(
+        [property: JsonPropertyName("output_text")] string? OutputText,
+        [property: JsonPropertyName("output")] IReadOnlyList<ResponsesOutputItem>? Output);
+
+    private sealed record ResponsesOutputItem([property: JsonPropertyName("content")] IReadOnlyList<ResponsesContentItem>? Content);
+    private sealed record ResponsesContentItem([property: JsonPropertyName("text")] string? Text);
 
     private sealed record ChatCompletionRequest([property: JsonPropertyName("model")] string Model, [property: JsonPropertyName("messages")] IReadOnlyList<ChatMessage> Messages, [property: JsonPropertyName("temperature")] double Temperature, [property: JsonPropertyName("max_tokens")] int? MaxTokens);
     private sealed record ChatMessage([property: JsonPropertyName("role")] string Role, [property: JsonPropertyName("content")] string Content);
