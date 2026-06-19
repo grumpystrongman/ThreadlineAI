@@ -34,11 +34,47 @@ A manual test exposed a bad fallback experience: when the running local service 
 
 This keeps the sidecar useful even when the service binary is stale or the provider execution path is unavailable.
 
+## Build 11.9.3 correction
+
+A second manual test confirmed that `/ask` can be present and still fail with provider configuration status `409 Conflict`, for example when the session provider is `Local` but no `Local` provider connection exists.
+
+11.9.3 treats provider configuration failures like a recoverable Ask execution failure. The sidecar now keeps the pending `Threadline` message and replaces it with the same local visibility report, including the provider failure reason, instead of appending a separate service/action error after the thinking message.
+
+## Local provider setup example
+
+`Local` must be configured as an OpenAI-compatible endpoint before provider-written answers can work. The `baseUrl` should include the OpenAI-compatible API root and should end with `/` because the provider appends `chat/completions`.
+
+For LM Studio:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "http://localhost:5057/providers" -ContentType "application/json" -Body '{
+  "providerName": "Local",
+  "authType": "LocalEndpoint",
+  "baseUrl": "http://localhost:1234/v1/",
+  "defaultModel": "local-model",
+  "status": "Ready"
+}'
+```
+
+For Ollama's OpenAI-compatible endpoint:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "http://localhost:5057/providers" -ContentType "application/json" -Body '{
+  "providerName": "Local",
+  "authType": "LocalEndpoint",
+  "baseUrl": "http://localhost:11434/v1/",
+  "defaultModel": "llama3.1",
+  "status": "Ready"
+}'
+```
+
+Use whichever model name your local runtime actually exposes.
+
 ## Why this matters
 
 The resolver can now distinguish high-confidence provider/file context from lower-confidence native UI or screenshot-required fallback. The sidecar should expose that distinction before the user asks a question. This keeps Threadline honest and prevents a bad product habit: answering with confidence when it barely saw the target.
 
-The Ask fallback must follow the same principle. If provider execution fails because the running service is old, Threadline should still tell the user what local context it resolved instead of hiding the useful answer behind an implementation detail.
+The Ask fallback must follow the same principle. If provider execution fails because the running service is old or the active provider is not configured, Threadline should still tell the user what local context it resolved instead of hiding the useful answer behind an implementation detail.
 
 ## Manual verification
 
@@ -64,9 +100,12 @@ Then validate:
 8. Confirm the context pill shows Native UI, Screenshot required, or Provider needed based on the resolver path.
 9. Ask `what can you actually see` while running against a service that lacks `/ask`.
 10. Confirm the Threadline answer reports the local visibility fallback instead of only saying `/ask` is missing.
-11. Ask a normal question and confirm the transcript includes a `Threadline Context` message with Status, Source, and Confidence.
-12. Click **Clear Context** and confirm the pill resets to No context.
-13. Click **New** and confirm the transcript clears cleanly without UI binding errors.
+11. Ask `what can you actually see` with the session provider set to `Local` before configuring a `Local` provider.
+12. Confirm the Threadline answer reports the local visibility fallback and states the provider is not ready.
+13. Configure the `Local` provider and start a new session with provider `Local`.
+14. Ask a normal question and confirm the transcript includes a provider-written answer plus a `Threadline Context` message with Status, Source, and Confidence.
+15. Click **Clear Context** and confirm the pill resets to No context.
+16. Click **New** and confirm the transcript clears cleanly without UI binding errors.
 
 ## Known limitations
 
@@ -74,3 +113,4 @@ Then validate:
 - Screenshot/OCR remains a placeholder route. Build 11.9 makes the need visible but does not implement image reading.
 - Browser and Office-class apps still need deeper app-specific provider work for confident body capture.
 - If `/ask` is missing, Threadline can only report local resolved context; it still cannot generate a provider-written answer until the local service is rebuilt/restarted with the current Ask endpoint.
+- If `/ask` exists but the active provider is not configured, Threadline can report local resolved context but cannot generate a provider-written answer until the provider record is saved as `Ready`.
