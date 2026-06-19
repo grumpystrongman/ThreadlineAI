@@ -3,7 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="ThreadlineAI Sidecar">
-  <Grid Padding="12" RowDefinitions="Auto,Auto,Auto,*,Auto,Auto" RowSpacing="8" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+  <Grid Padding="12" RowDefinitions="Auto,*,Auto,Auto,Auto" RowSpacing="8" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
       <StackPanel Spacing="1">
         <TextBlock Text="ThreadlineAI" FontSize="22" FontWeight="SemiBold" />
@@ -21,48 +21,68 @@
       </ComboBox>
     </Grid>
 
-    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="6">
-      <Button Content="New" Click="NewChat_Click" />
-      <Button Content="Clear Context" Click="ClearSharedContext_Click" />
-      <Button Content="Use Session" Click="UseActiveSession_Click" />
-      <Button Content="Check" Click="CheckService_Click" />
-      <Button Content="Start" Click="StartSession_Click" />
-    </StackPanel>
+    <Grid Grid.Row="1" ColumnDefinitions="340,*" ColumnSpacing="10" MinHeight="480">
+      <Border Grid.Column="0" BorderThickness="1" CornerRadius="8" Padding="8">
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="8">
+          <TextBlock Text="Current Target" FontSize="15" FontWeight="SemiBold" />
+          <TextBlock x:Name="CurrentWindowText" Grid.Row="1" Text="No target window." TextWrapping="Wrap" MaxLines="7" />
 
-    <Border Grid.Row="2" BorderThickness="1" CornerRadius="8" Padding="8">
-      <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
-        <TextBlock Text="Current Target" FontSize="15" FontWeight="SemiBold" />
-        <TextBlock x:Name="CurrentWindowText" Grid.Row="1" Text="No target window." TextWrapping="Wrap" MaxLines="5" />
-        <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="6">
-          <Button Content="Refresh Apps" Click="RefreshOpenWindows_Click" />
-          <Button Grid.Column="1" Content="Use Selected" Click="UseSelectedTarget_Click" />
-          <Button Grid.Column="2" Content="Follow / Lock" Click="ToggleFollowLock_Click" />
-          <ListView x:Name="OpenWindowsList" Grid.Column="3" Height="72" SelectionMode="Single" />
+          <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="6">
+            <Button Content="Refresh Apps" Click="RefreshOpenWindows_Click" />
+            <Button Content="Use Selected" Click="UseSelectedTarget_Click" />
+            <Button Content="Follow / Lock" Click="ToggleFollowLock_Click" />
+          </StackPanel>
+
+          <TextBlock Grid.Row="3" Text="Open Apps and Tabs" FontSize="13" FontWeight="SemiBold" Opacity="0.78" />
+          <ListView x:Name="OpenWindowsList"
+                    Grid.Row="4"
+                    SelectionMode="Single"
+                    HorizontalContentAlignment="Stretch"
+                    VerticalAlignment="Stretch" />
         </Grid>
-      </Grid>
-    </Border>
+      </Border>
 
-    <Grid Grid.Row="3" RowDefinitions="Auto,*" RowSpacing="6" MinHeight="390">
-      <TextBlock Text="Conversation" FontSize="16" FontWeight="SemiBold" />
-      <ListView x:Name="TranscriptList"
-                Grid.Row="1"
-                SelectionMode="None"
-                IsItemClickEnabled="False"
-                Padding="0,0,0,12"
-                HorizontalContentAlignment="Stretch"
-                VerticalAlignment="Stretch" />
+      <Grid Grid.Column="1" RowDefinitions="Auto,*" RowSpacing="6" MinHeight="480">
+        <TextBlock Text="Conversation" FontSize="16" FontWeight="SemiBold" />
+        <ListView x:Name="TranscriptList"
+                  Grid.Row="1"
+                  SelectionMode="None"
+                  IsItemClickEnabled="False"
+                  Padding="0,0,0,12"
+                  HorizontalContentAlignment="Stretch"
+                  VerticalAlignment="Stretch">
+          <ListView.ItemTemplate>
+            <DataTemplate>
+              <TextBox Text="{Binding}"
+                       IsReadOnly="True"
+                       AcceptsReturn="True"
+                       TextWrapping="Wrap"
+                       BorderThickness="0"
+                       Padding="8"
+                       Background="Transparent"
+                       HorizontalAlignment="Stretch" />
+            </DataTemplate>
+          </ListView.ItemTemplate>
+        </ListView>
+      </Grid>
     </Grid>
 
-    <TextBox x:Name="QuestionBox" Grid.Row="4" PlaceholderText="Ask about the selected app, tab, document, or session..." AcceptsReturn="True" MinHeight="78" TextWrapping="Wrap" />
+    <TextBox x:Name="QuestionBox" Grid.Row="2" PlaceholderText="Ask about the selected app, tab, document, or session..." AcceptsReturn="True" MinHeight="78" TextWrapping="Wrap" />
 
-    <Grid Grid.Row="5" RowDefinitions="Auto,Auto" RowSpacing="6">
+    <Grid Grid.Row="3" ColumnDefinitions="Auto,*" ColumnSpacing="8">
       <StackPanel Orientation="Horizontal" Spacing="6">
+        <Button Content="New" Click="NewChat_Click" />
+        <Button Content="Clear Context" Click="ClearSharedContext_Click" />
+        <Button Content="Use Session" Click="UseActiveSession_Click" />
+        <Button Content="Check" Click="CheckService_Click" />
+        <Button Content="Start" Click="StartSession_Click" />
         <Button Content="Ask" Click="Ask_Click" />
         <Button Content="Propose Insert" Click="ProposeInsert_Click" />
         <Button Content="Done" Click="CompleteLastAction_Click" />
         <Button Content="Clear Transcript" Click="ClearTranscript_Click" />
       </StackPanel>
-      <ListView x:Name="TimelineList" Grid.Row="1" Height="52" />
     </Grid>
+
+    <ListView x:Name="TimelineList" Grid.Row="4" Height="34" />
   </Grid>
 </Window>
