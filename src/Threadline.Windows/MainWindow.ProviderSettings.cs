@@ -102,7 +102,7 @@ public sealed partial class MainWindow
 
     private static ProviderDefaults GetProviderDefaults(string provider) => provider switch
     {
-        "OpenAI" => new("https://api.openai.com/v1/", "gpt-4.1-mini", "Paste your OpenAI API key once, then click Save Provider. The key is stored by the local Threadline service."),
+        "OpenAI" => new("https://api.openai.com/v1/", "gpt-4.1-mini", "Paste your OpenAI API key once, then click Save Provider. OpenAI calls use the Responses API while the key stays in local Threadline secret storage."),
         "Claude" => new("https://api.anthropic.com/v1/", "claude-3-5-sonnet-latest", "Claude may need an Anthropic-compatible adapter before provider execution is complete. Save the setting here so the sidecar has one place for provider setup."),
         "Gemini" => new("https://generativelanguage.googleapis.com/v1beta/openai/", "gemini-1.5-flash", "Use Gemini's OpenAI-compatible endpoint when available for your key/project."),
         "DeepSeek" => new("https://api.deepseek.com/v1/", "deepseek-chat", "DeepSeek is OpenAI-compatible. Paste the API key once, then save."),
