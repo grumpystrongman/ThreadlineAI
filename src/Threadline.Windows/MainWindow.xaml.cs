@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
+using System.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Threadline.Windows.Services;
+using Windows.ApplicationModel.DataTransfer;
 
 namespace Threadline.Windows;
 
@@ -44,6 +46,8 @@ public sealed partial class MainWindow : Window
     private async void Ask_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(AskAsync);
     private async void ProposeInsert_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(ProposeInsertActionAsync);
     private async void CompleteLastAction_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(CompleteLastActionAsync);
+    private void CopyConversation_Click(object sender, RoutedEventArgs e) => CopyConversationToClipboard();
+    private void CopyLastAnswer_Click(object sender, RoutedEventArgs e) => CopyLastAnswerToClipboard();
     private void ClearTranscript_Click(object sender, RoutedEventArgs e)
     {
         _transcriptMessages.Clear();
@@ -268,6 +272,51 @@ public sealed partial class MainWindow : Window
         transcriptMessage.Message = TrimForTranscript(message);
         transcriptMessage.Timestamp = DateTimeOffset.Now;
         ScrollTranscriptToLatest(transcriptMessage);
+    }
+
+    private void CopyConversationToClipboard()
+    {
+        var text = BuildTranscriptText(_transcriptMessages);
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        SetClipboardText(text);
+        AddTimeline("Copied conversation transcript.");
+    }
+
+    private void CopyLastAnswerToClipboard()
+    {
+        var lastAnswer = _transcriptMessages
+            .LastOrDefault(message => message.Speaker.StartsWith("Threadline", StringComparison.OrdinalIgnoreCase));
+
+        if (lastAnswer is null || string.IsNullOrWhiteSpace(lastAnswer.Message)) return;
+
+        SetClipboardText(lastAnswer.Message);
+        AddTimeline("Copied last Threadline answer.");
+    }
+
+    private static string BuildTranscriptText(IEnumerable<TranscriptMessage> messages)
+    {
+        var builder = new StringBuilder();
+        foreach (var message in messages)
+        {
+            if (builder.Length > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine();
+            }
+
+            builder.AppendLine($"{message.Speaker} ({message.TimestampDisplay})");
+            builder.Append(message.Message);
+        }
+
+        return builder.ToString();
+    }
+
+    private static void SetClipboardText(string text)
+    {
+        var package = new DataPackage();
+        package.SetText(text);
+        Clipboard.SetContent(package);
     }
 
     private void ScrollTranscriptToLatest(object item)
