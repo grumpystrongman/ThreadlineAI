@@ -264,7 +264,7 @@ public sealed class OpenAiCompatibleProvider : ILlmProvider
 
     private static string NormalizeResponsesRole(string role) => role switch
     {
-        "system" => "developer",
+        "system" => "system",
         "developer" => "developer",
         "assistant" => "assistant",
         _ => "user"
