@@ -162,28 +162,25 @@ public sealed partial class MainWindow : Window
         {
             await ShowLocalAskFallbackAsync(pendingMessage, question, currentWindow, "Ask endpoint missing", ex.Message);
         }
-        catch (InvalidOperationException ex) when (IsProviderExecutionFailure(ex))
+        catch (InvalidOperationException ex)
         {
-            await ShowLocalAskFallbackAsync(pendingMessage, question, currentWindow, "Provider not ready", ex.Message);
+            await ShowLocalAskFallbackAsync(pendingMessage, question, currentWindow, "Ask provider call failed", ex.Message);
         }
     }
 
     private async Task ShowLocalAskFallbackAsync(TranscriptMessage pendingMessage, string question, string? currentWindow, string reason, string detail)
     {
-        var messages = await _client.ComposePromptAsync(_session!.Id, question, currentWindow);
-        UpdateTranscript(pendingMessage, BuildLocalAskFallbackMessage(messages.Count, currentWindow, reason, detail));
-        AddTimeline($"{reason}; local visibility fallback shown.");
-    }
-
-    private static bool IsProviderExecutionFailure(InvalidOperationException ex)
-    {
-        var message = ex.Message ?? string.Empty;
-        return message.Contains("Threadline service returned 409", StringComparison.OrdinalIgnoreCase) ||
-               message.Contains("Provider '", StringComparison.OrdinalIgnoreCase) ||
-               message.Contains("provider", StringComparison.OrdinalIgnoreCase) &&
-               (message.Contains("not configured", StringComparison.OrdinalIgnoreCase) ||
-                message.Contains("not ready", StringComparison.OrdinalIgnoreCase) ||
-                message.Contains("missing", StringComparison.OrdinalIgnoreCase));
+        try
+        {
+            var messages = await _client.ComposePromptAsync(_session!.Id, question, currentWindow);
+            UpdateTranscript(pendingMessage, BuildLocalAskFallbackMessage(messages.Count, currentWindow, reason, detail));
+            AddTimeline($"{reason}; local visibility fallback shown.");
+        }
+        catch (Exception fallbackException)
+        {
+            UpdateTranscript(pendingMessage, BuildLocalAskFallbackMessage(0, currentWindow, reason, detail + " Fallback compose also failed: " + fallbackException.Message));
+            AddTimeline($"{reason}; local visibility fallback shown without prompt composition.");
+        }
     }
 
     private async Task ProposeInsertActionAsync()
@@ -247,10 +244,10 @@ public sealed partial class MainWindow : Window
     {
         if (ProviderBox.SelectedItem is ComboBoxItem item && item.Content is not null)
         {
-            return item.Content.ToString() ?? "Local";
+            return item.Content.ToString() ?? "OpenAI";
         }
 
-        return "Local";
+        return "OpenAI";
     }
 
     private static string FormatSession(ThreadlineSessionDto session) =>
