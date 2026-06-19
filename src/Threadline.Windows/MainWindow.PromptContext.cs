@@ -14,21 +14,24 @@ public sealed partial class MainWindow
             _lastForegroundWindow = target.Window;
             _attachment = await _client.AttachWindowAsync(_session!.Id, target.Window);
             _lastContextSummary = await _contentResolver.ResolveAsync(_session!.Id, target);
+            UpdateCurrentContextPanel(_lastContextSummary);
 
             AddTimeline($"Ask using context: {target.Window.ApplicationName} — {target.Title}");
-            AppendTranscript("Threadline Context", $"Using context from {target.Window.ApplicationName} — {target.Title}\nSource: {_lastContextSummary.Source}");
+            AppendTranscript("Threadline Context", $"Using context from {target.Window.ApplicationName} — {target.Title}\nSource: {_lastContextSummary.Source}\nConfidence: {_lastContextSummary.Confidence.ToString().ToUpperInvariant()}");
             return BuildFullPromptContext(_lastContextSummary);
         }
 
         if (_lastContextSummary is not null)
         {
             AddTimeline($"Ask using previous context: {_lastContextSummary.Title}");
+            UpdateCurrentContextPanel(_lastContextSummary);
             return BuildFullPromptContext(_lastContextSummary);
         }
 
         if (_lastNativeUiResult is { Success: true })
         {
             _lastContextSummary = _contextSummarizer.SummarizeNativeUi(_lastNativeUiResult);
+            UpdateCurrentContextPanel(_lastContextSummary);
             AddTimeline($"Ask using native UI context: {_lastContextSummary.Title}");
             return BuildFullPromptContext(_lastContextSummary);
         }
