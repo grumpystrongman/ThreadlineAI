@@ -160,17 +160,17 @@ public sealed partial class MainWindow : Window
         }
         catch (ThreadlineEndpointNotFoundException ex)
         {
-            await ShowLocalAskFallbackAsync(pendingMessage, currentWindow, "Ask endpoint missing", ex.Message);
+            await ShowLocalAskFallbackAsync(pendingMessage, question, currentWindow, "Ask endpoint missing", ex.Message);
         }
         catch (InvalidOperationException ex) when (IsProviderExecutionFailure(ex))
         {
-            await ShowLocalAskFallbackAsync(pendingMessage, currentWindow, "Provider not ready", ex.Message);
+            await ShowLocalAskFallbackAsync(pendingMessage, question, currentWindow, "Provider not ready", ex.Message);
         }
     }
 
-    private async Task ShowLocalAskFallbackAsync(TranscriptMessage pendingMessage, string? currentWindow, string reason, string detail)
+    private async Task ShowLocalAskFallbackAsync(TranscriptMessage pendingMessage, string question, string? currentWindow, string reason, string detail)
     {
-        var messages = await _client.ComposePromptAsync(_session!.Id, QuestionBox.Text ?? string.Empty, currentWindow);
+        var messages = await _client.ComposePromptAsync(_session!.Id, question, currentWindow);
         UpdateTranscript(pendingMessage, BuildLocalAskFallbackMessage(messages.Count, currentWindow, reason, detail));
         AddTimeline($"{reason}; local visibility fallback shown.");
     }
