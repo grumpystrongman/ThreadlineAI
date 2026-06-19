@@ -53,14 +53,26 @@
                   VerticalAlignment="Stretch">
           <ListView.ItemTemplate>
             <DataTemplate>
-              <TextBox Text="{Binding}"
-                       IsReadOnly="True"
-                       AcceptsReturn="True"
-                       TextWrapping="Wrap"
-                       BorderThickness="0"
-                       Padding="8"
-                       Background="Transparent"
-                       HorizontalAlignment="Stretch" />
+              <Border BorderThickness="1"
+                      CornerRadius="10"
+                      Padding="10"
+                      Margin="0,4,0,4"
+                      HorizontalAlignment="Stretch">
+                <StackPanel Spacing="4">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding Speaker}"
+                               FontWeight="SemiBold"
+                               Opacity="0.90" />
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding TimestampDisplay}"
+                               FontSize="11"
+                               Opacity="0.58" />
+                  </Grid>
+                  <TextBlock Text="{Binding Message}"
+                             TextWrapping="WrapWholeWords"
+                             IsTextSelectionEnabled="True" />
+                </StackPanel>
+              </Border>
             </DataTemplate>
           </ListView.ItemTemplate>
         </ListView>
