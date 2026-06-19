@@ -27,6 +27,7 @@ builder.Services.AddSingleton<IAdapterRegistry, InMemoryAdapterRegistry>();
 builder.Services.AddSingleton<IWindowAttachmentRepository, InMemoryWindowAttachmentRepository>();
 builder.Services.AddSingleton<ISecretStore>(_ => new DpapiProtectedSecretStore(builder.Configuration["Threadline:SecretStorePath"]));
 
+builder.Services.AddHttpClient();
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddSingleton<SecretRedactor>();
 builder.Services.AddSingleton(new CapturePolicy(DefaultRules.Create(DateTimeOffset.UtcNow)));
@@ -36,6 +37,7 @@ builder.Services.AddSingleton<ProviderConnectionService>();
 builder.Services.AddSingleton<SecretService>();
 builder.Services.AddSingleton<WindowAttachmentService>();
 builder.Services.AddSingleton<PromptComposer>();
+builder.Services.AddSingleton<ThreadlineAskService>();
 
 var app = builder.Build();
 
