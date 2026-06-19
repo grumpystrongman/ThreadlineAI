@@ -17,9 +17,28 @@ Build 11.9 makes Threadline's context quality visible in the sidecar instead of 
 - Reset the context status, context panel, and diagnostics panel when local context is cleared or a new chat starts.
 - Hardened New Chat and Clear Context so they clear the bound transcript collection instead of mutating the UI control items directly.
 
+## Build 11.9.1 correction
+
+A manual test exposed a bad fallback experience: when the running local service did not expose `/sessions/{sessionId}/ask`, Threadline answered with a service-plumbing message even though the resolver had already captured useful local context.
+
+11.9.1 changes that fallback. If `/ask` is missing but prompt composition still works, Threadline now reports what it can actually see locally:
+
+- Target
+- Context status
+- Source
+- Confidence
+- App/window information
+- Summary
+- Key details
+- Warnings
+
+This keeps the sidecar useful even when the service binary is stale or the provider execution path is unavailable.
+
 ## Why this matters
 
 The resolver can now distinguish high-confidence provider/file context from lower-confidence native UI or screenshot-required fallback. The sidecar should expose that distinction before the user asks a question. This keeps Threadline honest and prevents a bad product habit: answering with confidence when it barely saw the target.
+
+The Ask fallback must follow the same principle. If provider execution fails because the running service is old, Threadline should still tell the user what local context it resolved instead of hiding the useful answer behind an implementation detail.
 
 ## Manual verification
 
@@ -43,12 +62,15 @@ Then validate:
 6. Confirm the context pill shows File-backed when a unique file-backed match is found.
 7. Select a generic desktop app and click **Use**.
 8. Confirm the context pill shows Native UI, Screenshot required, or Provider needed based on the resolver path.
-9. Ask a question and confirm the transcript includes a `Threadline Context` message with Status, Source, and Confidence.
-10. Click **Clear Context** and confirm the pill resets to No context.
-11. Click **New** and confirm the transcript clears cleanly without UI binding errors.
+9. Ask `what can you actually see` while running against a service that lacks `/ask`.
+10. Confirm the Threadline answer reports the local visibility fallback instead of only saying `/ask` is missing.
+11. Ask a normal question and confirm the transcript includes a `Threadline Context` message with Status, Source, and Confidence.
+12. Click **Clear Context** and confirm the pill resets to No context.
+13. Click **New** and confirm the transcript clears cleanly without UI binding errors.
 
 ## Known limitations
 
 - The pill is text-only in this build. Color/state styling can come later once the sidecar theme is stable.
 - Screenshot/OCR remains a placeholder route. Build 11.9 makes the need visible but does not implement image reading.
 - Browser and Office-class apps still need deeper app-specific provider work for confident body capture.
+- If `/ask` is missing, Threadline can only report local resolved context; it still cannot generate a provider-written answer until the local service is rebuilt/restarted with the current Ask endpoint.
