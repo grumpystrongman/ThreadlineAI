@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Threadline.Windows.Services;
@@ -10,7 +9,6 @@ public sealed partial class MainWindow : Window
     private const int MaxTranscriptItems = 80;
     private const int MaxTranscriptMessageCharacters = 3000;
 
-    private readonly ObservableCollection<string> _transcriptItems = new();
     private readonly ActiveWindowMonitor _activeWindowMonitor = new();
     private readonly NativeUiAutomationReader _nativeUiAutomationReader = new();
     private readonly ContextSummarizer _contextSummarizer = new();
