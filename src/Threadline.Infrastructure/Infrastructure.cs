@@ -190,6 +190,7 @@ public sealed record OpenAiCompatibleProviderOptions(string ProviderName, string
 
 public sealed class OpenAiCompatibleProvider : ILlmProvider
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
     private readonly HttpClient _httpClient;
     private readonly OpenAiCompatibleProviderOptions _options;
     public OpenAiCompatibleProvider(HttpClient httpClient, OpenAiCompatibleProviderOptions options) { _httpClient = httpClient; _options = options; }
@@ -207,7 +208,7 @@ public sealed class OpenAiCompatibleProvider : ILlmProvider
     private async Task<LlmResponse> CompleteWithResponsesApiAsync(LlmRequest request, string model, CancellationToken cancellationToken)
     {
         using var message = CreateProviderRequest("responses");
-        message.Content = JsonContent.Create(new ResponsesApiRequest(model, request.Messages.Select(m => new ResponsesInputMessage(NormalizeResponsesRole(m.Role), m.Content)).ToArray(), request.MaxOutputTokens));
+        message.Content = JsonContent.Create(new ResponsesApiRequest(model, request.Messages.Select(m => new ResponsesInputMessage(NormalizeResponsesRole(m.Role), m.Content)).ToArray(), request.MaxOutputTokens), options: JsonOptions);
 
         using var response = await _httpClient.SendAsync(message, cancellationToken);
         response.EnsureSuccessStatusCode();
@@ -219,7 +220,7 @@ public sealed class OpenAiCompatibleProvider : ILlmProvider
     private async Task<LlmResponse> CompleteWithChatCompletionsAsync(LlmRequest request, string model, CancellationToken cancellationToken)
     {
         using var message = CreateProviderRequest("chat/completions");
-        message.Content = JsonContent.Create(new ChatCompletionRequest(model, request.Messages.Select(m => new ChatMessage(m.Role, m.Content)).ToArray(), request.Temperature, request.MaxOutputTokens));
+        message.Content = JsonContent.Create(new ChatCompletionRequest(model, request.Messages.Select(m => new ChatMessage(m.Role, m.Content)).ToArray(), request.Temperature, request.MaxOutputTokens), options: JsonOptions);
 
         using var response = await _httpClient.SendAsync(message, cancellationToken);
         response.EnsureSuccessStatusCode();
