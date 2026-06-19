@@ -48,6 +48,8 @@ public sealed record CompleteWindowActionRequest(string? ResultMessage = null, b
 
 public sealed record ComposePromptRequest(string Question, string? CurrentWindow = null, int? TakeRecentEvents = 20);
 
+public sealed record AskResponse(string Answer, IReadOnlyList<LlmMessage> Messages);
+
 public sealed record SaveSummaryRequest(string Summary);
 
 public sealed record SaveProviderConnectionRequest(
