@@ -7,6 +7,7 @@ namespace Threadline.Windows.Services;
 
 public sealed class ThreadlineLocalClient
 {
+    private readonly Uri _baseAddress;
     private readonly HttpClient _httpClient;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -15,7 +16,8 @@ public sealed class ThreadlineLocalClient
 
     public ThreadlineLocalClient(string baseUrl = "http://localhost:5057", string? localAccessToken = null)
     {
-        _httpClient = new HttpClient { BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/") };
+        _baseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+        _httpClient = new HttpClient { BaseAddress = _baseAddress };
         if (!string.IsNullOrWhiteSpace(localAccessToken))
         {
             _httpClient.DefaultRequestHeaders.Add("X-Threadline-Token", localAccessToken);
@@ -101,10 +103,11 @@ public sealed class ThreadlineLocalClient
             takeRecentEvents = 20
         };
 
-        var response = await _httpClient.PostAsJsonAsync($"sessions/{sessionId}/ask", request, _jsonOptions, cancellationToken);
+        var path = $"sessions/{sessionId}/ask";
+        var response = await _httpClient.PostAsJsonAsync(path, request, _jsonOptions, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            throw new ThreadlineEndpointNotFoundException("The local service does not expose the Ask response endpoint yet.");
+            throw new ThreadlineEndpointNotFoundException($"POST {new Uri(_baseAddress, path)} returned 404. The sidecar reached a Threadline service on {_baseAddress}, but that running service does not expose the Ask endpoint. Stop any old Threadline.Service process, pull/build the latest repo, and restart the service from the current source tree.");
         }
 
         return await ReadRequiredAsync<AskResponseDto>(response, cancellationToken);
