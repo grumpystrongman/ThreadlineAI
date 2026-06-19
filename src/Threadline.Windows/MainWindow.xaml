@@ -30,24 +30,27 @@
     </StackPanel>
 
     <Border Grid.Row="2" BorderThickness="1" CornerRadius="8" Padding="8">
-      <StackPanel Spacing="6">
+      <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
         <TextBlock Text="Current Target" FontSize="15" FontWeight="SemiBold" />
-        <TextBlock x:Name="CurrentWindowText" Text="No target window." TextWrapping="Wrap" MaxLines="6" />
-        <StackPanel Orientation="Horizontal" Spacing="6">
+        <TextBlock x:Name="CurrentWindowText" Grid.Row="1" Text="No target window." TextWrapping="Wrap" MaxLines="5" />
+        <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="6">
           <Button Content="Refresh Apps" Click="RefreshOpenWindows_Click" />
-          <Button Content="Use Selected" Click="UseSelectedTarget_Click" />
-          <Button Content="Follow / Lock" Click="ToggleFollowLock_Click" />
-        </StackPanel>
-        <ListView x:Name="OpenWindowsList" Height="64" SelectionMode="Single" />
-      </StackPanel>
+          <Button Grid.Column="1" Content="Use Selected" Click="UseSelectedTarget_Click" />
+          <Button Grid.Column="2" Content="Follow / Lock" Click="ToggleFollowLock_Click" />
+          <ListView x:Name="OpenWindowsList" Grid.Column="3" Height="72" SelectionMode="Single" />
+        </Grid>
+      </Grid>
     </Border>
 
-    <Grid Grid.Row="3" RowDefinitions="Auto,*" RowSpacing="6" MinHeight="360">
+    <Grid Grid.Row="3" RowDefinitions="Auto,*" RowSpacing="6" MinHeight="390">
       <TextBlock Text="Conversation" FontSize="16" FontWeight="SemiBold" />
       <ListView x:Name="TranscriptList"
                 Grid.Row="1"
                 SelectionMode="None"
-                Padding="0,0,0,12" />
+                IsItemClickEnabled="False"
+                Padding="0,0,0,12"
+                HorizontalContentAlignment="Stretch"
+                VerticalAlignment="Stretch" />
     </Grid>
 
     <TextBox x:Name="QuestionBox" Grid.Row="4" PlaceholderText="Ask about the selected app, tab, document, or session..." AcceptsReturn="True" MinHeight="78" TextWrapping="Wrap" />
