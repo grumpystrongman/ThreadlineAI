@@ -147,7 +147,7 @@ public sealed partial class MainWindow : Window
                 : response.Answer);
             AddTimeline("Received provider response.");
         }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("404", StringComparison.OrdinalIgnoreCase))
+        catch (ThreadlineEndpointNotFoundException)
         {
             var messages = await _client.ComposePromptAsync(_session!.Id, question, currentWindow);
             AppendTranscript("Threadline", $"The local service does not expose /ask yet. Prompt composition still works and produced {messages.Count} message(s), but provider response execution is not available from this service build.");
