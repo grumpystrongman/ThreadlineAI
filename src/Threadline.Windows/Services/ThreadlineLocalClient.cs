@@ -113,6 +113,44 @@ public sealed class ThreadlineLocalClient
         return await ReadRequiredAsync<AskResponseDto>(response, cancellationToken);
     }
 
+    public async Task SaveProviderCredentialAsync(string providerName, string apiKey, string baseUrl, string defaultModel, CancellationToken cancellationToken = default)
+    {
+        var request = new
+        {
+            secretValue = apiKey,
+            authType = "ApiKey",
+            baseUrl,
+            defaultModel,
+            status = "Ready",
+            metadata = new Dictionary<string, string>
+            {
+                ["source"] = "Threadline.Windows provider settings"
+            }
+        };
+
+        var response = await _httpClient.PostAsJsonAsync($"providers/{providerName}/credential", request, _jsonOptions, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task SaveLocalProviderAsync(string providerName, string baseUrl, string defaultModel, CancellationToken cancellationToken = default)
+    {
+        var request = new
+        {
+            providerName,
+            authType = "LocalEndpoint",
+            baseUrl,
+            defaultModel,
+            status = "Ready",
+            metadata = new Dictionary<string, string>
+            {
+                ["source"] = "Threadline.Windows provider settings"
+            }
+        };
+
+        var response = await _httpClient.PostAsJsonAsync("providers", request, _jsonOptions, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
     public async Task<WindowActionDto> ProposeInsertActionAsync(string sessionId, string payload, bool userApproved = true, CancellationToken cancellationToken = default)
     {
         var request = new
@@ -142,14 +180,18 @@ public sealed class ThreadlineLocalClient
 
     private async Task<T> ReadRequiredAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        if (!response.IsSuccessStatusCode)
-        {
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
-            throw new InvalidOperationException($"Threadline service returned {(int)response.StatusCode}: {body}");
-        }
+        await EnsureSuccessAsync(response, cancellationToken);
 
         return await response.Content.ReadFromJsonAsync<T>(_jsonOptions, cancellationToken)
             ?? throw new InvalidOperationException("Threadline service returned an empty response.");
+    }
+
+    private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        if (response.IsSuccessStatusCode) return;
+
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        throw new InvalidOperationException($"Threadline service returned {(int)response.StatusCode}: {body}");
     }
 }
 
