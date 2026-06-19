@@ -41,7 +41,20 @@
             <Button Content="Diagnostics" Click="ToggleDiagnostics_Click" FontSize="11" Padding="6,3" />
           </StackPanel>
 
-          <TextBlock Grid.Row="3" Text="Current Context" FontSize="12" FontWeight="SemiBold" Opacity="0.74" />
+          <Grid Grid.Row="3" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <TextBlock Text="Current Context" FontSize="12" FontWeight="SemiBold" Opacity="0.74" />
+            <Border x:Name="ContextStatusPill"
+                    Grid.Column="1"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Padding="8,2"
+                    VerticalAlignment="Center">
+              <TextBlock x:Name="ContextStatusText"
+                         Text="No context"
+                         FontSize="11"
+                         Opacity="0.82" />
+            </Border>
+          </Grid>
           <TextBlock x:Name="CurrentContextText"
                      Grid.Row="4"
                      Text="No resolved context yet. Select a target and click Use."
