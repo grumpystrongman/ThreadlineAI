@@ -18,14 +18,64 @@
           <Button Content="Clear Context" Click="ClearSharedContext_Click" FontSize="12" Padding="8,4" />
         </StackPanel>
       </StackPanel>
-      <ComboBox x:Name="ProviderBox" Grid.Column="1" Width="126" SelectedIndex="0" VerticalAlignment="Top">
-        <ComboBoxItem Content="OpenAI" />
-        <ComboBoxItem Content="Claude" />
-        <ComboBoxItem Content="Gemini" />
-        <ComboBoxItem Content="DeepSeek" />
-        <ComboBoxItem Content="OpenRouter" />
-        <ComboBoxItem Content="Local" />
-      </ComboBox>
+      <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Top">
+        <ComboBox x:Name="ProviderBox" Width="146" SelectedIndex="0" SelectionChanged="ProviderBox_SelectionChanged">
+          <ComboBoxItem Content="OpenAI" />
+          <ComboBoxItem Content="Claude" />
+          <ComboBoxItem Content="Gemini" />
+          <ComboBoxItem Content="DeepSeek" />
+          <ComboBoxItem Content="OpenRouter" />
+          <ComboBoxItem Content="Local" />
+        </ComboBox>
+        <Button Content="Settings" FontSize="12" Padding="10,4" HorizontalAlignment="Stretch">
+          <Button.Flyout>
+            <Flyout>
+              <ScrollViewer Width="380" MaxHeight="540" VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="8" Padding="4">
+                  <TextBlock Text="Provider Settings" FontSize="18" FontWeight="SemiBold" />
+                  <TextBlock Text="Save provider credentials and model settings here instead of running setup commands." TextWrapping="WrapWholeWords" Opacity="0.78" />
+
+                  <TextBlock Text="Provider" FontWeight="SemiBold" Margin="0,6,0,0" />
+                  <ComboBox x:Name="SettingsProviderBox" SelectedIndex="0" SelectionChanged="SettingsProviderBox_SelectionChanged" HorizontalAlignment="Stretch">
+                    <ComboBoxItem Content="OpenAI" />
+                    <ComboBoxItem Content="Claude" />
+                    <ComboBoxItem Content="Gemini" />
+                    <ComboBoxItem Content="DeepSeek" />
+                    <ComboBoxItem Content="OpenRouter" />
+                    <ComboBoxItem Content="Local" />
+                  </ComboBox>
+
+                  <TextBlock Text="Base URL" FontWeight="SemiBold" Margin="0,6,0,0" />
+                  <TextBox x:Name="ProviderBaseUrlBox" PlaceholderText="https://api.openai.com/v1/" TextWrapping="NoWrap" />
+
+                  <TextBlock Text="Default model" FontWeight="SemiBold" Margin="0,6,0,0" />
+                  <TextBox x:Name="ProviderModelBox" PlaceholderText="gpt-4.1-mini" TextWrapping="NoWrap" />
+
+                  <TextBlock Text="API key" FontWeight="SemiBold" Margin="0,6,0,0" />
+                  <PasswordBox x:Name="ProviderApiKeyBox" PlaceholderText="Stored through Threadline local secret storage" />
+
+                  <TextBlock x:Name="ProviderSettingsHintText"
+                             Text="For OpenAI, paste your API key once, then click Save. The key is stored by the local Threadline service."
+                             TextWrapping="WrapWholeWords"
+                             FontSize="11"
+                             Opacity="0.74" />
+
+                  <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,8,0,0">
+                    <Button Content="Use Defaults" Click="UseProviderDefaults_Click" FontSize="12" Padding="10,4" />
+                    <Button Content="Save Provider" Click="SaveProviderSettings_Click" FontSize="12" Padding="10,4" />
+                  </StackPanel>
+
+                  <TextBlock x:Name="ProviderSettingsStatusText"
+                             Text="Provider settings not saved yet."
+                             TextWrapping="WrapWholeWords"
+                             FontSize="11"
+                             Opacity="0.78" />
+                </StackPanel>
+              </ScrollViewer>
+            </Flyout>
+          </Button.Flyout>
+        </Button>
+      </StackPanel>
     </Grid>
 
     <Grid Grid.Row="1" ColumnDefinitions="320,*" ColumnSpacing="10" MinHeight="480">
