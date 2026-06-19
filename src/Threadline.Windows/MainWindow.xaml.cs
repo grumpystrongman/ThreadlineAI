@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Threadline.Windows.Services;
@@ -9,6 +10,7 @@ public sealed partial class MainWindow : Window
     private const int MaxTranscriptItems = 80;
     private const int MaxTranscriptMessageCharacters = 3000;
 
+    private readonly ObservableCollection<TranscriptMessage> _transcriptMessages = new();
     private readonly ActiveWindowMonitor _activeWindowMonitor = new();
     private readonly NativeUiAutomationReader _nativeUiAutomationReader = new();
     private readonly ContextSummarizer _contextSummarizer = new();
@@ -23,6 +25,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        TranscriptList.ItemsSource = _transcriptMessages;
         ConfigureSidecarWindow();
         AppendTranscript("Threadline", "Start or use a session, pick an app/tab, then ask Threadline about that target.");
         RefreshActiveWindow();
@@ -43,7 +46,7 @@ public sealed partial class MainWindow : Window
     private async void CompleteLastAction_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(CompleteLastActionAsync);
     private void ClearTranscript_Click(object sender, RoutedEventArgs e)
     {
-        TranscriptList.Items.Clear();
+        _transcriptMessages.Clear();
         AppendTranscript("Threadline", "Transcript cleared.");
     }
 
@@ -134,6 +137,7 @@ public sealed partial class MainWindow : Window
 
         QuestionBox.Text = string.Empty;
         AppendTranscript("You", question);
+        var pendingMessage = AppendTranscript("Threadline", "Thinking… resolving context and preparing a response.");
         AddTimeline("Resolving context for Ask...");
 
         var currentWindow = await ResolveContextForAskAsync();
@@ -142,7 +146,7 @@ public sealed partial class MainWindow : Window
         try
         {
             var response = await _client.AskAsync(_session!.Id, question, currentWindow);
-            AppendTranscript("Threadline", string.IsNullOrWhiteSpace(response.Answer)
+            UpdateTranscript(pendingMessage, string.IsNullOrWhiteSpace(response.Answer)
                 ? "The provider returned an empty answer."
                 : response.Answer);
             AddTimeline("Received provider response.");
@@ -150,7 +154,7 @@ public sealed partial class MainWindow : Window
         catch (ThreadlineEndpointNotFoundException)
         {
             var messages = await _client.ComposePromptAsync(_session!.Id, question, currentWindow);
-            AppendTranscript("Threadline", $"The local service does not expose /ask yet. Prompt composition still works and produced {messages.Count} message(s), but provider response execution is not available from this service build.");
+            UpdateTranscript(pendingMessage, $"The local service does not expose /ask yet. Prompt composition still works and produced {messages.Count} message(s), but provider response execution is not available from this service build.");
             AddTimeline("Ask endpoint missing; composed prompt fallback completed.");
         }
     }
@@ -242,17 +246,32 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void AppendTranscript(string speaker, string message)
+    private TranscriptMessage AppendTranscript(string speaker, string message)
     {
-        var safeMessage = TrimForTranscript(message);
-        var item = $"{speaker}\n{safeMessage}\n{DateTimeOffset.Now:t}";
+        var transcriptMessage = new TranscriptMessage(
+            speaker,
+            TrimForTranscript(message),
+            DateTimeOffset.Now);
 
-        TranscriptList.Items.Add(item);
-        while (TranscriptList.Items.Count > MaxTranscriptItems)
+        _transcriptMessages.Add(transcriptMessage);
+        while (_transcriptMessages.Count > MaxTranscriptItems)
         {
-            TranscriptList.Items.RemoveAt(0);
+            _transcriptMessages.RemoveAt(0);
         }
 
+        ScrollTranscriptToLatest(transcriptMessage);
+        return transcriptMessage;
+    }
+
+    private void UpdateTranscript(TranscriptMessage transcriptMessage, string message)
+    {
+        transcriptMessage.Message = TrimForTranscript(message);
+        transcriptMessage.Timestamp = DateTimeOffset.Now;
+        ScrollTranscriptToLatest(transcriptMessage);
+    }
+
+    private void ScrollTranscriptToLatest(object item)
+    {
         TranscriptList.UpdateLayout();
         TranscriptList.ScrollIntoView(item);
     }
@@ -264,4 +283,46 @@ public sealed partial class MainWindow : Window
         if (trimmed.Length <= MaxTranscriptMessageCharacters) return trimmed;
         return trimmed[..MaxTranscriptMessageCharacters].TrimEnd() + "\n...[trimmed in transcript]";
     }
+}
+
+public sealed class TranscriptMessage : System.ComponentModel.INotifyPropertyChanged
+{
+    private string _message;
+    private DateTimeOffset _timestamp;
+
+    public TranscriptMessage(string speaker, string message, DateTimeOffset timestamp)
+    {
+        Speaker = speaker;
+        _message = message;
+        _timestamp = timestamp;
+    }
+
+    public string Speaker { get; }
+
+    public string Message
+    {
+        get => _message;
+        set
+        {
+            if (_message == value) return;
+            _message = value;
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Message)));
+        }
+    }
+
+    public DateTimeOffset Timestamp
+    {
+        get => _timestamp;
+        set
+        {
+            if (_timestamp == value) return;
+            _timestamp = value;
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Timestamp)));
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(TimestampDisplay)));
+        }
+    }
+
+    public string TimestampDisplay => Timestamp.ToString("t");
+
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 }
