@@ -161,8 +161,8 @@ public sealed partial class MainWindow : Window
         catch (ThreadlineEndpointNotFoundException)
         {
             var messages = await _client.ComposePromptAsync(_session!.Id, question, currentWindow);
-            UpdateTranscript(pendingMessage, $"The local service does not expose /ask yet. Prompt composition still works and produced {messages.Count} message(s), but provider response execution is not available from this service build.");
-            AddTimeline("Ask endpoint missing; composed prompt fallback completed.");
+            UpdateTranscript(pendingMessage, BuildLocalAskFallbackMessage(messages.Count, currentWindow));
+            AddTimeline("Ask endpoint missing; local visibility fallback shown.");
         }
     }
 
@@ -312,6 +312,67 @@ public sealed partial class MainWindow : Window
             builder.Append(message.Message);
         }
 
+        return builder.ToString();
+    }
+
+    private string BuildLocalAskFallbackMessage(int composedMessageCount, string? currentWindow)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("Provider response execution is not available from the running local service build, but Threadline did resolve local context.");
+
+        if (_lastContextSummary is not null)
+        {
+            builder.AppendLine();
+            builder.AppendLine("What I can actually see:");
+            builder.AppendLine($"- Target: {_lastContextSummary.Title}");
+            builder.AppendLine($"- Status: {BuildContextStatus(_lastContextSummary)}");
+            builder.AppendLine($"- Source: {_lastContextSummary.Source}");
+            builder.AppendLine($"- Confidence: {_lastContextSummary.Confidence}");
+
+            if (_lastContextSummary.Process is not null)
+            {
+                builder.AppendLine($"- App: {_lastContextSummary.Process.ProcessName} ({_lastContextSummary.Process.AppType})");
+                builder.AppendLine($"- Window: {_lastContextSummary.Process.WindowTitle}");
+            }
+
+            builder.AppendLine();
+            builder.AppendLine("Summary:");
+            builder.AppendLine(_lastContextSummary.Summary);
+
+            if (_lastContextSummary.KeyDetails.Count > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine("Key details I can use:");
+                foreach (var detail in _lastContextSummary.KeyDetails.Take(8))
+                {
+                    builder.AppendLine($"- {detail}");
+                }
+            }
+
+            if (_lastContextSummary.Warnings.Count > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine("Warnings:");
+                foreach (var warning in _lastContextSummary.Warnings.Take(5))
+                {
+                    builder.AppendLine($"- {warning}");
+                }
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(currentWindow))
+        {
+            builder.AppendLine();
+            builder.AppendLine("What I can actually see:");
+            builder.AppendLine(currentWindow);
+        }
+        else
+        {
+            builder.AppendLine();
+            builder.AppendLine("I do not have readable target context yet. Select an app/tab and click Use, or let Follow mode identify the last non-Threadline app before asking again.");
+        }
+
+        builder.AppendLine();
+        builder.AppendLine($"Prompt composition produced {composedMessageCount} message(s). To get a provider-written answer, restart/build the local service so `/sessions/{{sessionId}}/ask` is available.");
         return builder.ToString();
     }
 
