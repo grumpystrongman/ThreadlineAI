@@ -14,14 +14,16 @@ public sealed partial class MainWindow
             _lastForegroundWindow = target.Window;
             _attachment = await _client.AttachWindowAsync(_session!.Id, target.Window);
             _lastContextSummary = await _contentResolver.ResolveAsync(_session!.Id, target);
+            UpdateCurrentContextPanel(_lastContextSummary);
 
             AddTimeline($"Ask using context: {target.Window.ApplicationName} — {target.Title}");
-            AppendTranscript("Threadline Context", $"Using context from {target.Window.ApplicationName} — {target.Title}\nSource: {_lastContextSummary.Source}");
+            AppendTranscript("Threadline Context", $"Using context from {target.Window.ApplicationName} — {target.Title}\nSource: {_lastContextSummary.Source}\nConfidence: {_lastContextSummary.Confidence}");
             return BuildFullPromptContext(_lastContextSummary);
         }
 
         if (_lastContextSummary is not null)
         {
+            UpdateCurrentContextPanel(_lastContextSummary);
             AddTimeline($"Ask using previous context: {_lastContextSummary.Title}");
             return BuildFullPromptContext(_lastContextSummary);
         }
@@ -29,6 +31,7 @@ public sealed partial class MainWindow
         if (_lastNativeUiResult is { Success: true })
         {
             _lastContextSummary = _contextSummarizer.SummarizeNativeUi(_lastNativeUiResult);
+            UpdateCurrentContextPanel(_lastContextSummary);
             AddTimeline($"Ask using native UI context: {_lastContextSummary.Title}");
             return BuildFullPromptContext(_lastContextSummary);
         }
@@ -60,6 +63,6 @@ public sealed partial class MainWindow
         if (string.IsNullOrWhiteSpace(value)) return string.Empty;
         var trimmed = value.Trim();
         if (trimmed.Length <= maxLength) return trimmed;
-        return trimmed[..maxLength].TrimEnd() + "\n...[truncated by Threadline]";
+        return trimmed.Substring(0, maxLength).TrimEnd() + "\n...[truncated by Threadline]";
     }
 }
