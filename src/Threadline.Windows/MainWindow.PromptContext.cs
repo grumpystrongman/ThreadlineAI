@@ -16,15 +16,16 @@ public sealed partial class MainWindow
             _lastContextSummary = await _contentResolver.ResolveAsync(_session!.Id, target);
             UpdateCurrentContextPanel(_lastContextSummary);
 
-            AddTimeline($"Ask using context: {target.Window.ApplicationName} — {target.Title}");
-            AppendTranscript("Threadline Context", $"Using context from {target.Window.ApplicationName} — {target.Title}\nSource: {_lastContextSummary.Source}\nConfidence: {_lastContextSummary.Confidence}");
+            var contextStatus = BuildContextStatus(_lastContextSummary);
+            AddTimeline($"Ask using context: {target.Window.ApplicationName} — {target.Title} ({contextStatus})");
+            AppendTranscript("Threadline Context", $"Using context from {target.Window.ApplicationName} — {target.Title}\nStatus: {contextStatus}\nSource: {_lastContextSummary.Source}\nConfidence: {_lastContextSummary.Confidence}");
             return BuildFullPromptContext(_lastContextSummary);
         }
 
         if (_lastContextSummary is not null)
         {
             UpdateCurrentContextPanel(_lastContextSummary);
-            AddTimeline($"Ask using previous context: {_lastContextSummary.Title}");
+            AddTimeline($"Ask using previous context: {_lastContextSummary.Title} ({BuildContextStatus(_lastContextSummary)})");
             return BuildFullPromptContext(_lastContextSummary);
         }
 
@@ -32,7 +33,7 @@ public sealed partial class MainWindow
         {
             _lastContextSummary = _contextSummarizer.SummarizeNativeUi(_lastNativeUiResult);
             UpdateCurrentContextPanel(_lastContextSummary);
-            AddTimeline($"Ask using native UI context: {_lastContextSummary.Title}");
+            AddTimeline($"Ask using native UI context: {_lastContextSummary.Title} ({BuildContextStatus(_lastContextSummary)})");
             return BuildFullPromptContext(_lastContextSummary);
         }
 
