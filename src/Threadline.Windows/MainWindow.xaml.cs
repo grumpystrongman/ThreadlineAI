@@ -48,6 +48,9 @@ public sealed partial class MainWindow : Window
     private async void CompleteLastAction_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(CompleteLastActionAsync);
     private void CopyConversation_Click(object sender, RoutedEventArgs e) => CopyConversationToClipboard();
     private void CopyLastAnswer_Click(object sender, RoutedEventArgs e) => CopyLastAnswerToClipboard();
+    private void JumpTranscriptTop_Click(object sender, RoutedEventArgs e) => ScrollTranscriptToTop();
+    private void JumpTranscriptBottom_Click(object sender, RoutedEventArgs e) => ScrollTranscriptToBottom(force: true);
+
     private void ClearTranscript_Click(object sender, RoutedEventArgs e)
     {
         _transcriptMessages.Clear();
@@ -263,7 +266,7 @@ public sealed partial class MainWindow : Window
             _transcriptMessages.RemoveAt(0);
         }
 
-        ScrollTranscriptToLatest(transcriptMessage);
+        ScrollTranscriptToBottom(force: true);
         return transcriptMessage;
     }
 
@@ -271,7 +274,7 @@ public sealed partial class MainWindow : Window
     {
         transcriptMessage.Message = TrimForTranscript(message);
         transcriptMessage.Timestamp = DateTimeOffset.Now;
-        ScrollTranscriptToLatest(transcriptMessage);
+        ScrollTranscriptToBottom(force: true);
     }
 
     private void CopyConversationToClipboard()
@@ -319,10 +322,21 @@ public sealed partial class MainWindow : Window
         Clipboard.SetContent(package);
     }
 
-    private void ScrollTranscriptToLatest(object item)
+    private void ScrollTranscriptToTop()
     {
-        TranscriptList.UpdateLayout();
-        TranscriptList.ScrollIntoView(item);
+        TranscriptScrollViewer.ChangeView(null, 0, null, disableAnimation: false);
+    }
+
+    private void ScrollTranscriptToBottom(bool force)
+    {
+        if (!force) return;
+
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            TranscriptList.UpdateLayout();
+            TranscriptScrollViewer.UpdateLayout();
+            TranscriptScrollViewer.ChangeView(null, TranscriptScrollViewer.ScrollableHeight, null, disableAnimation: false);
+        });
     }
 
     private static string TrimForTranscript(string? value)
