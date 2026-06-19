@@ -23,7 +23,21 @@ public sealed partial class MainWindow
             CurrentWindowText.Text = $"Selected target:\n{selected}\n\n{selected.Window.ToDisplayText()}";
             _attachment = await _client.AttachWindowAsync(_session!.Id, selected.Window);
             _lastContextSummary = await _contentResolver.ResolveAsync(_session!.Id, selected);
+            UpdateCurrentContextPanel(_lastContextSummary);
             AppendTranscript("Selected Target Preview", _lastContextSummary.ToPromptContext());
         });
+    }
+
+    private void ToggleDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        DiagnosticsPanel.Visibility = DiagnosticsPanel.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+    }
+
+    private void UpdateCurrentContextPanel(SummarizedContext context)
+    {
+        CurrentContextText.Text = $"Source:\n{context.Source}\n\nConfidence:\n{context.Confidence}\n\nSummary:\n{context.Summary}";
+        DiagnosticsText.Text = context.Diagnostics?.ToDisplayText() ?? "No diagnostics are available for the current context.";
     }
 }
