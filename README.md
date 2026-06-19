@@ -23,13 +23,14 @@ ThreadlineAI is in early alpha engineering.
 - Build 11.9: the sidecar now surfaces a visible context status pill, carries that status into Ask timeline/transcript messages, and resets bound transcript/context state safely when starting a new chat or clearing context.
 - Build 11.9.1: missing-Ask-endpoint fallback now reports the local resolved context visibility instead of only showing a service plumbing message.
 - Build 11.10: the sidecar moves Current Context above the conversation, frees the left column for Open Apps and Tabs, defaults the provider picker to OpenAI, and falls back to local visibility when Ask provider calls fail.
+- Build 11.11: provider setup now lives in a Settings flyout in the Windows sidecar, with provider defaults, API-key entry, and save actions wired to Threadline's provider and secret-storage service endpoints.
 
 ## What is in this scaffold
 
 - Core domain model for sessions, context events, capture rules, prompt composition, privacy rules, provider abstraction, provider connections, artifacts, audit events, context preview, adapter registration, secure secret references, window attachment, and window actions.
 - Infrastructure for SQLite persistence, in-memory adapter registration, in-memory testing, secure local secret storage, in-memory window attachment runtime state, and OpenAI-compatible HTTP providers.
 - Local service API for adapters, the Windows shell, and provider-backed Ask execution.
-- Windows companion UI scaffold wired to the local service for session, window attachment, context preview/storage, Ask response routing, prompt composition fallback, confidence-scored context resolution, visible context status, diagnostics, and action proposal flows.
+- Windows companion UI scaffold wired to the local service for session, window attachment, context preview/storage, Ask response routing, prompt composition fallback, confidence-scored context resolution, visible context status, provider settings, diagnostics, and action proposal flows.
 - Browser extension bridge for Chrome/Edge user-triggered page and selected-text capture into the active Threadline session.
 - PowerShell terminal adapter module for user-triggered terminal notes, transcript excerpts, command-output capture, and action tracking.
 - Privacy/security design notes and implementation roadmap.
