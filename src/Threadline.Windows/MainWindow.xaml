@@ -65,42 +65,49 @@
         <Grid ColumnDefinitions="*,Auto">
           <TextBlock Text="Conversation" FontSize="16" FontWeight="SemiBold" />
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+            <Button Content="Top" Click="JumpTranscriptTop_Click" FontSize="12" Padding="8,4" />
+            <Button Content="Bottom" Click="JumpTranscriptBottom_Click" FontSize="12" Padding="8,4" />
             <Button Content="Copy Conversation" Click="CopyConversation_Click" FontSize="12" Padding="8,4" />
             <Button Content="Copy Last Answer" Click="CopyLastAnswer_Click" FontSize="12" Padding="8,4" />
           </StackPanel>
         </Grid>
-        <ListView x:Name="TranscriptList"
-                  Grid.Row="1"
-                  SelectionMode="None"
-                  IsItemClickEnabled="False"
-                  Padding="0,0,0,12"
-                  HorizontalContentAlignment="Stretch"
-                  VerticalAlignment="Stretch">
-          <ListView.ItemTemplate>
-            <DataTemplate>
-              <Border BorderThickness="1"
-                      CornerRadius="10"
-                      Padding="10"
-                      Margin="0,4,0,4"
-                      HorizontalAlignment="Stretch">
-                <StackPanel Spacing="4">
-                  <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock Text="{Binding Speaker}"
-                               FontWeight="SemiBold"
-                               Opacity="0.90" />
-                    <TextBlock Grid.Column="1"
-                               Text="{Binding TimestampDisplay}"
-                               FontSize="11"
-                               Opacity="0.58" />
-                  </Grid>
-                  <TextBlock Text="{Binding Message}"
-                             TextWrapping="WrapWholeWords"
-                             IsTextSelectionEnabled="True" />
-                </StackPanel>
-              </Border>
-            </DataTemplate>
-          </ListView.ItemTemplate>
-        </ListView>
+
+        <Border Grid.Row="1" BorderThickness="1" CornerRadius="10" Padding="0">
+          <ScrollViewer x:Name="TranscriptScrollViewer"
+                        VerticalScrollBarVisibility="Auto"
+                        VerticalScrollMode="Enabled"
+                        HorizontalScrollBarVisibility="Disabled"
+                        HorizontalScrollMode="Disabled"
+                        ZoomMode="Disabled"
+                        Padding="8,6,8,12">
+            <ItemsControl x:Name="TranscriptList">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border BorderThickness="1"
+                          CornerRadius="10"
+                          Padding="10"
+                          Margin="0,4,0,4"
+                          HorizontalAlignment="Stretch">
+                    <StackPanel Spacing="4">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="{Binding Speaker}"
+                                   FontWeight="SemiBold"
+                                   Opacity="0.90" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding TimestampDisplay}"
+                                   FontSize="11"
+                                   Opacity="0.58" />
+                      </Grid>
+                      <TextBlock Text="{Binding Message}"
+                                 TextWrapping="WrapWholeWords"
+                                 IsTextSelectionEnabled="True" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
       </Grid>
     </Grid>
 
