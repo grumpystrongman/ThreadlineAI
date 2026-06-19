@@ -198,7 +198,11 @@ public sealed class OpenAiCompatibleProvider : ILlmProvider
     public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken = default)
     {
         using var message = new HttpRequestMessage(HttpMethod.Post, new Uri(new Uri(_options.BaseUrl), "chat/completions"));
-        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
+        if (!string.IsNullOrWhiteSpace(_options.ApiKey))
+        {
+            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
+        }
+
         var model = string.IsNullOrWhiteSpace(request.Model) ? _options.DefaultModel : request.Model;
         message.Content = JsonContent.Create(new ChatCompletionRequest(model, request.Messages.Select(m => new ChatMessage(m.Role, m.Content)).ToArray(), request.Temperature, request.MaxOutputTokens));
         using var response = await _httpClient.SendAsync(message, cancellationToken);
