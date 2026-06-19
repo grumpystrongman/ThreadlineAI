@@ -102,6 +102,11 @@ public sealed class ThreadlineLocalClient
         };
 
         var response = await _httpClient.PostAsJsonAsync($"sessions/{sessionId}/ask", request, _jsonOptions, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new ThreadlineEndpointNotFoundException("The local service does not expose the Ask response endpoint yet.");
+        }
+
         return await ReadRequiredAsync<AskResponseDto>(response, cancellationToken);
     }
 
@@ -142,6 +147,13 @@ public sealed class ThreadlineLocalClient
 
         return await response.Content.ReadFromJsonAsync<T>(_jsonOptions, cancellationToken)
             ?? throw new InvalidOperationException("Threadline service returned an empty response.");
+    }
+}
+
+public sealed class ThreadlineEndpointNotFoundException : InvalidOperationException
+{
+    public ThreadlineEndpointNotFoundException(string message) : base(message)
+    {
     }
 }
 
