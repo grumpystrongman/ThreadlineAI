@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace Threadline.Windows.Services;
 
 public sealed class ProcessIntelligenceService
@@ -8,8 +6,6 @@ public sealed class ProcessIntelligenceService
     {
         var window = target.Window;
         var processName = window.ProcessName ?? "Unknown";
-        var process = TryGetProcess(window.ProcessId);
-        var parent = TryGetParentProcess(process);
         var appType = Classify(processName, window.WindowTitle ?? target.Title);
         var methods = BuildCaptureMethods(target, appType);
 
@@ -19,57 +15,52 @@ public sealed class ProcessIntelligenceService
             window.ProcessId,
             processName,
             window.ExecutablePath,
-            parent?.ProcessName,
-            parent?.Id,
+            "Not resolved in 11.8 safe process model",
+            null,
             appType,
             methods);
     }
 
     private static IReadOnlyList<CaptureMethodAvailability> BuildCaptureMethods(ThreadlineTarget target, ActiveAppType appType)
     {
-        var methods = new List<CaptureMethodAvailability>();
-
-        methods.Add(new CaptureMethodAvailability(
-            CaptureMethodKind.Provider,
-            ProviderDisplayName(target.ProviderKey),
-            target.Kind == ThreadlineTargetKind.BrowserTab || target.ProviderKey.Equals("browser-extension", StringComparison.OrdinalIgnoreCase),
-            ProviderNotes(target)));
-
-        methods.Add(new CaptureMethodAvailability(
-            CaptureMethodKind.UiAutomation,
-            "UI Automation",
-            target.CanReadBody || appType is ActiveAppType.OfficeDocument or ActiveAppType.MailClient or ActiveAppType.PdfViewer or ActiveAppType.AnalyticsTool or ActiveAppType.DesktopApp,
-            "Windows accessibility text can be attempted, but confidence depends on what the app exposes."));
-
-        methods.Add(new CaptureMethodAvailability(
-            CaptureMethodKind.FileResolver,
-            "Document/File Resolver",
-            target.ProviderKey.Equals("notepad-tabs", StringComparison.OrdinalIgnoreCase) || appType == ActiveAppType.TextEditor,
-            "Available when the visible document title can be mapped to a unique local file."));
-
-        methods.Add(new CaptureMethodAvailability(
-            CaptureMethodKind.Screenshot,
-            "Screenshot",
-            true,
-            "Fallback only. Used when provider, UI Automation, and file resolution do not produce reliable text."));
-
-        methods.Add(new CaptureMethodAvailability(
-            CaptureMethodKind.Ocr,
-            "OCR",
-            false,
-            "Planned fallback after screenshot capture; not treated as implemented in this build."));
-
-        methods.Add(new CaptureMethodAvailability(
-            CaptureMethodKind.ImageExtraction,
-            "Image Extraction",
-            false,
-            "Planned for visual documents and dashboards."));
-
-        methods.Add(new CaptureMethodAvailability(
-            CaptureMethodKind.LayoutAnalysis,
-            "Layout Analysis",
-            false,
-            "Planned for screenshots, PDFs, and dashboard-like apps."));
+        var methods = new List<CaptureMethodAvailability>
+        {
+            new(
+                CaptureMethodKind.Provider,
+                ProviderDisplayName(target.ProviderKey),
+                target.Kind == ThreadlineTargetKind.BrowserTab || target.ProviderKey.Equals("browser-extension", StringComparison.OrdinalIgnoreCase) || target.ProviderKey.Equals("notepad-tabs", StringComparison.OrdinalIgnoreCase),
+                ProviderNotes(target)),
+            new(
+                CaptureMethodKind.UiAutomation,
+                "UI Automation",
+                target.CanReadBody || appType is ActiveAppType.OfficeDocument or ActiveAppType.MailClient or ActiveAppType.PdfViewer or ActiveAppType.AnalyticsTool or ActiveAppType.DesktopApp,
+                "Windows accessibility text can be attempted, but confidence depends on what the app exposes."),
+            new(
+                CaptureMethodKind.FileResolver,
+                "Document/File Resolver",
+                target.ProviderKey.Equals("notepad-tabs", StringComparison.OrdinalIgnoreCase) || appType == ActiveAppType.TextEditor,
+                "Available when the visible document title can be mapped to a unique local file."),
+            new(
+                CaptureMethodKind.Screenshot,
+                "Screenshot",
+                true,
+                "Fallback only. Used when provider, UI Automation, and file resolution do not produce reliable text."),
+            new(
+                CaptureMethodKind.Ocr,
+                "OCR",
+                false,
+                "Planned fallback after screenshot capture; not treated as implemented in this build."),
+            new(
+                CaptureMethodKind.ImageExtraction,
+                "Image Extraction",
+                false,
+                "Planned for visual documents and dashboards."),
+            new(
+                CaptureMethodKind.LayoutAnalysis,
+                "Layout Analysis",
+                false,
+                "Planned for screenshots, PDFs, and dashboard-like apps.")
+        };
 
         return methods;
     }
@@ -103,29 +94,4 @@ public sealed class ProcessIntelligenceService
 
     private static bool IsAny(string value, params string[] candidates) =>
         candidates.Any(candidate => string.Equals(value, candidate, StringComparison.OrdinalIgnoreCase));
-
-    private static Process? TryGetProcess(int? processId)
-    {
-        if (processId is null or <= 0) return null;
-        try { return Process.GetProcessById(processId.Value); } catch { return null; }
-    }
-
-    private static Process? TryGetParentProcess(Process? process)
-    {
-        if (process is null) return null;
-        try
-        {
-            using var searcher = new System.Management.ManagementObjectSearcher($"SELECT ParentProcessId FROM Win32_Process WHERE ProcessId = {process.Id}");
-            foreach (var item in searcher.Get())
-            {
-                var parentId = Convert.ToInt32(item["ParentProcessId"], System.Globalization.CultureInfo.InvariantCulture);
-                return TryGetProcess(parentId);
-            }
-        }
-        catch
-        {
-        }
-
-        return null;
-    }
 }
