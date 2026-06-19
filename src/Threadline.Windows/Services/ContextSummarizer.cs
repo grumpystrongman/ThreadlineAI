@@ -8,13 +8,16 @@ public sealed record SummarizedContext(
     string Summary,
     IReadOnlyList<string> KeyDetails,
     IReadOnlyList<string> Warnings,
-    string RawPreview)
+    string RawPreview,
+    ContextConfidence Confidence = ContextConfidence.Medium,
+    CaptureDiagnosticsSnapshot? Diagnostics = null)
 {
     public string ToPromptContext()
     {
         var details = KeyDetails.Count == 0 ? "None detected." : string.Join(Environment.NewLine, KeyDetails.Select(detail => $"- {detail}"));
         var warnings = Warnings.Count == 0 ? "None." : string.Join(Environment.NewLine, Warnings.Select(warning => $"- {warning}"));
-        return $"Context summary: {Title}\nSource: {Source}\n\nSummary:\n{Summary}\n\nKey details:\n{details}\n\nWarnings:\n{warnings}";
+        var diagnostics = Diagnostics is null ? string.Empty : $"\n\nDiagnostics:\n{Diagnostics.ToDisplayText()}";
+        return $"Context summary: {Title}\nSource: {Source}\nConfidence: {Confidence.ToString().ToUpperInvariant()}\n\nSummary:\n{Summary}\n\nKey details:\n{details}\n\nWarnings:\n{warnings}{diagnostics}";
     }
 }
 
@@ -38,7 +41,8 @@ public sealed class ContextSummarizer
                 "Threadline could not read useful native UI content from the target window.",
                 [],
                 result.Warnings,
-                result.ToDisplayText());
+                result.ToDisplayText(),
+                ContextConfidence.Low);
         }
 
         var cleanedLines = CleanLines(result.Content).ToList();
@@ -47,7 +51,7 @@ public sealed class ContextSummarizer
         var ambiguous = IsAmbiguousTabbedCapture(result, cleanedLines);
         if (ambiguous)
         {
-            warnings.Add("This native capture is tab-ambiguous. Threadline can identify the active Notepad window/tab title, but Windows exposed body text that may belong to another tab. Use selected text, clipboard capture, or a future tab picker for reliable document content.");
+            warnings.Add("This native capture is tab-ambiguous. Threadline can identify the active window/tab title, but Windows exposed body text that may belong to another tab. Threadline will not pretend this is trusted document context.");
         }
 
         var keyDetails = ambiguous
@@ -59,13 +63,20 @@ public sealed class ContextSummarizer
             warnings.Add("Native UI capture contained only window chrome or low-value controls after cleanup.");
         }
 
+        var confidence = cleanedLines.Count == 0
+            ? ContextConfidence.Low
+            : ambiguous
+                ? ContextConfidence.Low
+                : ContextConfidence.Medium;
+
         return new SummarizedContext(
             title,
             $"{result.ProcessName} native UI",
             summary,
             keyDetails,
             warnings,
-            result.ToDisplayText());
+            result.ToDisplayText(),
+            confidence);
     }
 
     public SummarizedContext SummarizePlainText(string title, string source, string text)
@@ -98,7 +109,21 @@ public sealed class ContextSummarizer
             summaryText,
             keyDetails,
             [],
-            text);
+            text,
+            string.IsNullOrWhiteSpace(text) ? ContextConfidence.None : ContextConfidence.High);
+    }
+
+    public SummarizedContext SummarizeScreenshotFallback(ThreadlineTarget target, IReadOnlyList<string> warnings)
+    {
+        var summary = "Threadline reached the screenshot fallback, but OCR/vision extraction is not available in this build. Based on visible content is therefore not safe to claim yet.";
+        return new SummarizedContext(
+            target.Title,
+            "screenshot-fallback",
+            summary,
+            [target.ToString()],
+            warnings,
+            target.Window.ToDisplayText(),
+            ContextConfidence.None);
     }
 
     private static IEnumerable<string> CleanLines(string content)
