@@ -34,6 +34,19 @@
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
           <StackPanel Spacing="3">
             <TextBlock Text="Threadline" FontSize="19" FontWeight="SemiBold" />
+            <TextBlock x:Name="WorkThreadStatusText"
+                       Text="Work Thread: loading..."
+                       TextWrapping="WrapWholeWords"
+                       MaxLines="2"
+                       FontSize="12"
+                       FontWeight="SemiBold"
+                       Opacity="0.84" />
+            <TextBox x:Name="WorkThreadTitleBox"
+                     PlaceholderText="Name this work thread..."
+                     MinWidth="220"
+                     MaxWidth="440"
+                     FontSize="11"
+                     TextWrapping="NoWrap" />
             <TextBlock x:Name="CurrentWindowText"
                        Text="Finding active context..."
                        TextWrapping="WrapWholeWords"
@@ -49,6 +62,10 @@
           </StackPanel>
 
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
+            <Button Content="New Thread" Click="NewWorkThread_Click" FontSize="12" Padding="8,4" />
+            <Button Content="Resume" Click="ResumeWorkThread_Click" FontSize="12" Padding="8,4" />
+            <Button Content="Rename" Click="RenameWorkThread_Click" FontSize="12" Padding="8,4" />
+            <Button Content="Close" Click="CloseWorkThread_Click" FontSize="12" Padding="8,4" />
             <Button Content="Start Session" Click="StartSession_Click" FontSize="12" Padding="8,4" />
             <CheckBox x:Name="AttachSidecarToggle"
                       Content="Attach"
