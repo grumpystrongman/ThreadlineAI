@@ -9,7 +9,11 @@ public sealed partial class MainWindow
     private readonly List<WorkThreadDto> _workThreadSessionList = new();
 
     private async void RefreshWorkThreads_Click(object sender, RoutedEventArgs e) =>
-        await RunUiActionAsync(() => RefreshWorkThreadSessionListAsync(selectActive: true));
+        await RunUiActionAsync(async () =>
+        {
+            OpenSessionManagerPanel();
+            await RefreshWorkThreadSessionListAsync(selectActive: true);
+        });
 
     private async void ResumeSelectedWorkThread_Click(object sender, RoutedEventArgs e) =>
         await RunUiActionAsync(ResumeSelectedWorkThreadAsync);
@@ -22,6 +26,17 @@ public sealed partial class MainWindow
 
     private async void DetachCurrentWindowFromWorkThread_Click(object sender, RoutedEventArgs e) =>
         await RunUiActionAsync(DetachCurrentWindowFromWorkThreadAsync);
+
+    private void OpenSessionManagerPanel()
+    {
+        WorkThreadSessionManagerPanel.Visibility = Visibility.Visible;
+        WorkThreadListStatusText.Text = "Sessions are shown here so the main sidecar can stay focused on the conversation.";
+    }
+
+    private void CloseSessionManagerPanel()
+    {
+        WorkThreadSessionManagerPanel.Visibility = Visibility.Collapsed;
+    }
 
     private void WorkThreadList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -80,6 +95,7 @@ public sealed partial class MainWindow
         if (selected is null)
         {
             WorkThreadListStatusText.Text = "Select a Work Thread first, then click Resume Selected.";
+            OpenSessionManagerPanel();
             return;
         }
 
@@ -87,6 +103,7 @@ public sealed partial class MainWindow
         UpdateWorkThreadUi();
         await LoadWorkThreadMessagesAsync();
         await RefreshWorkThreadSessionListAsync(selectActive: true);
+        CloseSessionManagerPanel();
         AddTimeline("Resumed selected Work Thread.");
     }
 
@@ -96,6 +113,7 @@ public sealed partial class MainWindow
         if (selected is null)
         {
             WorkThreadListStatusText.Text = "No Work Thread selected or active. Create or resume one first.";
+            OpenSessionManagerPanel();
             return;
         }
 
@@ -110,6 +128,7 @@ public sealed partial class MainWindow
         UpdateWorkThreadUi();
         SessionManagerTitleBox.Text = _activeWorkThread.Title;
         await RefreshWorkThreadSessionListAsync(selectActive: true);
+        WorkThreadListStatusText.Text = $"Renamed Work Thread: {_activeWorkThread.Title}";
         AddTimeline("Renamed selected Work Thread.");
     }
 
@@ -119,6 +138,7 @@ public sealed partial class MainWindow
         if (selected is null)
         {
             WorkThreadListStatusText.Text = "Select or create a Work Thread before tying a window.";
+            OpenSessionManagerPanel();
             return;
         }
 
@@ -139,6 +159,7 @@ public sealed partial class MainWindow
         await PersistTargetContextEventAsync(target, "ManualTie");
         PlaceSidecarForTarget(target, "Tied window to selected Work Thread.");
         await RefreshWorkThreadSessionListAsync(selectActive: true);
+        WorkThreadListStatusText.Text = "Tied window to selected Work Thread.";
         AddTimeline("Tied window to selected Work Thread.");
     }
 
