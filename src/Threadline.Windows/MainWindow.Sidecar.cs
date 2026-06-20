@@ -13,17 +13,22 @@ public sealed partial class MainWindow
 {
     private const int ShowWindowNormal = 1;
     private const int ShowWindowHide = 0;
+    private const int ShowWindowRestore = 9;
     private const int LeftMouseButtonVirtualKey = 0x01;
     private const int SidecarDefaultWidth = 430;
     private const int SidecarMinimumWidth = 360;
-    private const int SidecarMinimumHeight = 620;
-    private const int FloatingTriggerWidth = 72;
+    private const int SidecarMinimumHeight = 360;
+    private const int TargetMinimumWidth = 420;
+    private const int SidecarAttachGap = 8;
+    private const int FloatingTriggerWidth = 80;
     private const int FloatingTriggerHeight = 168;
     private const int FloatingTriggerHoverZone = 72;
     private const int FloatingTriggerReachPadding = 180;
     private const int FloatingTriggerHideGraceMilliseconds = 1800;
     private const int SidecarScreenMargin = 12;
     private const int SidecarScreenTopOffset = 40;
+    private const uint SetWindowPosNoZOrder = 0x0004;
+    private const uint SetWindowPosNoActivate = 0x0010;
 
     private readonly DispatcherTimer _edgeHoverTimer = new();
     private EdgeTriggerWindow? _edgeTriggerWindow;
@@ -233,8 +238,8 @@ public sealed partial class MainWindow
         var workArea = GetTargetWorkArea(sidecarId, targetWindow.Handle);
         var size = new SizeInt32(FloatingTriggerWidth, FloatingTriggerHeight);
         var x = anchorRight
-            ? targetRect.Right - FloatingTriggerWidth - 18
-            : targetRect.Left + 18;
+            ? targetRect.Right - FloatingTriggerWidth - 34
+            : targetRect.Left + 34;
         var y = cursor.Y - (FloatingTriggerHeight / 2);
 
         x = ClampToArea(x, workArea.X + SidecarScreenMargin, workArea.X + workArea.Width - FloatingTriggerWidth - SidecarScreenMargin);
@@ -343,38 +348,80 @@ public sealed partial class MainWindow
             var sidecarId = Win32Interop.GetWindowIdFromWindow(sidecarHwnd);
             var appWindow = AppWindow.GetFromWindowId(sidecarId);
             var workArea = GetTargetWorkArea(sidecarId, targetWindow.Handle);
-
             var maxWidth = Math.Max(1, workArea.Width - (SidecarScreenMargin * 2));
-            var width = ClampToArea(SidecarDefaultWidth, SidecarMinimumWidth, maxWidth);
+            var sidecarWidth = ClampToArea(SidecarDefaultWidth, SidecarMinimumWidth, maxWidth);
+
+            if (!_sidecarWindowHiddenForTrigger)
+            {
+                targetRect = EnsureSideBySideTargetSpace(targetWindow.Handle, targetRect, workArea, sidecarWidth);
+            }
 
             var maxHeight = Math.Max(1, workArea.Height - (SidecarScreenMargin * 2));
-            var height = ClampToArea(Math.Max(targetRect.Height, SidecarMinimumHeight), SidecarMinimumHeight, maxHeight);
+            var sidecarHeight = ClampToArea(targetRect.Height, SidecarMinimumHeight, maxHeight);
+            var y = ClampToArea(targetRect.Top, workArea.Y + SidecarScreenMargin, workArea.Y + workArea.Height - sidecarHeight - SidecarScreenMargin);
 
-            var minY = workArea.Y + SidecarScreenMargin;
-            var maxY = workArea.Y + workArea.Height - height - SidecarScreenMargin;
-            var y = ClampToArea(targetRect.Top, minY, Math.Max(minY, maxY));
+            var rightX = targetRect.Right + SidecarAttachGap;
+            var leftX = targetRect.Left - sidecarWidth - SidecarAttachGap;
+            var screenRightX = workArea.X + workArea.Width - sidecarWidth - SidecarScreenMargin;
 
-            var rightX = targetRect.Right + SidecarScreenMargin;
-            var leftX = targetRect.Left - width - SidecarScreenMargin;
-            var screenRightX = workArea.X + workArea.Width - width - SidecarScreenMargin;
-
-            var x = rightX + width <= workArea.X + workArea.Width
+            var x = rightX + sidecarWidth <= workArea.X + workArea.Width - SidecarScreenMargin
                 ? rightX
-                : leftX >= workArea.X
+                : leftX >= workArea.X + SidecarScreenMargin
                     ? leftX
                     : screenRightX;
 
-            appWindow.Resize(new SizeInt32(width, height));
+            appWindow.Resize(new SizeInt32(sidecarWidth, sidecarHeight));
             appWindow.Move(new PointInt32(x, y));
 
             var side = x == rightX ? "right" : x == leftX ? "left" : "screen edge";
-            UpdateSidecarAttachmentStatus($"Sidecar: Attached chat on {side} of {targetWindow.ApplicationName} — {targetTitle}. {reason}");
+            UpdateSidecarAttachmentStatus($"Sidecar: Attached chat on {side} of {targetWindow.ApplicationName} — {targetTitle}. Height matched to target. {reason}");
             return true;
         }
         catch
         {
             return false;
         }
+    }
+
+    private NativeRect EnsureSideBySideTargetSpace(nint targetHandle, NativeRect targetRect, RectInt32 workArea, int sidecarWidth)
+    {
+        var workLeft = workArea.X + SidecarScreenMargin;
+        var workTop = workArea.Y + SidecarScreenMargin;
+        var workRight = workArea.X + workArea.Width - SidecarScreenMargin;
+        var workBottom = workArea.Y + workArea.Height - SidecarScreenMargin;
+        var requiredRight = targetRect.Right + SidecarAttachGap + sidecarWidth;
+
+        if (requiredRight <= workRight && targetRect.Left >= workLeft && targetRect.Bottom <= workBottom && targetRect.Top >= workTop)
+        {
+            return targetRect;
+        }
+
+        var availableTargetWidth = Math.Max(1, workArea.Width - sidecarWidth - SidecarAttachGap - (SidecarScreenMargin * 2));
+        var targetWidth = ClampToArea(targetRect.Width, Math.Min(TargetMinimumWidth, availableTargetWidth), availableTargetWidth);
+        var targetHeight = ClampToArea(targetRect.Height, SidecarMinimumHeight, Math.Max(1, workArea.Height - (SidecarScreenMargin * 2)));
+        var targetLeft = workRight - sidecarWidth - SidecarAttachGap - targetWidth;
+        var targetTop = ClampToArea(targetRect.Top, workTop, workBottom - targetHeight);
+
+        targetLeft = ClampToArea(targetLeft, workLeft, Math.Max(workLeft, workRight - sidecarWidth - SidecarAttachGap - targetWidth));
+
+        // Maximized windows ignore normal move/resize calls. Restore first so Threadline can create a Copilot-style side-by-side layout.
+        _ = ShowWindow(targetHandle, ShowWindowRestore);
+        _ = SetWindowPos(
+            targetHandle,
+            nint.Zero,
+            targetLeft,
+            targetTop,
+            targetWidth,
+            targetHeight,
+            SetWindowPosNoZOrder | SetWindowPosNoActivate);
+
+        return GetWindowRect(targetHandle, out var updatedRect) ? updatedRect : new NativeRect
+        {
+            Left = targetLeft,
+            Top = targetTop,
+            Right = targetLeft + targetWidth,
+            Bottom = targetTop + targetHeight
+        };
     }
 
     private RectInt32 GetTargetWorkArea(WindowId sidecarId, nint targetHandle)
@@ -469,4 +516,7 @@ public sealed partial class MainWindow
 
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(nint hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(nint hWnd, nint hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 }
