@@ -32,13 +32,13 @@ public sealed partial class MainWindow : Window
         AppendTranscript("Threadline", "Start or use a session, pick an app/tab, then ask Threadline about that target.");
         RefreshActiveWindow();
         StartAutoFollow();
-        _ = CheckServiceAsync();
+        _ = RunUiActionAsync(CheckServiceAsync);
     }
 
     private async void CheckService_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(CheckServiceAsync);
     private async void StartSession_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(StartSessionAsync);
     private async void UseActiveSession_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(UseActiveSessionAsync);
-    private void RefreshWindow_Click(object sender, RoutedEventArgs e) => RefreshActiveWindow();
+    private async void RefreshWindow_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => { RefreshActiveWindow(); return Task.CompletedTask; });
     private async void AttachWindow_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(AttachWindowAsync);
     private async void PreviewWindow_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(PreviewWindowAsync);
     private async void StoreWindow_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(StoreWindowAsync);
@@ -46,15 +46,19 @@ public sealed partial class MainWindow : Window
     private async void Ask_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(AskAsync);
     private async void ProposeInsert_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(ProposeInsertActionAsync);
     private async void CompleteLastAction_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(CompleteLastActionAsync);
-    private void CopyConversation_Click(object sender, RoutedEventArgs e) => CopyConversationToClipboard();
-    private void CopyLastAnswer_Click(object sender, RoutedEventArgs e) => CopyLastAnswerToClipboard();
-    private void JumpTranscriptTop_Click(object sender, RoutedEventArgs e) => ScrollTranscriptToTop();
-    private void JumpTranscriptBottom_Click(object sender, RoutedEventArgs e) => ScrollTranscriptToBottom(force: true);
+    private async void CopyConversation_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => { CopyConversationToClipboard(); return Task.CompletedTask; });
+    private async void CopyLastAnswer_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => { CopyLastAnswerToClipboard(); return Task.CompletedTask; });
+    private async void JumpTranscriptTop_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => { ScrollTranscriptToTop(); return Task.CompletedTask; });
+    private async void JumpTranscriptBottom_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => { ScrollTranscriptToBottom(force: true); return Task.CompletedTask; });
 
-    private void ClearTranscript_Click(object sender, RoutedEventArgs e)
+    private async void ClearTranscript_Click(object sender, RoutedEventArgs e)
     {
-        _transcriptMessages.Clear();
-        AppendTranscript("Threadline", "Transcript cleared.");
+        await RunUiActionAsync(() =>
+        {
+            _transcriptMessages.Clear();
+            AppendTranscript("Threadline", "Transcript cleared.");
+            return Task.CompletedTask;
+        });
     }
 
     private async Task CheckServiceAsync()
@@ -130,7 +134,7 @@ public sealed partial class MainWindow : Window
         await Task.Delay(TimeSpan.FromSeconds(3));
         _lastNativeUiResult = _nativeUiAutomationReader.ReadForegroundWindow();
         _lastForegroundWindow = _activeWindowMonitor.GetActiveWindowSnapshot();
-        CurrentWindowText.Text = _lastForegroundWindow.ToDisplayText();
+        CurrentWindowText.Text = _lastForegroundWindow?.ToDisplayText() ?? "No foreground app detected.";
         _lastContextSummary = _contextSummarizer.SummarizeNativeUi(_lastNativeUiResult);
         AppendTranscript("Native UI Summary", _lastContextSummary.ToPromptContext());
         AddTimeline(_lastNativeUiResult.Success ? "Summarized target native UI context." : "Target native UI preview found no readable context.");
@@ -213,9 +217,10 @@ public sealed partial class MainWindow : Window
     private void RefreshActiveWindow()
     {
         _lastForegroundWindow = _activeWindowMonitor.GetActiveWindowSnapshot();
+        var foregroundText = _lastForegroundWindow?.ToDisplayText() ?? "No foreground app detected.";
         CurrentWindowText.Text = _attachment is null
-            ? _lastForegroundWindow.ToDisplayText()
-            : FormatAttachment(_attachment) + "\n\nForeground now:\n" + _lastForegroundWindow.ToDisplayText();
+            ? foregroundText
+            : FormatAttachment(_attachment) + "\n\nForeground now:\n" + foregroundText;
     }
 
     private async Task RunUiActionAsync(Func<Task> action)
@@ -226,7 +231,15 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ServiceStatusText.Text = "Service/action error";
+            try
+            {
+                ServiceStatusText.Text = "Service/action error";
+            }
+            catch
+            {
+                // Ignore secondary UI failures while reporting the original error.
+            }
+
             AddTimeline("Error: " + ex.Message);
             AppendTranscript("Threadline", "I hit a service/action error: " + ex.Message);
         }
@@ -258,15 +271,22 @@ public sealed partial class MainWindow : Window
 
     private void AddTimeline(string message)
     {
-        TimelineList.Items.Add($"{DateTimeOffset.Now:t} {message}");
-        while (TimelineList.Items.Count > 40)
+        try
         {
-            TimelineList.Items.RemoveAt(0);
-        }
+            TimelineList.Items.Add($"{DateTimeOffset.Now:t} {message}");
+            while (TimelineList.Items.Count > 40)
+            {
+                TimelineList.Items.RemoveAt(0);
+            }
 
-        if (TimelineList.Items.Count > 0)
+            if (TimelineList.Items.Count > 0)
+            {
+                TimelineList.ScrollIntoView(TimelineList.Items[^1]);
+            }
+        }
+        catch
         {
-            TimelineList.ScrollIntoView(TimelineList.Items[^1]);
+            // Timeline updates should never be able to crash the sidecar.
         }
     }
 
@@ -277,21 +297,36 @@ public sealed partial class MainWindow : Window
             TrimForTranscript(message),
             DateTimeOffset.Now);
 
-        _transcriptMessages.Add(transcriptMessage);
-        while (_transcriptMessages.Count > MaxTranscriptItems)
+        try
         {
-            _transcriptMessages.RemoveAt(0);
+            _transcriptMessages.Add(transcriptMessage);
+            while (_transcriptMessages.Count > MaxTranscriptItems)
+            {
+                _transcriptMessages.RemoveAt(0);
+            }
+
+            ScrollTranscriptToBottom(force: true);
+        }
+        catch
+        {
+            // Transcript rendering should never be able to crash the sidecar.
         }
 
-        ScrollTranscriptToBottom(force: true);
         return transcriptMessage;
     }
 
     private void UpdateTranscript(TranscriptMessage transcriptMessage, string message)
     {
-        transcriptMessage.Message = TrimForTranscript(message);
-        transcriptMessage.Timestamp = DateTimeOffset.Now;
-        ScrollTranscriptToBottom(force: true);
+        try
+        {
+            transcriptMessage.Message = TrimForTranscript(message);
+            transcriptMessage.Timestamp = DateTimeOffset.Now;
+            ScrollTranscriptToBottom(force: true);
+        }
+        catch
+        {
+            // A failed visual update is non-fatal; the app should stay alive.
+        }
     }
 
     private void CopyConversationToClipboard()
@@ -415,19 +450,40 @@ public sealed partial class MainWindow : Window
 
     private void ScrollTranscriptToTop()
     {
-        TranscriptScrollViewer.ChangeView(null, 0, null, disableAnimation: false);
+        try
+        {
+            TranscriptScrollViewer.ChangeView(null, 0, null, disableAnimation: false);
+        }
+        catch
+        {
+            // Non-fatal visual update.
+        }
     }
 
     private void ScrollTranscriptToBottom(bool force)
     {
         if (!force) return;
 
-        DispatcherQueue.TryEnqueue(() =>
+        try
         {
-            TranscriptList.UpdateLayout();
-            TranscriptScrollViewer.UpdateLayout();
-            TranscriptScrollViewer.ChangeView(null, TranscriptScrollViewer.ScrollableHeight, null, disableAnimation: false);
-        });
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                try
+                {
+                    TranscriptList.UpdateLayout();
+                    TranscriptScrollViewer.UpdateLayout();
+                    TranscriptScrollViewer.ChangeView(null, TranscriptScrollViewer.ScrollableHeight, null, disableAnimation: false);
+                }
+                catch
+                {
+                    // Dispatcher-delayed scroll/layout updates should never crash after a successful Ask.
+                }
+            });
+        }
+        catch
+        {
+            // Non-fatal visual update.
+        }
     }
 
     private static string TrimForTranscript(string? value)
