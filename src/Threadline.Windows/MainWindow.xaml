@@ -26,7 +26,7 @@
     <Grid x:Name="ChatShellPanel"
           Grid.Column="1"
           Padding="12"
-          RowDefinitions="Auto,Auto,Auto,*,Auto,Auto"
+          RowDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto"
           RowSpacing="8"
           HorizontalAlignment="Stretch"
           VerticalAlignment="Stretch">
@@ -109,7 +109,23 @@
         </Grid>
       </Border>
 
-      <Border x:Name="ProviderSettingsPanel" Grid.Row="1" BorderThickness="1" CornerRadius="12" Padding="10" Visibility="Collapsed">
+      <Border x:Name="SessionBindingPanel" Grid.Row="1" BorderThickness="1" CornerRadius="12" Padding="10">
+        <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
+          <TextBlock x:Name="SessionBindingStatusText"
+                     Text="Window session: no pending connection. Click AI on another window to choose how to connect it."
+                     TextWrapping="WrapWholeWords"
+                     MaxLines="3"
+                     FontSize="11"
+                     Opacity="0.82" />
+          <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+            <Button Content="Connect Current" Click="ConnectPendingTargetToCurrentSession_Click" FontSize="12" Padding="8,4" />
+            <Button Content="New Window Session" Click="StartNewSessionForPendingTarget_Click" FontSize="12" Padding="8,4" />
+            <Button Content="Detach" Click="DetachPendingTarget_Click" FontSize="12" Padding="8,4" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Border x:Name="ProviderSettingsPanel" Grid.Row="2" BorderThickness="1" CornerRadius="12" Padding="10" Visibility="Collapsed">
         <Grid RowDefinitions="Auto,Auto,*" RowSpacing="8">
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
             <StackPanel>
@@ -167,7 +183,7 @@
         </Grid>
       </Border>
 
-      <Border x:Name="CurrentContextPanel" Grid.Row="2" BorderThickness="1" CornerRadius="12" Padding="10">
+      <Border x:Name="CurrentContextPanel" Grid.Row="3" BorderThickness="1" CornerRadius="12" Padding="10">
         <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="4">
           <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
             <Border x:Name="ContextStatusPill"
@@ -206,7 +222,7 @@
         </Grid>
       </Border>
 
-      <Border Grid.Row="3" BorderThickness="1" CornerRadius="12" Padding="0">
+      <Border Grid.Row="4" BorderThickness="1" CornerRadius="12" Padding="0">
         <ScrollViewer x:Name="TranscriptScrollViewer"
                       VerticalScrollBarVisibility="Auto"
                       VerticalScrollMode="Enabled"
@@ -243,7 +259,7 @@
         </ScrollViewer>
       </Border>
 
-      <Border Grid.Row="4" BorderThickness="1" CornerRadius="12" Padding="8">
+      <Border Grid.Row="5" BorderThickness="1" CornerRadius="12" Padding="8">
         <Grid RowDefinitions="*,Auto" RowSpacing="6">
           <TextBox x:Name="QuestionBox"
                    PlaceholderText="Ask about this app, tab, document, or workflow..."
@@ -252,14 +268,15 @@
                    TextWrapping="Wrap"
                    BorderThickness="0" />
           <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6">
-            <Button Content="Copy" Click="CopyLastAnswer_Click" FontSize="12" Padding="8,4" />
+            <Button Content="Copy Last" Click="CopyLastAnswer_Click" FontSize="12" Padding="8,4" />
+            <Button Content="Copy All" Click="CopyConversation_Click" FontSize="12" Padding="8,4" />
             <Button Content="Clear" Click="ClearTranscript_Click" FontSize="12" Padding="8,4" />
             <Button Content="Ask" Click="Ask_Click" FontSize="12" Padding="12,4" />
           </StackPanel>
         </Grid>
       </Border>
 
-      <ListView x:Name="TimelineList" Grid.Row="5" Height="28" FontSize="10" />
+      <ListView x:Name="TimelineList" Grid.Row="6" Height="28" FontSize="10" />
     </Grid>
   </Grid>
 </Window>
