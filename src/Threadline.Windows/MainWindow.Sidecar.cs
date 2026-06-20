@@ -33,6 +33,22 @@ public sealed partial class MainWindow
         SetSidecarVisualState();
         StartFloatingEdgeTrigger();
         PlaceSidecarForTarget(GetBestSidecarTarget(), "Initial sidecar placement.");
+
+        try
+        {
+            RootShell.Loaded += (_, _) =>
+            {
+                if (_sidecarWindowHiddenForTrigger)
+                {
+                    _ = RootShell.DispatcherQueue.TryEnqueue(HideMainSidecarWindow);
+                }
+            };
+        }
+        catch
+        {
+            // If delayed hiding cannot be registered, fall back to an immediate hide attempt.
+        }
+
         HideMainSidecarWindow();
     }
 
