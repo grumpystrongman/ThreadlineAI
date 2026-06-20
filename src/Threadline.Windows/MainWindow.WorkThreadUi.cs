@@ -231,7 +231,7 @@ public sealed partial class MainWindow
                     windowTitle = target.Window.WindowTitle,
                     captureMode = "AttachedOrFollowed",
                     provider = target.ProviderKey,
-                    confidence = target.Confidence?.ToString() ?? "unknown",
+                    confidence = target.Confidence.ToString(),
                     capturedAt = DateTimeOffset.Now
                 }
             };
@@ -247,7 +247,7 @@ public sealed partial class MainWindow
                 windowTitle = _lastForegroundWindow?.WindowTitle,
                 captureMode = "Inferred",
                 provider = _lastContextSummary?.Source ?? "native-ui",
-                confidence = _lastContextSummary?.Confidence?.ToString() ?? "unknown",
+                confidence = _lastContextSummary is null ? "unknown" : _lastContextSummary.Confidence.ToString(),
                 capturedAt = DateTimeOffset.Now
             }
         };
@@ -318,8 +318,6 @@ public sealed partial class MainWindow
 
     private static string FormatStoredRole(string role)
     {
-        if (role.Equals("user", StringComparison.OrdinalIgnoreCase)) return "You";
-        if (role.Equals("assistant", StringComparison.OrdinalIgnoreCase)) return "Threadline";
-        return role;
+        return role.Equals("user", StringComparison.OrdinalIgnoreCase) ? "You" : "Threadline";
     }
 }
