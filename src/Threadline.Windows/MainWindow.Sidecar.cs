@@ -16,8 +16,6 @@ public sealed partial class MainWindow
     private const int SidecarDefaultWidth = 430;
     private const int SidecarMinimumWidth = 360;
     private const int SidecarMinimumHeight = 620;
-    private const int SidecarHandleWidth = 44;
-    private const int SidecarHandleHeight = 180;
     private const int FloatingTriggerWidth = 42;
     private const int FloatingTriggerHeight = 118;
     private const int FloatingTriggerHoverZone = 22;
@@ -27,24 +25,33 @@ public sealed partial class MainWindow
     private readonly DispatcherTimer _edgeHoverTimer = new();
     private EdgeTriggerWindow? _edgeTriggerWindow;
     private bool _attachSidecarToTarget = true;
-    private bool _sidecarCollapsedToHandle;
-    private bool _sidecarWindowHiddenForTrigger;
+    private bool _sidecarCollapsedToHandle = true;
+    private bool _sidecarWindowHiddenForTrigger = true;
 
     private void ConfigureSidecarWindow()
     {
         SetSidecarVisualState();
         StartFloatingEdgeTrigger();
         PlaceSidecarForTarget(GetBestSidecarTarget(), "Initial sidecar placement.");
+        HideMainSidecarWindow();
     }
 
     private void StartFloatingEdgeTrigger()
     {
-        _edgeTriggerWindow ??= new EdgeTriggerWindow();
-        _edgeTriggerWindow.TriggerRequested += (_, _) => RestoreSidecarFromFloatingTrigger();
+        _ = EnsureEdgeTriggerWindow();
 
         _edgeHoverTimer.Interval = TimeSpan.FromMilliseconds(120);
         _edgeHoverTimer.Tick += (_, _) => SafeUpdateFloatingEdgeTrigger();
         _edgeHoverTimer.Start();
+    }
+
+    private EdgeTriggerWindow EnsureEdgeTriggerWindow()
+    {
+        if (_edgeTriggerWindow is not null) return _edgeTriggerWindow;
+
+        _edgeTriggerWindow = new EdgeTriggerWindow();
+        _edgeTriggerWindow.TriggerRequested += (_, _) => RestoreSidecarFromFloatingTrigger();
+        return _edgeTriggerWindow;
     }
 
     private void ToggleAttachSidecarMode_Click(object sender, RoutedEventArgs e)
@@ -170,9 +177,7 @@ public sealed partial class MainWindow
         x = ClampToArea(x, workArea.X + SidecarScreenMargin, workArea.X + workArea.Width - FloatingTriggerWidth - SidecarScreenMargin);
         y = ClampToArea(y, workArea.Y + SidecarScreenMargin, workArea.Y + workArea.Height - FloatingTriggerHeight - SidecarScreenMargin);
 
-        _edgeTriggerWindow ??= new EdgeTriggerWindow();
-        _edgeTriggerWindow.TriggerRequested += (_, _) => RestoreSidecarFromFloatingTrigger();
-        _edgeTriggerWindow.ShowAt(new PointInt32(x, y), size);
+        EnsureEdgeTriggerWindow().ShowAt(new PointInt32(x, y), size);
     }
 
     private ActiveWindowSnapshot? GetCurrentNonThreadlineWindow()
