@@ -33,6 +33,7 @@ public sealed partial class MainWindow : Window
         RefreshActiveWindow();
         StartAutoFollow();
         _ = RunUiActionAsync(CheckServiceAsync);
+        _ = RunUiActionAsync(InitializeWorkThreadAsync);
     }
 
     private async void CheckService_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(CheckServiceAsync);
@@ -148,27 +149,37 @@ public sealed partial class MainWindow : Window
 
         QuestionBox.Text = string.Empty;
         AppendTranscript("You", question);
+        await PersistTranscriptMessageAsync("user", question);
+
         var pendingMessage = AppendTranscript("Threadline", "Thinking… resolving context and preparing a response.");
         AddTimeline("Resolving context for Ask...");
 
         var currentWindow = await ResolveContextForAskAsync();
+        await PersistTargetContextEventAsync(_selectedThreadlineTarget ?? _lastFollowTarget, _selectedThreadlineTarget is null ? "Inferred" : "Followed");
+        var contextReceipt = await PersistContextReceiptForAskAsync(currentWindow);
         AddTimeline("Sending Ask request to provider path...");
 
         try
         {
             var response = await _client.AskAsync(_session!.Id, question, currentWindow);
-            UpdateTranscript(pendingMessage, string.IsNullOrWhiteSpace(response.Answer)
+            var answer = string.IsNullOrWhiteSpace(response.Answer)
                 ? "The provider returned an empty answer."
-                : response.Answer);
-            AddTimeline("Received provider response.");
+                : response.Answer;
+            var receiptText = BuildContextReceiptText(contextReceipt, currentWindow);
+            var answerWithReceipt = answer + "\n\n" + receiptText;
+            UpdateTranscript(pendingMessage, answerWithReceipt);
+            await PersistTranscriptMessageAsync("assistant", answerWithReceipt, contextReceipt?.Id);
+            AddTimeline("Received provider response and saved Work Thread message.");
         }
         catch (ThreadlineEndpointNotFoundException ex)
         {
             await ShowLocalAskFallbackAsync(pendingMessage, question, currentWindow, "Ask endpoint missing", ex.Message);
+            await PersistTranscriptMessageAsync("assistant", pendingMessage.Message, contextReceipt?.Id);
         }
         catch (InvalidOperationException ex)
         {
             await ShowLocalAskFallbackAsync(pendingMessage, question, currentWindow, "Ask provider call failed", ex.Message);
+            await PersistTranscriptMessageAsync("assistant", pendingMessage.Message, contextReceipt?.Id);
         }
     }
 
