@@ -29,12 +29,17 @@ public sealed partial class MainWindow
 
     private void OpenSessionManagerPanel()
     {
-        WorkThreadSessionManagerPanel.Visibility = Visibility.Visible;
-        WorkThreadListStatusText.Text = "Sessions are shown here so the main sidecar can stay focused on the conversation.";
+        OpenSessionsDrawer();
     }
 
     private void CloseSessionManagerPanel()
     {
+        if (IsDrawerOpenFor(WorkThreadSessionManagerPanel))
+        {
+            CloseShellDrawer();
+            return;
+        }
+
         WorkThreadSessionManagerPanel.Visibility = Visibility.Collapsed;
     }
 
