@@ -15,7 +15,7 @@ public sealed partial class MainWindow
         LoadOpenWindows();
     }
 
-    private async void UseSelectedWindow_Click(object sender, RoutedEventArgs e)
+    private async void UseSelectedTarget_Click(object sender, RoutedEventArgs e)
     {
         await RunUiActionAsync(async () =>
         {
@@ -28,7 +28,9 @@ public sealed partial class MainWindow
             _selectedThreadlineTarget = selected;
             _selectedTargetWindow = selected.Window;
             _lastForegroundWindow = selected.Window;
+            _lastFollowTarget = selected;
             CurrentWindowText.Text = $"Selected target:\n{selected}\n\n{selected.Window.ToDisplayText()}";
+            PlaceSidecarForTarget(selected, "Selected target attached.");
             _attachment = await _client.AttachWindowAsync(_session!.Id, selected.Window);
 
             if (!selected.CanReadBody)
