@@ -132,6 +132,9 @@ public sealed partial class MainWindow
         try
         {
             SessionBindingStatusText.Text = message;
+            SessionBindingPanel.Visibility = _pendingConnectionTarget is null
+                ? Visibility.Collapsed
+                : Visibility.Visible;
         }
         catch
         {
