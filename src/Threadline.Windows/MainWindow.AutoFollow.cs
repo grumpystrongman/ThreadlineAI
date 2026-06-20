@@ -30,6 +30,7 @@ public sealed partial class MainWindow
             _lockedFollowTarget = null;
             _lastAutoFollowTargetId = null;
             SafeRefreshFollowTargetCard(force: true);
+            PlaceSidecarForTarget(_lastFollowTarget, "Unlocked; following last active app.");
             const string unlockMessage = "Unlocked. Following the last active app again.";
             AddTimeline(unlockMessage);
             AppendTranscript("Threadline Follow", unlockMessage);
@@ -48,6 +49,7 @@ public sealed partial class MainWindow
 
         _isTargetLocked = true;
         CurrentWindowText.Text = BuildTargetStatus(_lockedFollowTarget, "Locked target");
+        PlaceSidecarForTarget(_lockedFollowTarget, "Locked beside target.");
         var lockMessage = $"Locked target: {_lockedFollowTarget.Window.ApplicationName} — {_lockedFollowTarget.Title}";
         AddTimeline(lockMessage);
         AppendTranscript("Threadline Follow", lockMessage);
@@ -70,6 +72,7 @@ public sealed partial class MainWindow
         if (_isTargetLocked && _lockedFollowTarget is not null)
         {
             CurrentWindowText.Text = BuildTargetStatus(_lockedFollowTarget, "Locked target");
+            PlaceSidecarForTarget(_lockedFollowTarget, "Maintaining locked attachment.");
             return;
         }
 
@@ -77,6 +80,7 @@ public sealed partial class MainWindow
         if (activeWindow is null)
         {
             if (force) CurrentWindowText.Text = "Mode: Follow\nStatus: No foreground app detected yet.";
+            PlaceSidecarForTarget(_lastFollowTarget, "No foreground target detected.");
             return;
         }
 
@@ -85,10 +89,12 @@ public sealed partial class MainWindow
             if (_lastFollowTarget is not null)
             {
                 CurrentWindowText.Text = BuildTargetStatus(_lastFollowTarget, "Following last active app");
+                PlaceSidecarForTarget(_lastFollowTarget, "Following last active app while Threadline has focus.");
             }
             else if (force)
             {
                 CurrentWindowText.Text = "Mode: Follow\nStatus: Switch to another app, then return to Threadline.";
+                PlaceSidecarForTarget(null, "Waiting for first non-Threadline target.");
             }
             return;
         }
@@ -96,6 +102,7 @@ public sealed partial class MainWindow
         var activeTarget = ResolveTargetForWindow(activeWindow);
         _lastForegroundWindow = activeTarget.Window;
         _lastFollowTarget = activeTarget;
+        PlaceSidecarForTarget(activeTarget, "Following active app.");
 
         if (!force && string.Equals(_lastAutoFollowTargetId, activeTarget.Id, StringComparison.OrdinalIgnoreCase))
         {
