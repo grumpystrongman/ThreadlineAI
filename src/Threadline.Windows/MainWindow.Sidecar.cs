@@ -22,9 +22,9 @@ public sealed partial class MainWindow
     private const int SidecarAttachGap = 8;
     private const int FloatingTriggerWidth = 64;
     private const int FloatingTriggerHeight = 144;
-    private const int FloatingTriggerHoverZone = 96;
-    private const int FloatingTriggerInsetFromEdge = 128;
-    private const int FloatingTriggerReachPadding = 200;
+    private const int FloatingTriggerHoverZone = 116;
+    private const int FloatingTriggerInsetFromEdge = 96;
+    private const int FloatingTriggerReachPadding = 220;
     private const int FloatingTriggerHideGraceMilliseconds = 1800;
     private const int SidecarScreenMargin = 12;
     private const int SidecarScreenTopOffset = 40;
@@ -125,18 +125,17 @@ public sealed partial class MainWindow
         var openingTarget = _floatingTriggerTarget;
         if (openingTarget is not null)
         {
-            var isNewTarget = !string.Equals(_attachedSidecarTargetId, openingTarget.Id, StringComparison.OrdinalIgnoreCase);
-            _lastFollowTarget = openingTarget;
-            _lastForegroundWindow = openingTarget.Window;
-            _selectedThreadlineTarget = openingTarget;
-            _selectedTargetWindow = openingTarget.Window;
-            _attachedSidecarTargetId = openingTarget.Id;
-
-            if (isNewTarget && !string.IsNullOrWhiteSpace(QuestionBox.Text))
+            if (IsSidecarOpenAgainstDifferentTarget(openingTarget))
             {
-                QuestionBox.Text = string.Empty;
-                AddTimeline("Cleared draft question for newly attached target.");
+                _edgeTriggerWindow?.HideTrigger();
+                ShowMainSidecarWindow();
+                SetSidecarVisualState();
+                ShowPendingConnection(openingTarget);
+                return;
             }
+
+            var isNewTarget = !string.Equals(_attachedSidecarTargetId, openingTarget.Id, StringComparison.OrdinalIgnoreCase);
+            AttachSidecarToWindowTarget(openingTarget, clearDraft: isNewTarget, "Opened from floating edge trigger.");
         }
 
         _sidecarCollapsedToHandle = false;
@@ -214,13 +213,12 @@ public sealed partial class MainWindow
             return;
         }
 
-        var cursorWindow = GetCursorNonThreadlineWindow(cursor);
-        var activeWindow = cursorWindow ?? GetCurrentNonThreadlineWindow();
+        var candidateWindow = GetPreferredWindowForCursor(cursor);
         ThreadlineTarget? target = null;
 
-        if (activeWindow is not null && activeWindow.Handle != nint.Zero && IsWindow(activeWindow.Handle))
+        if (candidateWindow is not null && candidateWindow.Handle != nint.Zero && IsWindow(candidateWindow.Handle))
         {
-            target = ResolveTargetForWindow(activeWindow);
+            target = ResolveTargetForWindow(candidateWindow);
         }
         else if (_sidecarWindowHiddenForTrigger)
         {
@@ -285,10 +283,30 @@ public sealed partial class MainWindow
         trigger.HideTrigger();
     }
 
+    private ActiveWindowSnapshot? GetPreferredWindowForCursor(NativePoint cursor)
+    {
+        var activeWindow = GetCurrentNonThreadlineWindow();
+        if (activeWindow is not null && activeWindow.Handle != nint.Zero && IsWindow(activeWindow.Handle))
+        {
+            if (GetWindowRect(activeWindow.Handle, out var activeRect) && IsCursorNearTargetEdge(cursor, activeRect, out _))
+            {
+                return activeWindow;
+            }
+        }
+
+        var cursorWindow = GetCursorNonThreadlineWindow(cursor);
+        if (cursorWindow is not null && !IsShellOrDesktopWindow(cursorWindow))
+        {
+            return cursorWindow;
+        }
+
+        return activeWindow;
+    }
+
     private ActiveWindowSnapshot? GetCurrentNonThreadlineWindow()
     {
         var activeWindow = _activeWindowMonitor.GetActiveWindowSnapshot();
-        if (activeWindow is null || IsThreadlineWindow(activeWindow)) return null;
+        if (activeWindow is null || IsThreadlineWindow(activeWindow) || IsShellOrDesktopWindow(activeWindow)) return null;
         return activeWindow;
     }
 
@@ -551,6 +569,14 @@ public sealed partial class MainWindow
         {
             // The placement helper may run during startup before every named XAML control is ready.
         }
+    }
+
+    private static bool IsShellOrDesktopWindow(ActiveWindowSnapshot window)
+    {
+        var process = window.ProcessName ?? string.Empty;
+        var title = window.WindowTitle ?? string.Empty;
+        return string.Equals(process, "explorer", StringComparison.OrdinalIgnoreCase) &&
+               (string.IsNullOrWhiteSpace(title) || string.Equals(title, "Program Manager", StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool IsLeftMouseButtonDown() =>
