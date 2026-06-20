@@ -33,9 +33,37 @@ public sealed class ThreadlineWorkThreadClient
         return await ReadRequiredAsync<WorkThreadDto>(response, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<WorkThreadDto>> ListWorkThreadsAsync(int take = 25, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.GetAsync($"work-threads?take={take}", cancellationToken);
+        return await ReadRequiredAsync<List<WorkThreadDto>>(response, cancellationToken);
+    }
+
     public async Task<WorkThreadDto> StartWorkThreadAsync(string title, string? description = null, CancellationToken cancellationToken = default)
     {
         var response = await _httpClient.PostAsJsonAsync("work-threads", new { title, description }, _jsonOptions, cancellationToken);
+        return await ReadRequiredAsync<WorkThreadDto>(response, cancellationToken);
+    }
+
+    public async Task<WorkThreadDto> ResumeWorkThreadAsync(string workThreadId, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsync($"work-threads/{workThreadId}/resume", content: null, cancellationToken);
+        return await ReadRequiredAsync<WorkThreadDto>(response, cancellationToken);
+    }
+
+    public async Task<WorkThreadDto> RenameWorkThreadAsync(string workThreadId, string title, string? description = null, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync(
+            $"work-threads/{workThreadId}/rename",
+            new { title, description },
+            _jsonOptions,
+            cancellationToken);
+        return await ReadRequiredAsync<WorkThreadDto>(response, cancellationToken);
+    }
+
+    public async Task<WorkThreadDto> CloseWorkThreadAsync(string workThreadId, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsync($"work-threads/{workThreadId}/close", content: null, cancellationToken);
         return await ReadRequiredAsync<WorkThreadDto>(response, cancellationToken);
     }
 
