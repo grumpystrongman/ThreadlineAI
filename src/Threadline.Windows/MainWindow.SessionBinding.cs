@@ -16,24 +16,24 @@ public sealed partial class MainWindow
     private async void DetachPendingTarget_Click(object sender, RoutedEventArgs e) =>
         await RunUiActionAsync(DetachPendingOrCurrentTargetAsync);
 
-    private Task ConnectPendingTargetToCurrentSessionAsync()
+    private async Task ConnectPendingTargetToCurrentSessionAsync()
     {
         if (_pendingConnectionTarget is null)
         {
             AppendTranscript("Threadline", "No pending window connection. Click the AI icon on another app/window first.");
             UpdateSessionBindingStatus("Window session: no pending connection. Click AI on another window to choose how to connect it.");
-            return Task.CompletedTask;
+            return;
         }
 
         EnsureSession();
         AttachSidecarToWindowTarget(_pendingConnectionTarget, clearDraft: true, "Connected pending window to current session.");
+        await PersistTargetContextEventAsync(_selectedThreadlineTarget, "Manual");
         _sidecarCollapsedToHandle = false;
         _sidecarWindowHiddenForTrigger = false;
         ShowMainSidecarWindow();
         SetSidecarVisualState();
         PlaceSidecarForTarget(_selectedThreadlineTarget, "Connected pending window to current session.");
         AppendTranscript("Threadline Session", $"Connected this window to the current session:\n{FormatTargetForBinding(_selectedThreadlineTarget)}");
-        return Task.CompletedTask;
     }
 
     private async Task StartNewSessionForPendingTargetAsync()
@@ -53,6 +53,7 @@ public sealed partial class MainWindow
         AppendTranscript("Threadline Session", "Started a new window-attached session.\n" + FormatSession(_session));
 
         AttachSidecarToWindowTarget(target, clearDraft: true, "Started a new session for this window.");
+        await PersistTargetContextEventAsync(target, "Manual");
         _sidecarCollapsedToHandle = false;
         _sidecarWindowHiddenForTrigger = false;
         ShowMainSidecarWindow();
