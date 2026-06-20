@@ -21,6 +21,7 @@ public sealed partial class MainWindow
             _selectedTargetWindow = selected.Window;
             _lastForegroundWindow = selected.Window;
             CurrentWindowText.Text = $"Selected target:\n{selected}\n\n{selected.Window.ToDisplayText()}";
+            AttachSidecarToTarget(selected, force: true);
             _attachment = await _client.AttachWindowAsync(_session!.Id, selected.Window);
             _lastContextSummary = await _contentResolver.ResolveAsync(_session!.Id, selected);
             UpdateCurrentContextPanel(_lastContextSummary);
