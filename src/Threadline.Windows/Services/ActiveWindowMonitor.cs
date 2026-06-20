@@ -30,9 +30,14 @@ public sealed class ActiveWindowMonitor
         if (process?.Id == currentProcessId)
         {
             handle = FindNextVisibleAppWindow(currentProcessId) ?? handle;
-            process = GetProcess(handle);
         }
 
+        return GetWindowSnapshot(handle);
+    }
+
+    public ActiveWindowSnapshot GetWindowSnapshot(nint handle)
+    {
+        var process = GetProcess(handle);
         var title = GetWindowTitle(handle);
         return new ActiveWindowSnapshot(
             handle,
