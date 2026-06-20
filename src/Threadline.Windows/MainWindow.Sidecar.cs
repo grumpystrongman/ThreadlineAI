@@ -11,21 +11,40 @@ namespace Threadline.Windows;
 
 public sealed partial class MainWindow
 {
+    private const int ShowWindowNormal = 1;
+    private const int ShowWindowHide = 0;
     private const int SidecarDefaultWidth = 430;
     private const int SidecarMinimumWidth = 360;
     private const int SidecarMinimumHeight = 620;
     private const int SidecarHandleWidth = 44;
     private const int SidecarHandleHeight = 180;
+    private const int FloatingTriggerWidth = 42;
+    private const int FloatingTriggerHeight = 118;
+    private const int FloatingTriggerHoverZone = 22;
     private const int SidecarScreenMargin = 12;
     private const int SidecarScreenTopOffset = 40;
 
+    private readonly DispatcherTimer _edgeHoverTimer = new();
+    private EdgeTriggerWindow? _edgeTriggerWindow;
     private bool _attachSidecarToTarget = true;
     private bool _sidecarCollapsedToHandle;
+    private bool _sidecarWindowHiddenForTrigger;
 
     private void ConfigureSidecarWindow()
     {
         SetSidecarVisualState();
+        StartFloatingEdgeTrigger();
         PlaceSidecarForTarget(GetBestSidecarTarget(), "Initial sidecar placement.");
+    }
+
+    private void StartFloatingEdgeTrigger()
+    {
+        _edgeTriggerWindow ??= new EdgeTriggerWindow();
+        _edgeTriggerWindow.TriggerRequested += (_, _) => RestoreSidecarFromFloatingTrigger();
+
+        _edgeHoverTimer.Interval = TimeSpan.FromMilliseconds(120);
+        _edgeHoverTimer.Tick += (_, _) => SafeUpdateFloatingEdgeTrigger();
+        _edgeHoverTimer.Start();
     }
 
     private void ToggleAttachSidecarMode_Click(object sender, RoutedEventArgs e)
@@ -46,28 +65,139 @@ public sealed partial class MainWindow
 
     private void CollapseSidecarToHandle_Click(object sender, RoutedEventArgs e)
     {
-        _sidecarCollapsedToHandle = true;
-        SetSidecarVisualState();
-        PlaceSidecarForTarget(GetBestSidecarTarget(), "Collapsed to edge handle.");
-        AddTimeline("Sidecar collapsed to edge handle.");
+        HideSidecarBehindFloatingTrigger();
     }
 
     private void ExpandSidecarFromHandle(object sender, PointerRoutedEventArgs e)
     {
-        if (!_sidecarCollapsedToHandle) return;
+        RestoreSidecarFromFloatingTrigger();
+    }
 
-        _sidecarCollapsedToHandle = false;
+    private void HideSidecarBehindFloatingTrigger()
+    {
+        _sidecarCollapsedToHandle = true;
+        _sidecarWindowHiddenForTrigger = true;
         SetSidecarVisualState();
-        PlaceSidecarForTarget(GetBestSidecarTarget(), "Restored from edge handle.");
-        AddTimeline("Sidecar restored from edge handle.");
+        PlaceSidecarForTarget(GetBestSidecarTarget(), "Hidden behind floating edge trigger.");
+        HideMainSidecarWindow();
+        AddTimeline("Sidecar hidden. Hover near the target window edge to reveal the floating trigger.");
+    }
+
+    private void RestoreSidecarFromFloatingTrigger()
+    {
+        _sidecarCollapsedToHandle = false;
+        _sidecarWindowHiddenForTrigger = false;
+        _edgeTriggerWindow?.HideTrigger();
+        ShowMainSidecarWindow();
+        SetSidecarVisualState();
+        PlaceSidecarForTarget(GetBestSidecarTarget(), "Opened from floating edge trigger.");
+        AddTimeline("Sidecar opened from floating edge trigger.");
+    }
+
+    private void HideMainSidecarWindow()
+    {
+        try
+        {
+            _ = ShowWindow(WindowNative.GetWindowHandle(this), ShowWindowHide);
+        }
+        catch
+        {
+            // If hiding fails, leave the chat visible rather than crashing the app.
+        }
+    }
+
+    private void ShowMainSidecarWindow()
+    {
+        try
+        {
+            _ = ShowWindow(WindowNative.GetWindowHandle(this), ShowWindowNormal);
+            Activate();
+        }
+        catch
+        {
+            // If restoring fails, the floating trigger will remain available on the next hover pass.
+        }
+    }
+
+    private void SafeUpdateFloatingEdgeTrigger()
+    {
+        try
+        {
+            UpdateFloatingEdgeTrigger();
+        }
+        catch
+        {
+            _edgeTriggerWindow?.HideTrigger();
+        }
+    }
+
+    private void UpdateFloatingEdgeTrigger()
+    {
+        if (!_sidecarWindowHiddenForTrigger || !_attachSidecarToTarget)
+        {
+            _edgeTriggerWindow?.HideTrigger();
+            return;
+        }
+
+        var targetWindow = GetBestSidecarTarget()?.Window ?? GetCurrentNonThreadlineWindow();
+        if (targetWindow is null || targetWindow.Handle == nint.Zero || !IsWindow(targetWindow.Handle))
+        {
+            _edgeTriggerWindow?.HideTrigger();
+            return;
+        }
+
+        if (!GetWindowRect(targetWindow.Handle, out var targetRect) || !GetCursorPos(out var cursor))
+        {
+            _edgeTriggerWindow?.HideTrigger();
+            return;
+        }
+
+        if (!IsCursorNearTargetEdge(cursor, targetRect, out var anchorRight))
+        {
+            _edgeTriggerWindow?.HideTrigger();
+            return;
+        }
+
+        var sidecarHwnd = WindowNative.GetWindowHandle(this);
+        var sidecarId = Win32Interop.GetWindowIdFromWindow(sidecarHwnd);
+        var workArea = GetTargetWorkArea(sidecarId, targetWindow.Handle);
+        var size = new SizeInt32(FloatingTriggerWidth, FloatingTriggerHeight);
+        var x = anchorRight
+            ? targetRect.Right - (FloatingTriggerWidth / 2)
+            : targetRect.Left - (FloatingTriggerWidth / 2);
+        var y = cursor.Y - (FloatingTriggerHeight / 2);
+
+        x = ClampToArea(x, workArea.X + SidecarScreenMargin, workArea.X + workArea.Width - FloatingTriggerWidth - SidecarScreenMargin);
+        y = ClampToArea(y, workArea.Y + SidecarScreenMargin, workArea.Y + workArea.Height - FloatingTriggerHeight - SidecarScreenMargin);
+
+        _edgeTriggerWindow ??= new EdgeTriggerWindow();
+        _edgeTriggerWindow.TriggerRequested += (_, _) => RestoreSidecarFromFloatingTrigger();
+        _edgeTriggerWindow.ShowAt(new PointInt32(x, y), size);
+    }
+
+    private ActiveWindowSnapshot? GetCurrentNonThreadlineWindow()
+    {
+        var activeWindow = _activeWindowMonitor.GetActiveWindowSnapshot();
+        if (activeWindow is null || IsThreadlineWindow(activeWindow)) return null;
+        return activeWindow;
+    }
+
+    private static bool IsCursorNearTargetEdge(NativePoint cursor, NativeRect targetRect, out bool anchorRight)
+    {
+        var withinVerticalBand = cursor.Y >= targetRect.Top && cursor.Y <= targetRect.Bottom;
+        var nearRight = Math.Abs(cursor.X - targetRect.Right) <= FloatingTriggerHoverZone;
+        var nearLeft = Math.Abs(cursor.X - targetRect.Left) <= FloatingTriggerHoverZone;
+
+        anchorRight = nearRight || !nearLeft;
+        return withinVerticalBand && (nearRight || nearLeft);
     }
 
     private void SetSidecarVisualState()
     {
         try
         {
-            EdgeHandlePanel.Visibility = _sidecarCollapsedToHandle ? Visibility.Visible : Visibility.Collapsed;
-            ChatShellPanel.Visibility = _sidecarCollapsedToHandle ? Visibility.Collapsed : Visibility.Visible;
+            EdgeHandlePanel.Visibility = Visibility.Collapsed;
+            ChatShellPanel.Visibility = Visibility.Visible;
         }
         catch
         {
@@ -87,16 +217,16 @@ public sealed partial class MainWindow
     {
         if (!_attachSidecarToTarget)
         {
-            DockSidecarToScreen(_sidecarCollapsedToHandle
-                ? "Sidecar: Edge handle visible in screen dock mode."
+            DockSidecarToScreen(_sidecarWindowHiddenForTrigger
+                ? "Sidecar: Floating trigger armed in screen dock mode."
                 : "Sidecar: Screen dock mode. Attach is off.");
             return;
         }
 
         if (target is null)
         {
-            DockSidecarToScreen(_sidecarCollapsedToHandle
-                ? "Sidecar: Edge handle visible; waiting for a target window."
+            DockSidecarToScreen(_sidecarWindowHiddenForTrigger
+                ? "Sidecar: Floating trigger armed; waiting for a target window edge hover."
                 : "Sidecar: Attach mode on; waiting for a target window.");
             return;
         }
@@ -129,21 +259,14 @@ public sealed partial class MainWindow
             var workArea = GetTargetWorkArea(sidecarId, targetWindow.Handle);
 
             var maxWidth = Math.Max(1, workArea.Width - (SidecarScreenMargin * 2));
-            var width = _sidecarCollapsedToHandle
-                ? ClampToArea(SidecarHandleWidth, SidecarHandleWidth, maxWidth)
-                : ClampToArea(SidecarDefaultWidth, SidecarMinimumWidth, maxWidth);
+            var width = ClampToArea(SidecarDefaultWidth, SidecarMinimumWidth, maxWidth);
 
             var maxHeight = Math.Max(1, workArea.Height - (SidecarScreenMargin * 2));
-            var height = _sidecarCollapsedToHandle
-                ? ClampToArea(SidecarHandleHeight, SidecarHandleHeight, maxHeight)
-                : ClampToArea(Math.Max(targetRect.Height, SidecarMinimumHeight), SidecarMinimumHeight, maxHeight);
+            var height = ClampToArea(Math.Max(targetRect.Height, SidecarMinimumHeight), SidecarMinimumHeight, maxHeight);
 
             var minY = workArea.Y + SidecarScreenMargin;
             var maxY = workArea.Y + workArea.Height - height - SidecarScreenMargin;
-            var desiredY = _sidecarCollapsedToHandle
-                ? targetRect.Top + ((targetRect.Height - height) / 2)
-                : targetRect.Top;
-            var y = ClampToArea(desiredY, minY, Math.Max(minY, maxY));
+            var y = ClampToArea(targetRect.Top, minY, Math.Max(minY, maxY));
 
             var rightX = targetRect.Right + SidecarScreenMargin;
             var leftX = targetRect.Left - width - SidecarScreenMargin;
@@ -159,8 +282,7 @@ public sealed partial class MainWindow
             appWindow.Move(new PointInt32(x, y));
 
             var side = x == rightX ? "right" : x == leftX ? "left" : "screen edge";
-            var mode = _sidecarCollapsedToHandle ? "Edge handle" : "Attached chat";
-            UpdateSidecarAttachmentStatus($"Sidecar: {mode} on {side} of {targetWindow.ApplicationName} — {targetTitle}. {reason}");
+            UpdateSidecarAttachmentStatus($"Sidecar: Attached chat on {side} of {targetWindow.ApplicationName} — {targetTitle}. {reason}");
             return true;
         }
         catch
@@ -192,15 +314,9 @@ public sealed partial class MainWindow
             var area = DisplayArea.GetFromWindowId(id, DisplayAreaFallback.Nearest).WorkArea;
             var maxWidth = Math.Max(1, area.Width - (SidecarScreenMargin * 2));
             var maxHeight = Math.Max(1, area.Height - (SidecarScreenMargin * 2));
-            var width = _sidecarCollapsedToHandle
-                ? ClampToArea(SidecarHandleWidth, SidecarHandleWidth, maxWidth)
-                : ClampToArea(SidecarDefaultWidth, SidecarMinimumWidth, maxWidth);
-            var height = _sidecarCollapsedToHandle
-                ? ClampToArea(SidecarHandleHeight, SidecarHandleHeight, maxHeight)
-                : ClampToArea(area.Height - 80, SidecarMinimumHeight, maxHeight);
-            var y = _sidecarCollapsedToHandle
-                ? area.Y + Math.Max(SidecarScreenMargin, (area.Height - height) / 2)
-                : area.Y + SidecarScreenTopOffset;
+            var width = ClampToArea(SidecarDefaultWidth, SidecarMinimumWidth, maxWidth);
+            var height = ClampToArea(area.Height - 80, SidecarMinimumHeight, maxHeight);
+            var y = area.Y + SidecarScreenTopOffset;
 
             win.Resize(new SizeInt32(width, height));
             win.Move(new PointInt32(area.X + area.Width - width - 24, y));
@@ -243,9 +359,22 @@ public sealed partial class MainWindow
         public int Height => Math.Max(1, Bottom - Top);
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(nint hWnd, out NativeRect lpRect);
 
     [DllImport("user32.dll")]
     private static extern bool IsWindow(nint hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out NativePoint lpPoint);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(nint hWnd, int nCmdShow);
 }
