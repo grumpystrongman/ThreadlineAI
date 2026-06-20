@@ -49,6 +49,7 @@
           </StackPanel>
 
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
+            <Button Content="Start Session" Click="StartSession_Click" FontSize="12" Padding="8,4" />
             <CheckBox x:Name="AttachSidecarToggle"
                       Content="Attach"
                       IsChecked="True"
@@ -70,7 +71,6 @@
                         <Button Content="New" Click="NewChat_Click" FontSize="12" Padding="8,4" />
                         <Button Content="Use Session" Click="UseActiveSession_Click" FontSize="12" Padding="8,4" />
                         <Button Content="Check" Click="CheckService_Click" FontSize="12" Padding="8,4" />
-                        <Button Content="Start" Click="StartSession_Click" FontSize="12" Padding="8,4" />
                       </StackPanel>
 
                       <TextBlock Text="Target picker" FontWeight="SemiBold" Margin="0,6,0,0" />
@@ -259,7 +259,7 @@
         </Grid>
       </Border>
 
-      <ListView x:Name="TimelineList" Grid.Row="5" Height="0" Visibility="Collapsed" FontSize="11" />
+      <ListView x:Name="TimelineList" Grid.Row="5" Height="28" FontSize="10" />
     </Grid>
   </Grid>
 </Window>
