@@ -16,14 +16,18 @@ public sealed partial class MainWindow
     private const int SidecarDefaultWidth = 430;
     private const int SidecarMinimumWidth = 360;
     private const int SidecarMinimumHeight = 620;
-    private const int FloatingTriggerWidth = 42;
-    private const int FloatingTriggerHeight = 118;
-    private const int FloatingTriggerHoverZone = 22;
+    private const int FloatingTriggerWidth = 40;
+    private const int FloatingTriggerHeight = 112;
+    private const int FloatingTriggerHoverZone = 48;
+    private const int FloatingTriggerReachPadding = 96;
+    private const int FloatingTriggerHideGraceMilliseconds = 900;
     private const int SidecarScreenMargin = 12;
     private const int SidecarScreenTopOffset = 40;
 
     private readonly DispatcherTimer _edgeHoverTimer = new();
     private EdgeTriggerWindow? _edgeTriggerWindow;
+    private ThreadlineTarget? _floatingTriggerTarget;
+    private DateTimeOffset _lastFloatingTriggerEligibleAt = DateTimeOffset.MinValue;
     private bool _attachSidecarToTarget = true;
     private bool _sidecarCollapsedToHandle = true;
     private bool _sidecarWindowHiddenForTrigger = true;
@@ -56,7 +60,7 @@ public sealed partial class MainWindow
     {
         _ = EnsureEdgeTriggerWindow();
 
-        _edgeHoverTimer.Interval = TimeSpan.FromMilliseconds(120);
+        _edgeHoverTimer.Interval = TimeSpan.FromMilliseconds(100);
         _edgeHoverTimer.Tick += (_, _) => SafeUpdateFloatingEdgeTrigger();
         _edgeHoverTimer.Start();
     }
@@ -108,6 +112,12 @@ public sealed partial class MainWindow
 
     private void RestoreSidecarFromFloatingTrigger()
     {
+        if (_floatingTriggerTarget is not null)
+        {
+            _lastFollowTarget = _floatingTriggerTarget;
+            _lastForegroundWindow = _floatingTriggerTarget.Window;
+        }
+
         _sidecarCollapsedToHandle = false;
         _sidecarWindowHiddenForTrigger = false;
         _edgeTriggerWindow?.HideTrigger();
@@ -156,9 +166,23 @@ public sealed partial class MainWindow
 
     private void UpdateFloatingEdgeTrigger()
     {
+        var trigger = EnsureEdgeTriggerWindow();
+
         if (!_sidecarWindowHiddenForTrigger || !_attachSidecarToTarget)
         {
-            _edgeTriggerWindow?.HideTrigger();
+            trigger.HideTrigger();
+            return;
+        }
+
+        if (!GetCursorPos(out var cursor))
+        {
+            HideFloatingTriggerIfGraceExpired(trigger);
+            return;
+        }
+
+        if (trigger.IsPointerInside || trigger.IsCursorWithinReach(cursor.X, cursor.Y, FloatingTriggerReachPadding))
+        {
+            _lastFloatingTriggerEligibleAt = DateTimeOffset.Now;
             return;
         }
 
@@ -168,7 +192,7 @@ public sealed partial class MainWindow
             var activeWindow = GetCurrentNonThreadlineWindow();
             if (activeWindow is null || activeWindow.Handle == nint.Zero || !IsWindow(activeWindow.Handle))
             {
-                _edgeTriggerWindow?.HideTrigger();
+                HideFloatingTriggerIfGraceExpired(trigger);
                 return;
             }
 
@@ -180,19 +204,19 @@ public sealed partial class MainWindow
         var targetWindow = target.Window;
         if (targetWindow.Handle == nint.Zero || !IsWindow(targetWindow.Handle))
         {
-            _edgeTriggerWindow?.HideTrigger();
+            HideFloatingTriggerIfGraceExpired(trigger);
             return;
         }
 
-        if (!GetWindowRect(targetWindow.Handle, out var targetRect) || !GetCursorPos(out var cursor))
+        if (!GetWindowRect(targetWindow.Handle, out var targetRect))
         {
-            _edgeTriggerWindow?.HideTrigger();
+            HideFloatingTriggerIfGraceExpired(trigger);
             return;
         }
 
         if (!IsCursorNearTargetEdge(cursor, targetRect, out var anchorRight))
         {
-            _edgeTriggerWindow?.HideTrigger();
+            HideFloatingTriggerIfGraceExpired(trigger);
             return;
         }
 
@@ -201,14 +225,32 @@ public sealed partial class MainWindow
         var workArea = GetTargetWorkArea(sidecarId, targetWindow.Handle);
         var size = new SizeInt32(FloatingTriggerWidth, FloatingTriggerHeight);
         var x = anchorRight
-            ? targetRect.Right - (FloatingTriggerWidth / 2)
-            : targetRect.Left - (FloatingTriggerWidth / 2);
+            ? targetRect.Right - FloatingTriggerWidth - 4
+            : targetRect.Left + 4;
         var y = cursor.Y - (FloatingTriggerHeight / 2);
 
         x = ClampToArea(x, workArea.X + SidecarScreenMargin, workArea.X + workArea.Width - FloatingTriggerWidth - SidecarScreenMargin);
         y = ClampToArea(y, workArea.Y + SidecarScreenMargin, workArea.Y + workArea.Height - FloatingTriggerHeight - SidecarScreenMargin);
 
-        EnsureEdgeTriggerWindow().ShowAt(new PointInt32(x, y), size);
+        _floatingTriggerTarget = target;
+        _lastFloatingTriggerEligibleAt = DateTimeOffset.Now;
+        trigger.ShowAt(new PointInt32(x, y), size);
+    }
+
+    private void HideFloatingTriggerIfGraceExpired(EdgeTriggerWindow trigger)
+    {
+        if (!trigger.IsVisible)
+        {
+            return;
+        }
+
+        var elapsed = DateTimeOffset.Now - _lastFloatingTriggerEligibleAt;
+        if (elapsed.TotalMilliseconds <= FloatingTriggerHideGraceMilliseconds)
+        {
+            return;
+        }
+
+        trigger.HideTrigger();
     }
 
     private ActiveWindowSnapshot? GetCurrentNonThreadlineWindow()
@@ -221,8 +263,8 @@ public sealed partial class MainWindow
     private static bool IsCursorNearTargetEdge(NativePoint cursor, NativeRect targetRect, out bool anchorRight)
     {
         var withinVerticalBand = cursor.Y >= targetRect.Top && cursor.Y <= targetRect.Bottom;
-        var nearRight = Math.Abs(cursor.X - targetRect.Right) <= FloatingTriggerHoverZone;
-        var nearLeft = Math.Abs(cursor.X - targetRect.Left) <= FloatingTriggerHoverZone;
+        var nearRight = cursor.X >= targetRect.Right - FloatingTriggerHoverZone && cursor.X <= targetRect.Right + FloatingTriggerHoverZone;
+        var nearLeft = cursor.X >= targetRect.Left - FloatingTriggerHoverZone && cursor.X <= targetRect.Left + FloatingTriggerHoverZone;
 
         anchorRight = nearRight || !nearLeft;
         return withinVerticalBand && (nearRight || nearLeft);
