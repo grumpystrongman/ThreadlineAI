@@ -1,10 +1,9 @@
 name: Phase 1 Validation
 
+# Disabled for automatic direct-to-main microbuilds.
+# Run manually from GitHub Actions when full validation is intentionally needed.
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   dotnet-core:
