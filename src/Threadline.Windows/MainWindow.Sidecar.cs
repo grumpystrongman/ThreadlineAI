@@ -30,6 +30,8 @@ public sealed partial class MainWindow
     private const int SidecarScreenTopOffset = 40;
     private const uint SetWindowPosNoZOrder = 0x0004;
     private const uint SetWindowPosNoActivate = 0x0010;
+    private const uint MonitorDefaultToNearest = 0x00000002;
+    private const uint GetAncestorRoot = 2;
 
     private readonly DispatcherTimer _edgeHoverTimer = new();
     private EdgeTriggerWindow? _edgeTriggerWindow;
@@ -212,7 +214,8 @@ public sealed partial class MainWindow
             return;
         }
 
-        var activeWindow = GetCurrentNonThreadlineWindow();
+        var cursorWindow = GetCursorNonThreadlineWindow(cursor);
+        var activeWindow = cursorWindow ?? GetCurrentNonThreadlineWindow();
         ThreadlineTarget? target = null;
 
         if (activeWindow is not null && activeWindow.Handle != nint.Zero && IsWindow(activeWindow.Handle))
@@ -287,6 +290,26 @@ public sealed partial class MainWindow
         var activeWindow = _activeWindowMonitor.GetActiveWindowSnapshot();
         if (activeWindow is null || IsThreadlineWindow(activeWindow)) return null;
         return activeWindow;
+    }
+
+    private ActiveWindowSnapshot? GetCursorNonThreadlineWindow(NativePoint cursor)
+    {
+        try
+        {
+            var handle = WindowFromPoint(cursor);
+            if (handle == nint.Zero) return null;
+
+            var rootHandle = GetAncestor(handle, GetAncestorRoot);
+            if (rootHandle == nint.Zero) rootHandle = handle;
+            if (rootHandle == nint.Zero || !IsWindow(rootHandle)) return null;
+
+            var snapshot = _activeWindowMonitor.GetWindowSnapshot(rootHandle);
+            return IsThreadlineWindow(snapshot) ? null : snapshot;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static bool IsCursorNearTargetEdge(NativePoint cursor, NativeRect targetRect, out bool anchorRight)
@@ -463,6 +486,27 @@ public sealed partial class MainWindow
     {
         try
         {
+            var monitor = MonitorFromWindow(targetHandle, MonitorDefaultToNearest);
+            if (monitor != nint.Zero)
+            {
+                var monitorInfo = new NativeMonitorInfo { cbSize = Marshal.SizeOf<NativeMonitorInfo>() };
+                if (GetMonitorInfo(monitor, ref monitorInfo))
+                {
+                    return new RectInt32(
+                        monitorInfo.rcWork.Left,
+                        monitorInfo.rcWork.Top,
+                        monitorInfo.rcWork.Width,
+                        monitorInfo.rcWork.Height);
+                }
+            }
+        }
+        catch
+        {
+            // Fall back to Windows App SDK display area lookup below.
+        }
+
+        try
+        {
             var targetId = Win32Interop.GetWindowIdFromWindow(targetHandle);
             return DisplayArea.GetFromWindowId(targetId, DisplayAreaFallback.Nearest).WorkArea;
         }
@@ -514,9 +558,12 @@ public sealed partial class MainWindow
 
     private static int ClampToArea(int value, int minimum, int maximum)
     {
-        var safeMaximum = Math.Max(1, maximum);
-        var safeMinimum = Math.Min(Math.Max(1, minimum), safeMaximum);
-        return Math.Clamp(value, safeMinimum, safeMaximum);
+        if (maximum < minimum)
+        {
+            return minimum;
+        }
+
+        return Math.Clamp(value, minimum, maximum);
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -538,6 +585,15 @@ public sealed partial class MainWindow
         public int Y;
     }
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct NativeMonitorInfo
+    {
+        public int cbSize;
+        public NativeRect rcMonitor;
+        public NativeRect rcWork;
+        public uint dwFlags;
+    }
+
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(nint hWnd, out NativeRect lpRect);
 
@@ -546,6 +602,18 @@ public sealed partial class MainWindow
 
     [DllImport("user32.dll")]
     private static extern bool GetCursorPos(out NativePoint lpPoint);
+
+    [DllImport("user32.dll")]
+    private static extern nint WindowFromPoint(NativePoint point);
+
+    [DllImport("user32.dll")]
+    private static extern nint GetAncestor(nint hWnd, uint gaFlags);
+
+    [DllImport("user32.dll")]
+    private static extern nint MonitorFromWindow(nint hwnd, uint dwFlags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool GetMonitorInfo(nint hMonitor, ref NativeMonitorInfo lpmi);
 
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vKey);
