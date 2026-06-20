@@ -1,3 +1,7 @@
+param(
+  [switch] $Run
+)
+
 $ErrorActionPreference = 'Stop'
 if ($PSVersionTable.PSVersion.Major -ge 7) {
   $PSNativeCommandUseErrorActionPreference = $true
@@ -112,4 +116,17 @@ Invoke-CheckedCommand $msbuild src/Threadline.Windows/Threadline.Windows.csproj 
 Write-Host 'Building Threadline Windows companion...'
 Invoke-CheckedCommand $msbuild src/Threadline.Windows/Threadline.Windows.csproj /p:Configuration=Release /p:Restore=false
 
-Write-Host 'Windows companion build complete.'
+Write-Host 'Windows companion build complete.' -ForegroundColor Green
+
+if ($Run) {
+  Write-Host 'Launching Windows companion because -Run was supplied...'
+  & "$PSScriptRoot\run-windows.ps1" -SkipBuild
+  exit $LASTEXITCODE
+}
+
+Write-Host ''
+Write-Host 'Build only: the Windows app has not been launched.' -ForegroundColor Yellow
+Write-Host 'To launch it now, run:' -ForegroundColor Yellow
+Write-Host '  ./eng/run-windows.ps1' -ForegroundColor Yellow
+Write-Host 'Or build and launch in one step:' -ForegroundColor Yellow
+Write-Host '  ./eng/build-windows.ps1 -Run' -ForegroundColor Yellow
