@@ -26,7 +26,7 @@
     <Grid x:Name="ChatShellPanel"
           Grid.Column="1"
           Padding="12"
-          RowDefinitions="Auto,Auto,*,Auto,Auto"
+          RowDefinitions="Auto,Auto,Auto,*,Auto,Auto"
           RowSpacing="8"
           HorizontalAlignment="Stretch"
           VerticalAlignment="Stretch">
@@ -55,11 +55,12 @@
                       Click="ToggleAttachSidecarMode_Click"
                       FontSize="11"
                       VerticalAlignment="Center" />
+            <Button Content="Settings" Click="ToggleProviderSettingsPanel_Click" FontSize="12" Padding="8,4" />
             <Button Content="Hide" Click="CollapseSidecarToHandle_Click" FontSize="12" Padding="8,4" />
             <Button Content="⋯" FontSize="16" Padding="8,2">
               <Button.Flyout>
                 <Flyout>
-                  <ScrollViewer Width="400" MaxHeight="620" VerticalScrollBarVisibility="Auto">
+                  <ScrollViewer Width="360" MaxHeight="520" VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="8" Padding="4">
                       <TextBlock Text="Sidecar controls" FontSize="16" FontWeight="SemiBold" />
                       <TextBlock x:Name="ServiceStatusText" Text="Service: unknown" TextWrapping="WrapWholeWords" FontSize="11" Opacity="0.72" />
@@ -71,16 +72,6 @@
                         <Button Content="Check" Click="CheckService_Click" FontSize="12" Padding="8,4" />
                         <Button Content="Start" Click="StartSession_Click" FontSize="12" Padding="8,4" />
                       </StackPanel>
-
-                      <TextBlock Text="Provider" FontWeight="SemiBold" Margin="0,6,0,0" />
-                      <ComboBox x:Name="ProviderBox" SelectedIndex="0" SelectionChanged="ProviderBox_SelectionChanged" HorizontalAlignment="Stretch">
-                        <ComboBoxItem Content="OpenAI" />
-                        <ComboBoxItem Content="Claude" />
-                        <ComboBoxItem Content="Gemini" />
-                        <ComboBoxItem Content="DeepSeek" />
-                        <ComboBoxItem Content="OpenRouter" />
-                        <ComboBoxItem Content="Local" />
-                      </ComboBox>
 
                       <TextBlock Text="Target picker" FontWeight="SemiBold" Margin="0,6,0,0" />
                       <StackPanel Orientation="Horizontal" Spacing="6">
@@ -105,33 +96,6 @@
                         </ListView.ItemTemplate>
                       </ListView>
 
-                      <TextBlock Text="Provider settings" FontWeight="SemiBold" Margin="0,6,0,0" />
-                      <ComboBox x:Name="SettingsProviderBox" SelectedIndex="0" SelectionChanged="SettingsProviderBox_SelectionChanged" HorizontalAlignment="Stretch">
-                        <ComboBoxItem Content="OpenAI" />
-                        <ComboBoxItem Content="Claude" />
-                        <ComboBoxItem Content="Gemini" />
-                        <ComboBoxItem Content="DeepSeek" />
-                        <ComboBoxItem Content="OpenRouter" />
-                        <ComboBoxItem Content="Local" />
-                      </ComboBox>
-                      <TextBox x:Name="ProviderBaseUrlBox" Header="Base URL" PlaceholderText="https://api.openai.com/v1/" TextWrapping="NoWrap" />
-                      <TextBox x:Name="ProviderModelBox" Header="Default model" PlaceholderText="gpt-4.1-mini" TextWrapping="NoWrap" />
-                      <PasswordBox x:Name="ProviderApiKeyBox" Header="API key" PlaceholderText="Stored through Threadline local secret storage" />
-                      <TextBlock x:Name="ProviderSettingsHintText"
-                                 Text="For OpenAI, paste your API key once, then click Save. The key is stored by the local Threadline service."
-                                 TextWrapping="WrapWholeWords"
-                                 FontSize="11"
-                                 Opacity="0.74" />
-                      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                        <Button Content="Use Defaults" Click="UseProviderDefaults_Click" FontSize="12" Padding="8,4" />
-                        <Button Content="Save Provider" Click="SaveProviderSettings_Click" FontSize="12" Padding="8,4" />
-                      </StackPanel>
-                      <TextBlock x:Name="ProviderSettingsStatusText"
-                                 Text="Provider settings not saved yet."
-                                 TextWrapping="WrapWholeWords"
-                                 FontSize="11"
-                                 Opacity="0.78" />
-
                       <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
                         <Button Content="Diagnostics" Click="ToggleDiagnostics_Click" FontSize="12" Padding="8,4" />
                         <Button Content="Clear Context" Click="ClearSharedContext_Click" FontSize="12" Padding="8,4" />
@@ -145,7 +109,59 @@
         </Grid>
       </Border>
 
-      <Border x:Name="CurrentContextPanel" Grid.Row="1" BorderThickness="1" CornerRadius="12" Padding="10">
+      <Border x:Name="ProviderSettingsPanel" Grid.Row="1" BorderThickness="1" CornerRadius="12" Padding="10" Visibility="Collapsed">
+        <ScrollViewer MaxHeight="430" VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="8">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <StackPanel>
+                <TextBlock Text="Provider Settings" FontSize="16" FontWeight="SemiBold" />
+                <TextBlock Text="This panel stays open while you copy and paste provider details." TextWrapping="WrapWholeWords" FontSize="11" Opacity="0.72" />
+              </StackPanel>
+              <Button Grid.Column="1" Content="Close" Click="CloseProviderSettingsPanel_Click" FontSize="12" Padding="8,4" VerticalAlignment="Top" />
+            </Grid>
+
+            <TextBlock Text="Chat provider" FontWeight="SemiBold" Margin="0,4,0,0" />
+            <ComboBox x:Name="ProviderBox" SelectedIndex="0" SelectionChanged="ProviderBox_SelectionChanged" HorizontalAlignment="Stretch">
+              <ComboBoxItem Content="OpenAI" />
+              <ComboBoxItem Content="Claude" />
+              <ComboBoxItem Content="Gemini" />
+              <ComboBoxItem Content="DeepSeek" />
+              <ComboBoxItem Content="OpenRouter" />
+              <ComboBoxItem Content="Local" />
+            </ComboBox>
+
+            <TextBlock Text="Settings provider" FontWeight="SemiBold" Margin="0,4,0,0" />
+            <ComboBox x:Name="SettingsProviderBox" SelectedIndex="0" SelectionChanged="SettingsProviderBox_SelectionChanged" HorizontalAlignment="Stretch">
+              <ComboBoxItem Content="OpenAI" />
+              <ComboBoxItem Content="Claude" />
+              <ComboBoxItem Content="Gemini" />
+              <ComboBoxItem Content="DeepSeek" />
+              <ComboBoxItem Content="OpenRouter" />
+              <ComboBoxItem Content="Local" />
+            </ComboBox>
+
+            <TextBox x:Name="ProviderBaseUrlBox" Header="Base URL" PlaceholderText="https://api.openai.com/v1/" TextWrapping="NoWrap" />
+            <TextBox x:Name="ProviderModelBox" Header="Default model" PlaceholderText="gpt-4.1-mini" TextWrapping="NoWrap" />
+            <PasswordBox x:Name="ProviderApiKeyBox" Header="API key" PlaceholderText="Stored through Threadline local secret storage" />
+            <TextBlock x:Name="ProviderSettingsHintText"
+                       Text="For OpenAI, paste your API key once, then click Save Provider. The key is stored by the local Threadline service."
+                       TextWrapping="WrapWholeWords"
+                       FontSize="11"
+                       Opacity="0.74" />
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+              <Button Content="Use Defaults" Click="UseProviderDefaults_Click" FontSize="12" Padding="8,4" />
+              <Button Content="Save Provider" Click="SaveProviderSettings_Click" FontSize="12" Padding="8,4" />
+            </StackPanel>
+            <TextBlock x:Name="ProviderSettingsStatusText"
+                       Text="Provider settings not saved yet."
+                       TextWrapping="WrapWholeWords"
+                       FontSize="11"
+                       Opacity="0.82" />
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+
+      <Border x:Name="CurrentContextPanel" Grid.Row="2" BorderThickness="1" CornerRadius="12" Padding="10">
         <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="4">
           <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
             <Border x:Name="ContextStatusPill"
@@ -184,7 +200,7 @@
         </Grid>
       </Border>
 
-      <Border Grid.Row="2" BorderThickness="1" CornerRadius="12" Padding="0">
+      <Border Grid.Row="3" BorderThickness="1" CornerRadius="12" Padding="0">
         <ScrollViewer x:Name="TranscriptScrollViewer"
                       VerticalScrollBarVisibility="Auto"
                       VerticalScrollMode="Enabled"
@@ -221,7 +237,7 @@
         </ScrollViewer>
       </Border>
 
-      <Border Grid.Row="3" BorderThickness="1" CornerRadius="12" Padding="8">
+      <Border Grid.Row="4" BorderThickness="1" CornerRadius="12" Padding="8">
         <Grid RowDefinitions="*,Auto" RowSpacing="6">
           <TextBox x:Name="QuestionBox"
                    PlaceholderText="Ask about this app, tab, document, or workflow..."
@@ -237,7 +253,7 @@
         </Grid>
       </Border>
 
-      <ListView x:Name="TimelineList" Grid.Row="4" Height="0" Visibility="Collapsed" FontSize="11" />
+      <ListView x:Name="TimelineList" Grid.Row="5" Height="0" Visibility="Collapsed" FontSize="11" />
     </Grid>
   </Grid>
 </Window>
