@@ -32,6 +32,38 @@ public sealed class EdgeTriggerWindow : Window
             Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(1, 0, 0, 0))
         };
 
+        var sparkleText = new TextBlock
+        {
+            Text = "✦",
+            FontSize = 17,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Bottom
+        };
+        Grid.SetRow(sparkleText, 1);
+
+        var aiText = new TextBlock
+        {
+            Text = "AI",
+            FontSize = 11,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 6, 0, 0)
+        };
+        Grid.SetRow(aiText, 2);
+
+        var pillContent = new Grid
+        {
+            RowDefinitions =
+            {
+                new RowDefinition { Height = new GridLength(1, GridUnitType.Star) },
+                new RowDefinition { Height = GridLength.Auto },
+                new RowDefinition { Height = GridLength.Auto },
+                new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }
+            }
+        };
+        pillContent.Children.Add(sparkleText);
+        pillContent.Children.Add(aiText);
+
         _triggerPill = new Border
         {
             Width = 34,
@@ -44,41 +76,8 @@ public sealed class EdgeTriggerWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
             Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(218, 32, 32, 36)),
             BorderBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(180, 255, 255, 255)),
-            Child = new Grid
-            {
-                RowDefinitions =
-                {
-                    new RowDefinition { Height = new GridLength(1, GridUnitType.Star) },
-                    new RowDefinition { Height = GridLength.Auto },
-                    new RowDefinition { Height = GridLength.Auto },
-                    new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }
-                },
-                Children =
-                {
-                    new TextBlock
-                    {
-                        Text = "✦",
-                        FontSize = 17,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        VerticalAlignment = VerticalAlignment.Bottom
-                    },
-                    new TextBlock
-                    {
-                        Text = "AI",
-                        FontSize = 11,
-                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        Margin = new Thickness(0, 6, 0, 0)
-                    }
-                }
-            }
+            Child = pillContent
         };
-
-        if (_triggerPill.Child is Grid contentGrid && contentGrid.Children.Count >= 2)
-        {
-            Grid.SetRow(contentGrid.Children[0], 1);
-            Grid.SetRow(contentGrid.Children[1], 2);
-        }
 
         root.Children.Add(_triggerPill);
         root.PointerEntered += (_, _) => _triggerPill.Opacity = 0.96;
