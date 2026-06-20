@@ -1,10 +1,19 @@
+param(
+  [switch] $SkipBuild
+)
+
 $ErrorActionPreference = 'Stop'
 if ($PSVersionTable.PSVersion.Major -ge 7) {
   $PSNativeCommandUseErrorActionPreference = $true
 }
 
-Write-Host 'Building Windows companion with Visual Studio MSBuild...'
-& "$PSScriptRoot\build-windows.ps1"
+if (-not $SkipBuild) {
+  Write-Host 'Building Windows companion with Visual Studio MSBuild...'
+  & "$PSScriptRoot\build-windows.ps1"
+}
+else {
+  Write-Host 'Skipping build because -SkipBuild was supplied.'
+}
 
 $repoRoot = Resolve-Path "$PSScriptRoot\.."
 $releaseRoot = Join-Path $repoRoot 'src\Threadline.Windows\bin\Release'
@@ -59,3 +68,4 @@ if ($null -eq $running -or $running.HasExited) {
 }
 
 Write-Host "Threadline.Windows is running. Process ID: $($process.Id)" -ForegroundColor Green
+Write-Host 'If you do not see the window, check the right edge of your active display for the sidecar or edge handle.' -ForegroundColor Yellow
