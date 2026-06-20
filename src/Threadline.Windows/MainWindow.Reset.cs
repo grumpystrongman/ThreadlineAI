@@ -34,8 +34,10 @@ public sealed partial class MainWindow
         _lastContextSummary = null;
         _selectedTargetWindow = null;
         _selectedThreadlineTarget = null;
+        _lastSidecarAttachedTargetId = null;
         ResetCurrentContextPanel();
         QuestionBox.Text = string.Empty;
         OpenWindowsList.SelectedItem = null;
+        TryAttachSidecarToBestTarget(force: true);
     }
 }
