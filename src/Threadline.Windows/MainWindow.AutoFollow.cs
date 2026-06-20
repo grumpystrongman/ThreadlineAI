@@ -20,6 +20,7 @@ public sealed partial class MainWindow
         AddTimeline("Follow mode is on. Switch to another app, then return here.");
         AppendTranscript("Threadline Follow", "Follow mode is on. I remember the last non-Threadline app you used and keep it visible when you return to this sidecar.");
         SafeRefreshFollowTargetCard(force: true);
+        TryAttachSidecarToBestTarget(force: true);
     }
 
     private void ToggleFollowLock_Click(object sender, RoutedEventArgs e)
@@ -30,6 +31,7 @@ public sealed partial class MainWindow
             _lockedFollowTarget = null;
             _lastAutoFollowTargetId = null;
             SafeRefreshFollowTargetCard(force: true);
+            TryAttachSidecarToBestTarget(force: true);
             const string unlockMessage = "Unlocked. Following the last active app again.";
             AddTimeline(unlockMessage);
             AppendTranscript("Threadline Follow", unlockMessage);
@@ -48,6 +50,7 @@ public sealed partial class MainWindow
 
         _isTargetLocked = true;
         CurrentWindowText.Text = BuildTargetStatus(_lockedFollowTarget, "Locked target");
+        AttachSidecarToTarget(_lockedFollowTarget, force: true);
         var lockMessage = $"Locked target: {_lockedFollowTarget.Window.ApplicationName} — {_lockedFollowTarget.Title}";
         AddTimeline(lockMessage);
         AppendTranscript("Threadline Follow", lockMessage);
@@ -70,6 +73,7 @@ public sealed partial class MainWindow
         if (_isTargetLocked && _lockedFollowTarget is not null)
         {
             CurrentWindowText.Text = BuildTargetStatus(_lockedFollowTarget, "Locked target");
+            AttachSidecarToTarget(_lockedFollowTarget, force);
             return;
         }
 
@@ -85,6 +89,7 @@ public sealed partial class MainWindow
             if (_lastFollowTarget is not null)
             {
                 CurrentWindowText.Text = BuildTargetStatus(_lastFollowTarget, "Following last active app");
+                AttachSidecarToTarget(_lastFollowTarget, force);
             }
             else if (force)
             {
@@ -100,11 +105,13 @@ public sealed partial class MainWindow
         if (!force && string.Equals(_lastAutoFollowTargetId, activeTarget.Id, StringComparison.OrdinalIgnoreCase))
         {
             CurrentWindowText.Text = BuildTargetStatus(activeTarget, "Following active app");
+            AttachSidecarToTarget(activeTarget);
             return;
         }
 
         _lastAutoFollowTargetId = activeTarget.Id;
         CurrentWindowText.Text = BuildTargetStatus(activeTarget, "Following active app");
+        AttachSidecarToTarget(activeTarget, force);
         var followMessage = $"Following: {activeTarget.Window.ApplicationName} — {activeTarget.Title}";
         AddTimeline(followMessage);
 
