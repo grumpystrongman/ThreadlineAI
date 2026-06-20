@@ -20,11 +20,14 @@ public sealed partial class MainWindow
             _selectedThreadlineTarget = selected;
             _selectedTargetWindow = selected.Window;
             _lastForegroundWindow = selected.Window;
+            _lastFollowTarget = selected;
             CurrentWindowText.Text = $"Selected target:\n{selected}\n\n{selected.Window.ToDisplayText()}";
+            PlaceSidecarForTarget(selected, "Selected target attached.");
             _attachment = await _client.AttachWindowAsync(_session!.Id, selected.Window);
             _lastContextSummary = await _contentResolver.ResolveAsync(_session!.Id, selected);
             UpdateCurrentContextPanel(_lastContextSummary);
             AppendTranscript("Selected Target Preview", _lastContextSummary.ToPromptContext());
+            AddTimeline($"Selected target {selected.Title}; context source: {_lastContextSummary.Source}");
         });
     }
 
