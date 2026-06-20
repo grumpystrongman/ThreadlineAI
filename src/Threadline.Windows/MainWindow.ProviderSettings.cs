@@ -23,15 +23,48 @@ public sealed partial class MainWindow
         ApplyProviderDefaults(provider, overwriteExisting: false);
     }
 
+    private void ToggleProviderSettingsPanel_Click(object sender, RoutedEventArgs e)
+    {
+        ProviderSettingsPanel.Visibility = ProviderSettingsPanel.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+
+        if (ProviderSettingsPanel.Visibility == Visibility.Visible)
+        {
+            ProviderSettingsStatusText.Text = "Provider settings panel open. It will stay open while you copy and paste values.";
+            ApplyProviderDefaults(GetSelectedSettingsProvider(), overwriteExisting: false);
+        }
+    }
+
+    private void CloseProviderSettingsPanel_Click(object sender, RoutedEventArgs e)
+    {
+        ProviderSettingsPanel.Visibility = Visibility.Collapsed;
+    }
+
     private void UseProviderDefaults_Click(object sender, RoutedEventArgs e)
     {
         ApplyProviderDefaults(GetSelectedSettingsProvider(), overwriteExisting: true);
-        ProviderSettingsStatusText.Text = "Defaults applied. Add or confirm the credential, then save the provider.";
+        ProviderSettingsStatusText.Text = "Defaults applied. Add or confirm the credential, then click Save Provider.";
     }
 
     private async void SaveProviderSettings_Click(object sender, RoutedEventArgs e)
     {
-        await RunUiActionAsync(SaveProviderSettingsAsync);
+        var provider = GetSelectedSettingsProvider();
+        ProviderSettingsPanel.Visibility = Visibility.Visible;
+        ProviderSettingsStatusText.Text = $"Saving {provider} provider settings...";
+        ServiceStatusText.Text = $"Saving provider: {provider}";
+
+        try
+        {
+            await SaveProviderSettingsAsync();
+        }
+        catch (Exception ex)
+        {
+            ProviderSettingsStatusText.Text = $"Could not save {provider}: {ex.Message}";
+            ServiceStatusText.Text = "Provider save failed";
+            AddTimeline($"Provider save failed for {provider}: {ex.Message}");
+            AppendTranscript("Threadline Settings", $"Provider settings were not saved for {provider}.\n\nReason: {ex.Message}");
+        }
     }
 
     private async Task SaveProviderSettingsAsync()
@@ -67,9 +100,11 @@ public sealed partial class MainWindow
         }
 
         SelectComboBoxItem(ProviderBox, provider);
-        ProviderSettingsStatusText.Text = $"Saved {provider}. Start a new session to use this provider.";
+        SelectComboBoxItem(SettingsProviderBox, provider);
+        ProviderSettingsPanel.Visibility = Visibility.Visible;
+        ProviderSettingsStatusText.Text = $"Saved {provider}. Start or restart a session to use this provider.";
         ServiceStatusText.Text = $"Provider saved: {provider}";
-        AppendTranscript("Threadline Settings", $"Saved provider settings for {provider}. Start a new session with Provider set to {provider}.");
+        AppendTranscript("Threadline Settings", $"Saved provider settings for {provider}. Start or restart a session with Provider set to {provider}.");
         AddTimeline($"Saved provider settings for {provider}.");
     }
 
