@@ -20,8 +20,8 @@ public sealed partial class MainWindow
     private const int SidecarMinimumHeight = 360;
     private const int TargetMinimumWidth = 420;
     private const int SidecarAttachGap = 8;
-    private const int FloatingTriggerWidth = 80;
-    private const int FloatingTriggerHeight = 168;
+    private const int FloatingTriggerWidth = 56;
+    private const int FloatingTriggerHeight = 132;
     private const int FloatingTriggerHoverZone = 72;
     private const int FloatingTriggerReachPadding = 180;
     private const int FloatingTriggerHideGraceMilliseconds = 1800;
@@ -238,8 +238,8 @@ public sealed partial class MainWindow
         var workArea = GetTargetWorkArea(sidecarId, targetWindow.Handle);
         var size = new SizeInt32(FloatingTriggerWidth, FloatingTriggerHeight);
         var x = anchorRight
-            ? targetRect.Right - FloatingTriggerWidth - 34
-            : targetRect.Left + 34;
+            ? targetRect.Right - FloatingTriggerWidth - 56
+            : targetRect.Left + 56;
         var y = cursor.Y - (FloatingTriggerHeight / 2);
 
         x = ClampToArea(x, workArea.X + SidecarScreenMargin, workArea.X + workArea.Width - FloatingTriggerWidth - SidecarScreenMargin);
@@ -374,7 +374,7 @@ public sealed partial class MainWindow
             appWindow.Move(new PointInt32(x, y));
 
             var side = x == rightX ? "right" : x == leftX ? "left" : "screen edge";
-            UpdateSidecarAttachmentStatus($"Sidecar: Attached chat on {side} of {targetWindow.ApplicationName} — {targetTitle}. Height matched to target. {reason}");
+            UpdateSidecarAttachmentStatus($"Sidecar: Attached chat on {side} of {targetWindow.ApplicationName} — {targetTitle}. {reason}");
             return true;
         }
         catch
