@@ -20,10 +20,11 @@ public sealed partial class MainWindow
     private const int SidecarMinimumHeight = 360;
     private const int TargetMinimumWidth = 420;
     private const int SidecarAttachGap = 8;
-    private const int FloatingTriggerWidth = 56;
-    private const int FloatingTriggerHeight = 132;
-    private const int FloatingTriggerHoverZone = 72;
-    private const int FloatingTriggerReachPadding = 180;
+    private const int FloatingTriggerWidth = 64;
+    private const int FloatingTriggerHeight = 144;
+    private const int FloatingTriggerHoverZone = 96;
+    private const int FloatingTriggerInsetFromEdge = 128;
+    private const int FloatingTriggerReachPadding = 200;
     private const int FloatingTriggerHideGraceMilliseconds = 1800;
     private const int SidecarScreenMargin = 12;
     private const int SidecarScreenTopOffset = 40;
@@ -238,8 +239,8 @@ public sealed partial class MainWindow
         var workArea = GetTargetWorkArea(sidecarId, targetWindow.Handle);
         var size = new SizeInt32(FloatingTriggerWidth, FloatingTriggerHeight);
         var x = anchorRight
-            ? targetRect.Right - FloatingTriggerWidth - 56
-            : targetRect.Left + 56;
+            ? targetRect.Right - FloatingTriggerWidth - FloatingTriggerInsetFromEdge
+            : targetRect.Left + FloatingTriggerInsetFromEdge;
         var y = cursor.Y - (FloatingTriggerHeight / 2);
 
         x = ClampToArea(x, workArea.X + SidecarScreenMargin, workArea.X + workArea.Width - FloatingTriggerWidth - SidecarScreenMargin);
