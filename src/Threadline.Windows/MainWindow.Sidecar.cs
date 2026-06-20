@@ -13,14 +13,15 @@ public sealed partial class MainWindow
 {
     private const int ShowWindowNormal = 1;
     private const int ShowWindowHide = 0;
+    private const int LeftMouseButtonVirtualKey = 0x01;
     private const int SidecarDefaultWidth = 430;
     private const int SidecarMinimumWidth = 360;
     private const int SidecarMinimumHeight = 620;
-    private const int FloatingTriggerWidth = 40;
-    private const int FloatingTriggerHeight = 112;
-    private const int FloatingTriggerHoverZone = 48;
-    private const int FloatingTriggerReachPadding = 96;
-    private const int FloatingTriggerHideGraceMilliseconds = 900;
+    private const int FloatingTriggerWidth = 72;
+    private const int FloatingTriggerHeight = 168;
+    private const int FloatingTriggerHoverZone = 72;
+    private const int FloatingTriggerReachPadding = 180;
+    private const int FloatingTriggerHideGraceMilliseconds = 1800;
     private const int SidecarScreenMargin = 12;
     private const int SidecarScreenTopOffset = 40;
 
@@ -60,7 +61,7 @@ public sealed partial class MainWindow
     {
         _ = EnsureEdgeTriggerWindow();
 
-        _edgeHoverTimer.Interval = TimeSpan.FromMilliseconds(100);
+        _edgeHoverTimer.Interval = TimeSpan.FromMilliseconds(75);
         _edgeHoverTimer.Tick += (_, _) => SafeUpdateFloatingEdgeTrigger();
         _edgeHoverTimer.Start();
     }
@@ -180,6 +181,13 @@ public sealed partial class MainWindow
             return;
         }
 
+        if (trigger.IsVisible && trigger.IsCursorWithinReach(cursor.X, cursor.Y, 12) && IsLeftMouseButtonDown())
+        {
+            _lastFloatingTriggerEligibleAt = DateTimeOffset.Now;
+            RestoreSidecarFromFloatingTrigger();
+            return;
+        }
+
         if (trigger.IsPointerInside || trigger.IsCursorWithinReach(cursor.X, cursor.Y, FloatingTriggerReachPadding))
         {
             _lastFloatingTriggerEligibleAt = DateTimeOffset.Now;
@@ -225,8 +233,8 @@ public sealed partial class MainWindow
         var workArea = GetTargetWorkArea(sidecarId, targetWindow.Handle);
         var size = new SizeInt32(FloatingTriggerWidth, FloatingTriggerHeight);
         var x = anchorRight
-            ? targetRect.Right - FloatingTriggerWidth - 4
-            : targetRect.Left + 4;
+            ? targetRect.Right - FloatingTriggerWidth - 18
+            : targetRect.Left + 18;
         var y = cursor.Y - (FloatingTriggerHeight / 2);
 
         x = ClampToArea(x, workArea.X + SidecarScreenMargin, workArea.X + workArea.Width - FloatingTriggerWidth - SidecarScreenMargin);
@@ -418,6 +426,9 @@ public sealed partial class MainWindow
         }
     }
 
+    private static bool IsLeftMouseButtonDown() =>
+        (GetAsyncKeyState(LeftMouseButtonVirtualKey) & unchecked((short)0x8000)) != 0;
+
     private static int ClampToArea(int value, int minimum, int maximum)
     {
         var safeMaximum = Math.Max(1, maximum);
@@ -452,6 +463,9 @@ public sealed partial class MainWindow
 
     [DllImport("user32.dll")]
     private static extern bool GetCursorPos(out NativePoint lpPoint);
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
 
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(nint hWnd, int nCmdShow);
