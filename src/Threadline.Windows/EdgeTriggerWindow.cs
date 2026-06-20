@@ -15,7 +15,7 @@ public sealed class EdgeTriggerWindow
     private const int SwShowNoActivate = 4;
     private const uint SwpNoActivate = 0x0010;
     private const uint SwpShowWindow = 0x0040;
-    private static readonly nint HwndTopmost = new(-1);
+    private static readonly nint HwndTopmost = unchecked((nint)(-1));
 
     private const uint WmPaint = 0x000F;
     private const uint WmEraseBackground = 0x0014;
@@ -25,8 +25,8 @@ public sealed class EdgeTriggerWindow
     private const uint WmLButtonDown = 0x0201;
     private const uint WmLButtonUp = 0x0202;
     private const uint WmMouseLeave = 0x02A3;
-    private const nint HitTestClient = 1;
-    private const nint MouseActivateNoActivate = 3;
+    private static readonly nint HitTestClient = new(1);
+    private static readonly nint MouseActivateNoActivate = new(3);
     private const uint TrackMouseLeave = 0x00000002;
     private const int TransparentBkMode = 1;
     private const uint DrawTextCenter = 0x00000001;
@@ -190,15 +190,15 @@ public sealed class EdgeTriggerWindow
     {
         if (_isTrackingMouseLeave) return;
 
-        var trackMouseEvent = new TrackMouseEvent
+        var trackMouseEvent = new NativeTrackMouseEvent
         {
-            cbSize = Marshal.SizeOf<TrackMouseEvent>(),
+            cbSize = Marshal.SizeOf<NativeTrackMouseEvent>(),
             dwFlags = TrackMouseLeave,
             hwndTrack = hwnd,
             dwHoverTime = 0
         };
 
-        if (TrackMouseEvent(ref trackMouseEvent))
+        if (TrackMouseEventNative(ref trackMouseEvent))
         {
             _isTrackingMouseLeave = true;
         }
@@ -300,7 +300,7 @@ public sealed class EdgeTriggerWindow
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct TrackMouseEvent
+    private struct NativeTrackMouseEvent
     {
         public int cbSize;
         public uint dwFlags;
@@ -338,8 +338,8 @@ public sealed class EdgeTriggerWindow
     [DllImport("user32.dll")]
     private static extern bool GetClientRect(nint hWnd, out NativeRect lpRect);
 
-    [DllImport("user32.dll")]
-    private static extern bool TrackMouseEvent(ref TrackMouseEvent lpEventTrack);
+    [DllImport("user32.dll", EntryPoint = "TrackMouseEvent")]
+    private static extern bool TrackMouseEventNative(ref NativeTrackMouseEvent lpEventTrack);
 
     [DllImport("user32.dll")]
     private static extern nint LoadCursor(nint hInstance, int lpCursorName);
