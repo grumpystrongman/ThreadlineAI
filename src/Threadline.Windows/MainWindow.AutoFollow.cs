@@ -53,6 +53,7 @@ public sealed partial class MainWindow
         var lockMessage = $"Locked target: {_lockedFollowTarget.Window.ApplicationName} — {_lockedFollowTarget.Title}";
         AddTimeline(lockMessage);
         AppendTranscript("Threadline", lockMessage);
+        _ = PersistTargetContextEventAsync(_lockedFollowTarget, "Locked");
     }
 
     private void SafeRefreshFollowTargetCard(bool force = false)
@@ -131,6 +132,7 @@ public sealed partial class MainWindow
         CurrentWindowText.Text = BuildTargetStatus(activeTarget, "Available target");
         var followMessage = $"Available: {activeTarget.Window.ApplicationName} — {activeTarget.Title}";
         AddTimeline(followMessage);
+        _ = PersistTargetContextEventAsync(activeTarget, "Followed");
 
         if (!_hasAnnouncedFirstFollowTarget || force)
         {
