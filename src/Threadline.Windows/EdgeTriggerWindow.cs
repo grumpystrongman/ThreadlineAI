@@ -15,7 +15,7 @@ public sealed class EdgeTriggerWindow : Window
     private const int ShowNoActivate = 4;
     private const int HideWindow = 0;
 
-    private readonly Border _triggerPill;
+    private readonly Border _triggerTab;
     private readonly Grid _root;
     private AppWindow? _appWindow;
     private PointInt32 _lastLocation;
@@ -29,18 +29,20 @@ public sealed class EdgeTriggerWindow : Window
         Title = "Threadline edge trigger";
         ExtendsContentIntoTitleBar = true;
 
+        var tabBackground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(236, 30, 34, 48));
+
         _root = new Grid
         {
-            Width = 72,
-            Height = 168,
+            Width = 56,
+            Height = 132,
             IsHitTestVisible = true,
-            Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(1, 0, 0, 0))
+            Background = tabBackground
         };
 
         var sparkleText = new TextBlock
         {
             Text = "✦",
-            FontSize = 22,
+            FontSize = 20,
             Foreground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(245, 255, 255, 255)),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Bottom
@@ -58,17 +60,17 @@ public sealed class EdgeTriggerWindow : Window
         };
         Grid.SetRow(aiText, 2);
 
-        var hintText = new TextBlock
+        var openText = new TextBlock
         {
             Text = "open",
             FontSize = 9,
-            Foreground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(205, 255, 255, 255)),
+            Foreground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(215, 255, 255, 255)),
             HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Thickness(0, 8, 0, 0)
         };
-        Grid.SetRow(hintText, 3);
+        Grid.SetRow(openText, 3);
 
-        var pillContent = new Grid
+        var tabContent = new Grid
         {
             RowDefinitions =
             {
@@ -79,35 +81,35 @@ public sealed class EdgeTriggerWindow : Window
                 new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }
             }
         };
-        pillContent.Children.Add(sparkleText);
-        pillContent.Children.Add(aiText);
-        pillContent.Children.Add(hintText);
+        tabContent.Children.Add(sparkleText);
+        tabContent.Children.Add(aiText);
+        tabContent.Children.Add(openText);
 
-        _triggerPill = new Border
+        _triggerTab = new Border
         {
-            Width = 72,
-            Height = 168,
-            CornerRadius = new CornerRadius(34),
-            BorderThickness = new Thickness(1.5),
-            Padding = new Thickness(8),
-            Opacity = 0.76,
+            Width = 56,
+            Height = 132,
+            CornerRadius = new CornerRadius(24),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(6),
+            Opacity = 0.86,
             IsHitTestVisible = true,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Stretch,
-            Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(214, 24, 27, 34)),
-            BorderBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(180, 255, 255, 255)),
-            Child = pillContent
+            Background = tabBackground,
+            BorderBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(170, 255, 255, 255)),
+            Child = tabContent
         };
 
-        _root.Children.Add(_triggerPill);
+        _root.Children.Add(_triggerTab);
         _root.PointerEntered += (_, _) => SetHoverState(true);
         _root.PointerExited += (_, _) => SetHoverState(false);
         _root.PointerPressed += OnTriggerPressed;
         _root.Tapped += OnTriggerTapped;
-        _triggerPill.PointerEntered += (_, _) => SetHoverState(true);
-        _triggerPill.PointerExited += (_, _) => SetHoverState(false);
-        _triggerPill.PointerPressed += OnTriggerPressed;
-        _triggerPill.Tapped += OnTriggerTapped;
+        _triggerTab.PointerEntered += (_, _) => SetHoverState(true);
+        _triggerTab.PointerExited += (_, _) => SetHoverState(false);
+        _triggerTab.PointerPressed += OnTriggerPressed;
+        _triggerTab.Tapped += OnTriggerTapped;
 
         Content = _root;
     }
@@ -137,9 +139,9 @@ public sealed class EdgeTriggerWindow : Window
         _lastSize = size;
         _root.Width = size.Width;
         _root.Height = size.Height;
-        _triggerPill.Width = size.Width;
-        _triggerPill.Height = size.Height;
-        _triggerPill.CornerRadius = new CornerRadius(Math.Max(18, size.Width / 2 - 2));
+        _triggerTab.Width = size.Width;
+        _triggerTab.Height = size.Height;
+        _triggerTab.CornerRadius = new CornerRadius(Math.Max(16, size.Width / 2 - 4));
 
         var hwnd = WindowNative.GetWindowHandle(this);
         _appWindow.Resize(size);
@@ -186,10 +188,13 @@ public sealed class EdgeTriggerWindow : Window
     private void SetHoverState(bool isHovering)
     {
         _isPointerInside = isHovering;
-        _triggerPill.Opacity = isHovering ? 0.98 : 0.76;
-        _triggerPill.Background = new SolidColorBrush(isHovering
-            ? global::Windows.UI.Color.FromArgb(238, 42, 48, 66)
-            : global::Windows.UI.Color.FromArgb(214, 24, 27, 34));
+        _triggerTab.Opacity = isHovering ? 0.98 : 0.86;
+        var background = isHovering
+            ? global::Windows.UI.Color.FromArgb(248, 52, 58, 82)
+            : global::Windows.UI.Color.FromArgb(236, 30, 34, 48);
+        var brush = new SolidColorBrush(background);
+        _root.Background = brush;
+        _triggerTab.Background = brush;
     }
 
     private void OnTriggerPressed(object sender, PointerRoutedEventArgs e)
@@ -211,7 +216,7 @@ public sealed class EdgeTriggerWindow : Window
 
     private static void ApplyRoundedWindowRegion(nint hwnd, SizeInt32 size)
     {
-        var radius = Math.Max(28, size.Width - 4);
+        var radius = Math.Max(24, size.Width - 4);
         var region = CreateRoundRectRgn(0, 0, size.Width + 1, size.Height + 1, radius, radius);
         if (region == nint.Zero) return;
 
