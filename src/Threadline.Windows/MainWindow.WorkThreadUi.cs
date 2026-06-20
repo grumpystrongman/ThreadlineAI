@@ -231,7 +231,7 @@ public sealed partial class MainWindow
                     windowTitle = target.Window.WindowTitle,
                     captureMode = "AttachedOrFollowed",
                     provider = target.ProviderKey,
-                    confidence = target.Confidence,
+                    confidence = target.Confidence?.ToString() ?? "unknown",
                     capturedAt = DateTimeOffset.Now
                 }
             };
@@ -247,7 +247,7 @@ public sealed partial class MainWindow
                 windowTitle = _lastForegroundWindow?.WindowTitle,
                 captureMode = "Inferred",
                 provider = _lastContextSummary?.Source ?? "native-ui",
-                confidence = _lastContextSummary?.Confidence ?? "unknown",
+                confidence = _lastContextSummary?.Confidence?.ToString() ?? "unknown",
                 capturedAt = DateTimeOffset.Now
             }
         };
