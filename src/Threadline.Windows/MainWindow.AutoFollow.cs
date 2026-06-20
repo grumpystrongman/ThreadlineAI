@@ -17,8 +17,8 @@ public sealed partial class MainWindow
         _autoFollowTimer.Interval = TimeSpan.FromSeconds(1);
         _autoFollowTimer.Tick += (_, _) => SafeRefreshFollowTargetCard();
         _autoFollowTimer.Start();
-        AddTimeline("Follow mode is on. Switch to another app, then return here.");
-        AppendTranscript("Threadline Follow", "Follow mode is on. I remember the last non-Threadline app you used and keep it visible when you return to this sidecar.");
+        AddTimeline("Window edge trigger is on. Hover near another app edge and click AI to attach Threadline there.");
+        AppendTranscript("Threadline", "Hover near a window edge and click AI to attach this sidecar to that window. Once open, the sidecar stays attached until you explicitly choose another window.");
         SafeRefreshFollowTargetCard(force: true);
     }
 
@@ -30,19 +30,19 @@ public sealed partial class MainWindow
             _lockedFollowTarget = null;
             _lastAutoFollowTargetId = null;
             SafeRefreshFollowTargetCard(force: true);
-            PlaceSidecarForTarget(_lastFollowTarget, "Unlocked; following last active app.");
-            const string unlockMessage = "Unlocked. Following the last active app again.";
+            PlaceSidecarForTarget(_selectedThreadlineTarget ?? _lastFollowTarget, "Unlocked; keeping current sidecar attachment.");
+            const string unlockMessage = "Unlocked. The sidecar will stay attached until you click another AI edge icon.";
             AddTimeline(unlockMessage);
-            AppendTranscript("Threadline Follow", unlockMessage);
+            AppendTranscript("Threadline", unlockMessage);
             return;
         }
 
         _lockedFollowTarget = _selectedThreadlineTarget ?? _lastFollowTarget;
         if (_lockedFollowTarget is null)
         {
-            const string noTargetMessage = "Nothing to lock yet. Switch to another app first, then return to Threadline.";
+            const string noTargetMessage = "Nothing to lock yet. Hover over another app edge and click AI first.";
             AddTimeline(noTargetMessage);
-            AppendTranscript("Threadline Follow", noTargetMessage);
+            AppendTranscript("Threadline", noTargetMessage);
             SafeRefreshFollowTargetCard(force: true);
             return;
         }
@@ -52,7 +52,7 @@ public sealed partial class MainWindow
         PlaceSidecarForTarget(_lockedFollowTarget, "Locked beside target.");
         var lockMessage = $"Locked target: {_lockedFollowTarget.Window.ApplicationName} — {_lockedFollowTarget.Title}";
         AddTimeline(lockMessage);
-        AppendTranscript("Threadline Follow", lockMessage);
+        AppendTranscript("Threadline", lockMessage);
     }
 
     private void SafeRefreshFollowTargetCard(bool force = false)
@@ -72,15 +72,35 @@ public sealed partial class MainWindow
         if (_isTargetLocked && _lockedFollowTarget is not null)
         {
             CurrentWindowText.Text = BuildTargetStatus(_lockedFollowTarget, "Locked target");
-            PlaceSidecarForTarget(_lockedFollowTarget, "Maintaining locked attachment.");
+            if (!_sidecarWindowHiddenForTrigger)
+            {
+                PlaceSidecarForTarget(_lockedFollowTarget, "Maintaining locked attachment.");
+            }
+            return;
+        }
+
+        // When the sidecar is open, it should not chase focus changes. The floating AI icon can retarget,
+        // but the visible sidecar remains bound to the explicitly selected/clicked window until another AI icon is clicked.
+        if (!_sidecarWindowHiddenForTrigger)
+        {
+            var attachedTarget = _selectedThreadlineTarget ?? _lastFollowTarget;
+            if (attachedTarget is not null)
+            {
+                CurrentWindowText.Text = BuildTargetStatus(attachedTarget, "Attached target");
+                return;
+            }
+
+            if (force)
+            {
+                CurrentWindowText.Text = "Mode: Waiting\nStatus: Hover near another app edge and click AI to attach this sidecar.";
+            }
             return;
         }
 
         var activeWindow = _activeWindowMonitor.GetActiveWindowSnapshot();
         if (activeWindow is null)
         {
-            if (force) CurrentWindowText.Text = "Mode: Follow\nStatus: No foreground app detected yet.";
-            PlaceSidecarForTarget(_lastFollowTarget, "No foreground target detected.");
+            if (force) CurrentWindowText.Text = "Mode: Edge trigger\nStatus: No foreground app detected yet.";
             return;
         }
 
@@ -88,13 +108,11 @@ public sealed partial class MainWindow
         {
             if (_lastFollowTarget is not null)
             {
-                CurrentWindowText.Text = BuildTargetStatus(_lastFollowTarget, "Following last active app");
-                PlaceSidecarForTarget(_lastFollowTarget, "Following last active app while Threadline has focus.");
+                CurrentWindowText.Text = BuildTargetStatus(_lastFollowTarget, "Last attached target");
             }
             else if (force)
             {
-                CurrentWindowText.Text = "Mode: Follow\nStatus: Switch to another app, then return to Threadline.";
-                PlaceSidecarForTarget(null, "Waiting for first non-Threadline target.");
+                CurrentWindowText.Text = "Mode: Edge trigger\nStatus: Hover near another app edge and click AI.";
             }
             return;
         }
@@ -102,23 +120,21 @@ public sealed partial class MainWindow
         var activeTarget = ResolveTargetForWindow(activeWindow);
         _lastForegroundWindow = activeTarget.Window;
         _lastFollowTarget = activeTarget;
-        PlaceSidecarForTarget(activeTarget, "Following active app.");
 
         if (!force && string.Equals(_lastAutoFollowTargetId, activeTarget.Id, StringComparison.OrdinalIgnoreCase))
         {
-            CurrentWindowText.Text = BuildTargetStatus(activeTarget, "Following active app");
+            CurrentWindowText.Text = BuildTargetStatus(activeTarget, "Available target");
             return;
         }
 
         _lastAutoFollowTargetId = activeTarget.Id;
-        CurrentWindowText.Text = BuildTargetStatus(activeTarget, "Following active app");
-        var followMessage = $"Following: {activeTarget.Window.ApplicationName} — {activeTarget.Title}";
+        CurrentWindowText.Text = BuildTargetStatus(activeTarget, "Available target");
+        var followMessage = $"Available: {activeTarget.Window.ApplicationName} — {activeTarget.Title}";
         AddTimeline(followMessage);
 
         if (!_hasAnnouncedFirstFollowTarget || force)
         {
             _hasAnnouncedFirstFollowTarget = true;
-            AppendTranscript("Threadline Follow", followMessage);
         }
     }
 
