@@ -34,7 +34,13 @@ public sealed partial class MainWindow
         _lastContextSummary = null;
         _selectedTargetWindow = null;
         _selectedThreadlineTarget = null;
+        _lastAutoFollowTargetId = null;
+        if (!_isTargetLocked)
+        {
+            _lastFollowTarget = null;
+        }
         ResetCurrentContextPanel();
+        PlaceSidecarForTarget(GetBestSidecarTarget(), "Local context reset.");
         QuestionBox.Text = string.Empty;
         OpenWindowsList.SelectedItem = null;
     }
