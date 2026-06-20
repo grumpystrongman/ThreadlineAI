@@ -19,5 +19,31 @@ public sealed partial class MainWindow
         {
             _workThread = await _workThreadClient.StartWorkThreadAsync($"Work Thread {DateTimeOffset.Now:g}", "Created locally.");
         }
+
+        try
+        {
+            SessionBindingStatusText.Text = $"Active Work Thread: {_workThread.Title}\nStatus: {_workThread.Status} • Thread: {_workThread.Id}";
+        }
+        catch
+        {
+            // Non-fatal UI update.
+        }
+    }
+
+    private async Task PersistWorkMessageAsync(string role, string content)
+    {
+        if (_workThread is null || string.IsNullOrWhiteSpace(content))
+        {
+            return;
+        }
+
+        try
+        {
+            await _workThreadClient.SaveConversationMessageAsync(_workThread.Id, role, content);
+        }
+        catch (Exception ex)
+        {
+            AddTimeline("Work message save failed: " + ex.Message);
+        }
     }
 }
