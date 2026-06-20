@@ -21,29 +21,22 @@ public sealed partial class MainWindow
     private async void CloseWorkThread_Click(object sender, RoutedEventArgs e) =>
         await RunUiActionAsync(CloseWorkThreadAsync);
 
-    private async Task InitializeWorkThreadAsync()
+    private Task InitializeWorkThreadAsync()
     {
+        // Keep the Windows shell launch path stable. Build 13.1A leaves the
+        // Work Thread controls available, but no longer performs service I/O
+        // or transcript hydration during MainWindow construction.
         try
         {
-            _activeWorkThread = await _workThreadClient.GetActiveWorkThreadAsync();
-            if (_activeWorkThread is null)
-            {
-                _activeWorkThread = await _workThreadClient.StartWorkThreadAsync(BuildDefaultWorkThreadTitle(), "Automatically created by Threadline Windows sidecar.");
-                AddTimeline("Created default active work thread.");
-            }
-            else
-            {
-                AddTimeline("Loaded active work thread.");
-            }
-
-            UpdateWorkThreadUi();
-            await LoadWorkThreadMessagesAsync();
+            WorkThreadStatusText.Text = "Work Thread: ready — click Resume or New Thread";
+            AddTimeline("Work Thread auto-load deferred until user action.");
         }
-        catch (Exception ex)
+        catch
         {
-            WorkThreadStatusText.Text = "Work Thread: unavailable";
-            AddTimeline("Work Thread unavailable: " + ex.Message);
+            // Startup status should never be able to crash the sidecar.
         }
+
+        return Task.CompletedTask;
     }
 
     private async Task NewWorkThreadAsync()
