@@ -96,6 +96,11 @@ public sealed partial class MainWindow
     private void ShowPendingConnection(ThreadlineTarget target)
     {
         _pendingConnectionTarget = target;
+        _sidecarCollapsedToHandle = false;
+        _sidecarWindowHiddenForTrigger = false;
+        ShowMainSidecarWindow();
+        SetSidecarVisualState();
+        PlaceSidecarForTarget(target, "Pending window connection; choose how to bind this window.");
         UpdateSessionBindingStatus($"Pending window connection:\n{FormatTargetForBinding(target)}\nChoose Connect Current, New Window Session, or Detach.");
         CurrentWindowText.Text = BuildTargetStatus(target, "Pending connection");
         AddTimeline($"Pending connection: {target.Window.ApplicationName} — {target.Title}");
