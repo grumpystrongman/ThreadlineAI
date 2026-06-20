@@ -17,7 +17,7 @@ public sealed partial class MainWindow
     private const int LeftMouseButtonVirtualKey = 0x01;
     private const int SidecarDefaultWidth = 430;
     private const int SidecarMinimumWidth = 360;
-    private const int SidecarMinimumHeight = 360;
+    private const int SidecarMinimumHeight = 620;
     private const int TargetMinimumWidth = 420;
     private const int SidecarAttachGap = 8;
     private const int FloatingTriggerWidth = 64;
@@ -35,6 +35,7 @@ public sealed partial class MainWindow
     private EdgeTriggerWindow? _edgeTriggerWindow;
     private ThreadlineTarget? _floatingTriggerTarget;
     private DateTimeOffset _lastFloatingTriggerEligibleAt = DateTimeOffset.MinValue;
+    private string? _attachedSidecarTargetId;
     private bool _attachSidecarToTarget = true;
     private bool _sidecarCollapsedToHandle = true;
     private bool _sidecarWindowHiddenForTrigger = true;
@@ -119,12 +120,21 @@ public sealed partial class MainWindow
 
     private void RestoreSidecarFromFloatingTrigger()
     {
-        if (_floatingTriggerTarget is not null)
+        var openingTarget = _floatingTriggerTarget;
+        if (openingTarget is not null)
         {
-            _lastFollowTarget = _floatingTriggerTarget;
-            _lastForegroundWindow = _floatingTriggerTarget.Window;
-            _selectedThreadlineTarget = _floatingTriggerTarget;
-            _selectedTargetWindow = _floatingTriggerTarget.Window;
+            var isNewTarget = !string.Equals(_attachedSidecarTargetId, openingTarget.Id, StringComparison.OrdinalIgnoreCase);
+            _lastFollowTarget = openingTarget;
+            _lastForegroundWindow = openingTarget.Window;
+            _selectedThreadlineTarget = openingTarget;
+            _selectedTargetWindow = openingTarget.Window;
+            _attachedSidecarTargetId = openingTarget.Id;
+
+            if (isNewTarget && !string.IsNullOrWhiteSpace(QuestionBox.Text))
+            {
+                QuestionBox.Text = string.Empty;
+                AddTimeline("Cleared draft question for newly attached target.");
+            }
         }
 
         _sidecarCollapsedToHandle = false;
@@ -152,7 +162,7 @@ public sealed partial class MainWindow
     {
         try
         {
-            _ = ShowWindow(WindowNative.GetWindowHandle(this), ShowWindowNormal);
+            _ = ShowWindow(WindowNative.GetWindowHandle(this), ShowWindowRestore);
             Activate();
         }
         catch
@@ -353,6 +363,7 @@ public sealed partial class MainWindow
             var sidecarHwnd = WindowNative.GetWindowHandle(this);
             var sidecarId = Win32Interop.GetWindowIdFromWindow(sidecarHwnd);
             var appWindow = AppWindow.GetFromWindowId(sidecarId);
+            EnsureSidecarWindowUserResizable(appWindow);
             var workArea = GetTargetWorkArea(sidecarId, targetWindow.Handle);
             var maxWidth = Math.Max(1, workArea.Width - (SidecarScreenMargin * 2));
             var sidecarWidth = ClampToArea(SidecarDefaultWidth, SidecarMinimumWidth, maxWidth);
@@ -363,7 +374,8 @@ public sealed partial class MainWindow
             }
 
             var maxHeight = Math.Max(1, workArea.Height - (SidecarScreenMargin * 2));
-            var sidecarHeight = ClampToArea(targetRect.Height, SidecarMinimumHeight, maxHeight);
+            var requestedHeight = Math.Max(targetRect.Height, SidecarMinimumHeight);
+            var sidecarHeight = ClampToArea(requestedHeight, Math.Min(SidecarMinimumHeight, maxHeight), maxHeight);
             var y = ClampToArea(targetRect.Top, workArea.Y + SidecarScreenMargin, workArea.Y + workArea.Height - sidecarHeight - SidecarScreenMargin);
 
             var rightX = targetRect.Right + SidecarAttachGap;
@@ -389,6 +401,22 @@ public sealed partial class MainWindow
         }
     }
 
+    private static void EnsureSidecarWindowUserResizable(AppWindow appWindow)
+    {
+        try
+        {
+            if (appWindow.Presenter is OverlappedPresenter presenter)
+            {
+                presenter.IsResizable = true;
+                presenter.IsMaximizable = true;
+            }
+        }
+        catch
+        {
+            // Keep placement working even if presenter flags are unavailable on a given Windows App SDK runtime.
+        }
+    }
+
     private NativeRect EnsureSideBySideTargetSpace(nint targetHandle, NativeRect targetRect, RectInt32 workArea, int sidecarWidth)
     {
         var workLeft = workArea.X + SidecarScreenMargin;
@@ -403,8 +431,9 @@ public sealed partial class MainWindow
         }
 
         var availableTargetWidth = Math.Max(1, workArea.Width - sidecarWidth - SidecarAttachGap - (SidecarScreenMargin * 2));
+        var maxTargetHeight = Math.Max(1, workArea.Height - (SidecarScreenMargin * 2));
         var targetWidth = ClampToArea(targetRect.Width, Math.Min(TargetMinimumWidth, availableTargetWidth), availableTargetWidth);
-        var targetHeight = ClampToArea(targetRect.Height, SidecarMinimumHeight, Math.Max(1, workArea.Height - (SidecarScreenMargin * 2)));
+        var targetHeight = ClampToArea(targetRect.Height, 1, maxTargetHeight);
         var targetLeft = workRight - sidecarWidth - SidecarAttachGap - targetWidth;
         var targetTop = ClampToArea(targetRect.Top, workTop, workBottom - targetHeight);
 
@@ -450,11 +479,12 @@ public sealed partial class MainWindow
             var hwnd = WindowNative.GetWindowHandle(this);
             var id = Win32Interop.GetWindowIdFromWindow(hwnd);
             var win = AppWindow.GetFromWindowId(id);
+            EnsureSidecarWindowUserResizable(win);
             var area = DisplayArea.GetFromWindowId(id, DisplayAreaFallback.Nearest).WorkArea;
             var maxWidth = Math.Max(1, area.Width - (SidecarScreenMargin * 2));
             var maxHeight = Math.Max(1, area.Height - (SidecarScreenMargin * 2));
             var width = ClampToArea(SidecarDefaultWidth, SidecarMinimumWidth, maxWidth);
-            var height = ClampToArea(area.Height - 80, SidecarMinimumHeight, maxHeight);
+            var height = ClampToArea(area.Height - 80, Math.Min(SidecarMinimumHeight, maxHeight), maxHeight);
             var y = area.Y + SidecarScreenTopOffset;
 
             win.Resize(new SizeInt32(width, height));
