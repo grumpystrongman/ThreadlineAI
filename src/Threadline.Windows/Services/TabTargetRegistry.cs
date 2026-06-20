@@ -33,13 +33,15 @@ public sealed record ThreadlineTarget(
 
         var providerBadge = ProviderKey switch
         {
-            "browser-extension" => "Browser provider",
-            "notepad-tabs" => "Notepad tab provider",
+            "browser-extension" => "Browser extension",
+            "notepad-tabs" => "Notepad tab resolver",
             "native-ui" => "Native UI",
             _ => ProviderKey
         };
 
-        var state = CanReadBody ? "ready" : "needs provider";
+        var state = CanReadBody || ProviderKey.Equals("browser-extension", StringComparison.OrdinalIgnoreCase)
+            ? "ready"
+            : "needs resolver";
         var icon = Kind switch
         {
             ThreadlineTargetKind.BrowserTab => "🌐",
