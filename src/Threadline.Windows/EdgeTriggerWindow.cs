@@ -31,16 +31,17 @@ public sealed class EdgeTriggerWindow : Window
 
         _root = new Grid
         {
-            Width = 40,
-            Height = 112,
-            Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0))
+            Width = 72,
+            Height = 168,
+            IsHitTestVisible = true,
+            Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(1, 0, 0, 0))
         };
 
         var sparkleText = new TextBlock
         {
             Text = "✦",
-            FontSize = 17,
-            Foreground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(235, 255, 255, 255)),
+            FontSize = 22,
+            Foreground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(245, 255, 255, 255)),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Bottom
         };
@@ -49,13 +50,23 @@ public sealed class EdgeTriggerWindow : Window
         var aiText = new TextBlock
         {
             Text = "AI",
-            FontSize = 11,
+            FontSize = 13,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(235, 255, 255, 255)),
+            Foreground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(245, 255, 255, 255)),
             HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Thickness(0, 6, 0, 0)
+            Margin = new Thickness(0, 8, 0, 0)
         };
         Grid.SetRow(aiText, 2);
+
+        var hintText = new TextBlock
+        {
+            Text = "open",
+            FontSize = 9,
+            Foreground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(205, 255, 255, 255)),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 8, 0, 0)
+        };
+        Grid.SetRow(hintText, 3);
 
         var pillContent = new Grid
         {
@@ -64,24 +75,27 @@ public sealed class EdgeTriggerWindow : Window
                 new RowDefinition { Height = new GridLength(1, GridUnitType.Star) },
                 new RowDefinition { Height = GridLength.Auto },
                 new RowDefinition { Height = GridLength.Auto },
+                new RowDefinition { Height = GridLength.Auto },
                 new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }
             }
         };
         pillContent.Children.Add(sparkleText);
         pillContent.Children.Add(aiText);
+        pillContent.Children.Add(hintText);
 
         _triggerPill = new Border
         {
-            Width = 40,
-            Height = 112,
-            CornerRadius = new CornerRadius(18),
-            BorderThickness = new Thickness(1),
-            Padding = new Thickness(6),
-            Opacity = 0.54,
+            Width = 72,
+            Height = 168,
+            CornerRadius = new CornerRadius(34),
+            BorderThickness = new Thickness(1.5),
+            Padding = new Thickness(8),
+            Opacity = 0.76,
+            IsHitTestVisible = true,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Stretch,
-            Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(188, 28, 28, 34)),
-            BorderBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(120, 255, 255, 255)),
+            Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(214, 24, 27, 34)),
+            BorderBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(180, 255, 255, 255)),
             Child = pillContent
         };
 
@@ -90,6 +104,8 @@ public sealed class EdgeTriggerWindow : Window
         _root.PointerExited += (_, _) => SetHoverState(false);
         _root.PointerPressed += OnTriggerPressed;
         _root.Tapped += OnTriggerTapped;
+        _triggerPill.PointerEntered += (_, _) => SetHoverState(true);
+        _triggerPill.PointerExited += (_, _) => SetHoverState(false);
         _triggerPill.PointerPressed += OnTriggerPressed;
         _triggerPill.Tapped += OnTriggerTapped;
 
@@ -123,6 +139,7 @@ public sealed class EdgeTriggerWindow : Window
         _root.Height = size.Height;
         _triggerPill.Width = size.Width;
         _triggerPill.Height = size.Height;
+        _triggerPill.CornerRadius = new CornerRadius(Math.Max(18, size.Width / 2 - 2));
 
         var hwnd = WindowNative.GetWindowHandle(this);
         _appWindow.Resize(size);
@@ -169,7 +186,10 @@ public sealed class EdgeTriggerWindow : Window
     private void SetHoverState(bool isHovering)
     {
         _isPointerInside = isHovering;
-        _triggerPill.Opacity = isHovering ? 0.96 : 0.54;
+        _triggerPill.Opacity = isHovering ? 0.98 : 0.76;
+        _triggerPill.Background = new SolidColorBrush(isHovering
+            ? global::Windows.UI.Color.FromArgb(238, 42, 48, 66)
+            : global::Windows.UI.Color.FromArgb(214, 24, 27, 34));
     }
 
     private void OnTriggerPressed(object sender, PointerRoutedEventArgs e)
@@ -191,7 +211,8 @@ public sealed class EdgeTriggerWindow : Window
 
     private static void ApplyRoundedWindowRegion(nint hwnd, SizeInt32 size)
     {
-        var region = CreateRoundRectRgn(0, 0, size.Width + 1, size.Height + 1, 30, 30);
+        var radius = Math.Max(28, size.Width - 4);
+        var region = CreateRoundRectRgn(0, 0, size.Width + 1, size.Height + 1, radius, radius);
         if (region == nint.Zero) return;
 
         if (SetWindowRgn(hwnd, region, true) == 0)
