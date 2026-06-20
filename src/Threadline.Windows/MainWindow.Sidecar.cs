@@ -22,8 +22,8 @@ public sealed partial class MainWindow
     private const int SidecarAttachGap = 8;
     private const int FloatingTriggerWidth = 64;
     private const int FloatingTriggerHeight = 144;
-    private const int FloatingTriggerHoverZone = 116;
-    private const int FloatingTriggerInsetFromEdge = 96;
+    private const int FloatingTriggerHoverZone = 180;
+    private const int FloatingTriggerInsetFromEdge = 24;
     private const int FloatingTriggerReachPadding = 220;
     private const int FloatingTriggerHideGraceMilliseconds = 1800;
     private const int SidecarScreenMargin = 12;
@@ -32,6 +32,7 @@ public sealed partial class MainWindow
     private const uint SetWindowPosNoActivate = 0x0010;
     private const uint MonitorDefaultToNearest = 0x00000002;
     private const uint GetAncestorRoot = 2;
+    private const uint GetAncestorRootOwner = 3;
 
     private readonly DispatcherTimer _edgeHoverTimer = new();
     private EdgeTriggerWindow? _edgeTriggerWindow;
@@ -285,22 +286,19 @@ public sealed partial class MainWindow
 
     private ActiveWindowSnapshot? GetPreferredWindowForCursor(NativePoint cursor)
     {
-        var activeWindow = GetCurrentNonThreadlineWindow();
-        if (activeWindow is not null && activeWindow.Handle != nint.Zero && IsWindow(activeWindow.Handle))
-        {
-            if (GetWindowRect(activeWindow.Handle, out var activeRect) && IsCursorNearTargetEdge(cursor, activeRect, out _))
-            {
-                return activeWindow;
-            }
-        }
-
         var cursorWindow = GetCursorNonThreadlineWindow(cursor);
         if (cursorWindow is not null && !IsShellOrDesktopWindow(cursorWindow))
         {
             return cursorWindow;
         }
 
-        return activeWindow;
+        var activeWindow = GetCurrentNonThreadlineWindow();
+        if (activeWindow is not null && activeWindow.Handle != nint.Zero && IsWindow(activeWindow.Handle))
+        {
+            return activeWindow;
+        }
+
+        return null;
     }
 
     private ActiveWindowSnapshot? GetCurrentNonThreadlineWindow()
@@ -317,12 +315,12 @@ public sealed partial class MainWindow
             var handle = WindowFromPoint(cursor);
             if (handle == nint.Zero) return null;
 
+            var rootOwnerHandle = GetAncestor(handle, GetAncestorRootOwner);
             var rootHandle = GetAncestor(handle, GetAncestorRoot);
-            if (rootHandle == nint.Zero) rootHandle = handle;
-            if (rootHandle == nint.Zero || !IsWindow(rootHandle)) return null;
 
-            var snapshot = _activeWindowMonitor.GetWindowSnapshot(rootHandle);
-            return IsThreadlineWindow(snapshot) ? null : snapshot;
+            return GetUsableWindowSnapshot(rootOwnerHandle)
+                ?? GetUsableWindowSnapshot(rootHandle)
+                ?? GetUsableWindowSnapshot(handle);
         }
         catch
         {
@@ -330,9 +328,24 @@ public sealed partial class MainWindow
         }
     }
 
+    private ActiveWindowSnapshot? GetUsableWindowSnapshot(nint handle)
+    {
+        if (handle == nint.Zero || !IsWindow(handle)) return null;
+
+        var snapshot = _activeWindowMonitor.GetWindowSnapshot(handle);
+        if (IsThreadlineWindow(snapshot) || IsShellOrDesktopWindow(snapshot)) return null;
+
+        // Chromium and Electron apps often expose child/chrome HWNDs. Keep them if they resolve to
+        // a real process even when the window title is sparse; the context resolver can still fall
+        // back to native UI or extension-backed tab data.
+        return string.IsNullOrWhiteSpace(snapshot.ProcessName) && string.IsNullOrWhiteSpace(snapshot.WindowTitle)
+            ? null
+            : snapshot;
+    }
+
     private static bool IsCursorNearTargetEdge(NativePoint cursor, NativeRect targetRect, out bool anchorRight)
     {
-        var withinVerticalBand = cursor.Y >= targetRect.Top && cursor.Y <= targetRect.Bottom;
+        var withinVerticalBand = cursor.Y >= targetRect.Top - 12 && cursor.Y <= targetRect.Bottom + 12;
         var nearRight = cursor.X >= targetRect.Right - FloatingTriggerHoverZone && cursor.X <= targetRect.Right + FloatingTriggerHoverZone;
         var nearLeft = cursor.X >= targetRect.Left - FloatingTriggerHoverZone && cursor.X <= targetRect.Left + FloatingTriggerHoverZone;
 
