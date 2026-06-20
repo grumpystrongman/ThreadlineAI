@@ -162,8 +162,23 @@ public sealed partial class MainWindow
             return;
         }
 
-        var targetWindow = GetBestSidecarTarget()?.Window ?? GetCurrentNonThreadlineWindow();
-        if (targetWindow is null || targetWindow.Handle == nint.Zero || !IsWindow(targetWindow.Handle))
+        var target = GetBestSidecarTarget();
+        if (target is null)
+        {
+            var activeWindow = GetCurrentNonThreadlineWindow();
+            if (activeWindow is null || activeWindow.Handle == nint.Zero || !IsWindow(activeWindow.Handle))
+            {
+                _edgeTriggerWindow?.HideTrigger();
+                return;
+            }
+
+            target = ResolveTargetForWindow(activeWindow);
+            _lastForegroundWindow = target.Window;
+            _lastFollowTarget = target;
+        }
+
+        var targetWindow = target.Window;
+        if (targetWindow.Handle == nint.Zero || !IsWindow(targetWindow.Handle))
         {
             _edgeTriggerWindow?.HideTrigger();
             return;
