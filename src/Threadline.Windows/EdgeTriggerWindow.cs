@@ -16,26 +16,31 @@ public sealed class EdgeTriggerWindow : Window
     private const int HideWindow = 0;
 
     private readonly Border _triggerPill;
+    private readonly Grid _root;
     private AppWindow? _appWindow;
+    private PointInt32 _lastLocation;
+    private SizeInt32 _lastSize;
     private bool _isConfigured;
     private bool _isVisible;
+    private bool _isPointerInside;
 
     public EdgeTriggerWindow()
     {
         Title = "Threadline edge trigger";
         ExtendsContentIntoTitleBar = true;
 
-        var root = new Grid
+        _root = new Grid
         {
-            Width = 42,
-            Height = 118,
-            Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(1, 0, 0, 0))
+            Width = 40,
+            Height = 112,
+            Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0))
         };
 
         var sparkleText = new TextBlock
         {
             Text = "✦",
             FontSize = 17,
+            Foreground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(235, 255, 255, 255)),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Bottom
         };
@@ -46,6 +51,7 @@ public sealed class EdgeTriggerWindow : Window
             Text = "AI",
             FontSize = 11,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(235, 255, 255, 255)),
             HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Thickness(0, 6, 0, 0)
         };
@@ -66,37 +72,63 @@ public sealed class EdgeTriggerWindow : Window
 
         _triggerPill = new Border
         {
-            Width = 34,
-            Height = 104,
-            CornerRadius = new CornerRadius(14),
+            Width = 40,
+            Height = 112,
+            CornerRadius = new CornerRadius(18),
             BorderThickness = new Thickness(1),
-            Padding = new Thickness(5),
-            Opacity = 0.72,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(218, 32, 32, 36)),
-            BorderBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(180, 255, 255, 255)),
+            Padding = new Thickness(6),
+            Opacity = 0.54,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch,
+            Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(188, 28, 28, 34)),
+            BorderBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(120, 255, 255, 255)),
             Child = pillContent
         };
 
-        root.Children.Add(_triggerPill);
-        root.PointerEntered += (_, _) => _triggerPill.Opacity = 0.96;
-        root.PointerExited += (_, _) => _triggerPill.Opacity = 0.72;
-        root.PointerPressed += OnTriggerPressed;
+        _root.Children.Add(_triggerPill);
+        _root.PointerEntered += (_, _) => SetHoverState(true);
+        _root.PointerExited += (_, _) => SetHoverState(false);
+        _root.PointerPressed += OnTriggerPressed;
+        _root.Tapped += OnTriggerTapped;
+        _triggerPill.PointerPressed += OnTriggerPressed;
+        _triggerPill.Tapped += OnTriggerTapped;
 
-        Content = root;
+        Content = _root;
     }
 
     public event EventHandler? TriggerRequested;
+
+    public bool IsVisible => _isVisible;
+
+    public bool IsPointerInside => _isPointerInside;
+
+    public bool IsCursorWithinReach(int x, int y, int padding)
+    {
+        if (!_isVisible) return false;
+
+        return x >= _lastLocation.X - padding &&
+               x <= _lastLocation.X + _lastSize.Width + padding &&
+               y >= _lastLocation.Y - padding &&
+               y <= _lastLocation.Y + _lastSize.Height + padding;
+    }
 
     public void ShowAt(PointInt32 location, SizeInt32 size)
     {
         EnsureConfigured(size);
         if (_appWindow is null) return;
 
+        _lastLocation = location;
+        _lastSize = size;
+        _root.Width = size.Width;
+        _root.Height = size.Height;
+        _triggerPill.Width = size.Width;
+        _triggerPill.Height = size.Height;
+
+        var hwnd = WindowNative.GetWindowHandle(this);
         _appWindow.Resize(size);
+        ApplyRoundedWindowRegion(hwnd, size);
         _appWindow.Move(location);
-        _ = ShowWindow(WindowNative.GetWindowHandle(this), ShowNoActivate);
+        _ = ShowWindow(hwnd, ShowNoActivate);
         _isVisible = true;
     }
 
@@ -106,6 +138,7 @@ public sealed class EdgeTriggerWindow : Window
 
         _ = ShowWindow(WindowNative.GetWindowHandle(this), HideWindow);
         _isVisible = false;
+        _isPointerInside = false;
     }
 
     private void EnsureConfigured(SizeInt32 size)
@@ -117,6 +150,7 @@ public sealed class EdgeTriggerWindow : Window
         var id = Win32Interop.GetWindowIdFromWindow(hwnd);
         _appWindow = AppWindow.GetFromWindowId(id);
         _appWindow.Resize(size);
+        ApplyRoundedWindowRegion(hwnd, size);
 
         if (_appWindow.Presenter is OverlappedPresenter presenter)
         {
@@ -132,12 +166,49 @@ public sealed class EdgeTriggerWindow : Window
         _isVisible = false;
     }
 
+    private void SetHoverState(bool isHovering)
+    {
+        _isPointerInside = isHovering;
+        _triggerPill.Opacity = isHovering ? 0.96 : 0.54;
+    }
+
     private void OnTriggerPressed(object sender, PointerRoutedEventArgs e)
     {
         e.Handled = true;
+        RequestTrigger();
+    }
+
+    private void OnTriggerTapped(object sender, TappedRoutedEventArgs e)
+    {
+        e.Handled = true;
+        RequestTrigger();
+    }
+
+    private void RequestTrigger()
+    {
         TriggerRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private static void ApplyRoundedWindowRegion(nint hwnd, SizeInt32 size)
+    {
+        var region = CreateRoundRectRgn(0, 0, size.Width + 1, size.Height + 1, 30, 30);
+        if (region == nint.Zero) return;
+
+        if (SetWindowRgn(hwnd, region, true) == 0)
+        {
+            _ = DeleteObject(region);
+        }
     }
 
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(nint hWnd, int nCmdShow);
+
+    [DllImport("gdi32.dll")]
+    private static extern nint CreateRoundRectRgn(int nLeftRect, int nTopRect, int nRightRect, int nBottomRect, int nWidthEllipse, int nHeightEllipse);
+
+    [DllImport("user32.dll")]
+    private static extern int SetWindowRgn(nint hWnd, nint hRgn, bool bRedraw);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteObject(nint hObject);
 }
