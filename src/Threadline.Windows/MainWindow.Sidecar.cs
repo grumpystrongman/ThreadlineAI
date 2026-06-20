@@ -123,6 +123,8 @@ public sealed partial class MainWindow
         {
             _lastFollowTarget = _floatingTriggerTarget;
             _lastForegroundWindow = _floatingTriggerTarget.Window;
+            _selectedThreadlineTarget = _floatingTriggerTarget;
+            _selectedTargetWindow = _floatingTriggerTarget.Window;
         }
 
         _sidecarCollapsedToHandle = false;
@@ -175,7 +177,7 @@ public sealed partial class MainWindow
     {
         var trigger = EnsureEdgeTriggerWindow();
 
-        if (!_sidecarWindowHiddenForTrigger || !_attachSidecarToTarget)
+        if (!_attachSidecarToTarget)
         {
             trigger.HideTrigger();
             return;
@@ -200,19 +202,22 @@ public sealed partial class MainWindow
             return;
         }
 
-        var target = GetBestSidecarTarget();
+        var activeWindow = GetCurrentNonThreadlineWindow();
+        ThreadlineTarget? target = null;
+
+        if (activeWindow is not null && activeWindow.Handle != nint.Zero && IsWindow(activeWindow.Handle))
+        {
+            target = ResolveTargetForWindow(activeWindow);
+        }
+        else if (_sidecarWindowHiddenForTrigger)
+        {
+            target = GetBestSidecarTarget();
+        }
+
         if (target is null)
         {
-            var activeWindow = GetCurrentNonThreadlineWindow();
-            if (activeWindow is null || activeWindow.Handle == nint.Zero || !IsWindow(activeWindow.Handle))
-            {
-                HideFloatingTriggerIfGraceExpired(trigger);
-                return;
-            }
-
-            target = ResolveTargetForWindow(activeWindow);
-            _lastForegroundWindow = target.Window;
-            _lastFollowTarget = target;
+            HideFloatingTriggerIfGraceExpired(trigger);
+            return;
         }
 
         var targetWindow = target.Window;
