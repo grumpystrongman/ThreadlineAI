@@ -1,10 +1,9 @@
 name: .NET
 
+# Disabled for automatic direct-to-main microbuilds.
+# Run manually from GitHub Actions when CI validation is intentionally needed.
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build-core:
