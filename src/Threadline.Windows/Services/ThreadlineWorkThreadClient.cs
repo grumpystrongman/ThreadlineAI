@@ -47,7 +47,7 @@ public sealed class ThreadlineWorkThreadClient
 
     public async Task<WorkThreadDto> ResumeWorkThreadAsync(string workThreadId, CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.PostAsync($"work-threads/{workThreadId}/resume", content: null, cancellationToken);
+        var response = await _httpClient.PostAsync($"work-threads/{workThreadId}/resume", null, cancellationToken);
         return await ReadRequiredAsync<WorkThreadDto>(response, cancellationToken);
     }
 
@@ -63,7 +63,7 @@ public sealed class ThreadlineWorkThreadClient
 
     public async Task<WorkThreadDto> CloseWorkThreadAsync(string workThreadId, CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.PostAsync($"work-threads/{workThreadId}/close", content: null, cancellationToken);
+        var response = await _httpClient.PostAsync($"work-threads/{workThreadId}/close", null, cancellationToken);
         return await ReadRequiredAsync<WorkThreadDto>(response, cancellationToken);
     }
 
