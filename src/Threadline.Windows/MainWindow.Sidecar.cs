@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Input;
 using Threadline.Windows.Services;
 using Windows.Graphics;
 using WinRT.Interop;
@@ -10,16 +11,20 @@ namespace Threadline.Windows;
 
 public sealed partial class MainWindow
 {
-    private const int SidecarDefaultWidth = 520;
-    private const int SidecarMinimumWidth = 420;
+    private const int SidecarDefaultWidth = 430;
+    private const int SidecarMinimumWidth = 360;
     private const int SidecarMinimumHeight = 620;
+    private const int SidecarHandleWidth = 44;
+    private const int SidecarHandleHeight = 180;
     private const int SidecarScreenMargin = 12;
     private const int SidecarScreenTopOffset = 40;
 
     private bool _attachSidecarToTarget = true;
+    private bool _sidecarCollapsedToHandle;
 
     private void ConfigureSidecarWindow()
     {
+        SetSidecarVisualState();
         PlaceSidecarForTarget(GetBestSidecarTarget(), "Initial sidecar placement.");
     }
 
@@ -39,6 +44,37 @@ public sealed partial class MainWindow
         }
     }
 
+    private void CollapseSidecarToHandle_Click(object sender, RoutedEventArgs e)
+    {
+        _sidecarCollapsedToHandle = true;
+        SetSidecarVisualState();
+        PlaceSidecarForTarget(GetBestSidecarTarget(), "Collapsed to edge handle.");
+        AddTimeline("Sidecar collapsed to edge handle.");
+    }
+
+    private void ExpandSidecarFromHandle(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_sidecarCollapsedToHandle) return;
+
+        _sidecarCollapsedToHandle = false;
+        SetSidecarVisualState();
+        PlaceSidecarForTarget(GetBestSidecarTarget(), "Restored from edge handle.");
+        AddTimeline("Sidecar restored from edge handle.");
+    }
+
+    private void SetSidecarVisualState()
+    {
+        try
+        {
+            EdgeHandlePanel.Visibility = _sidecarCollapsedToHandle ? Visibility.Visible : Visibility.Collapsed;
+            ChatShellPanel.Visibility = _sidecarCollapsedToHandle ? Visibility.Collapsed : Visibility.Visible;
+        }
+        catch
+        {
+            // Visual state can be requested during startup before every named XAML control is ready.
+        }
+    }
+
     private ThreadlineTarget? GetBestSidecarTarget()
     {
         if (_isTargetLocked && _lockedFollowTarget is not null) return _lockedFollowTarget;
@@ -51,13 +87,17 @@ public sealed partial class MainWindow
     {
         if (!_attachSidecarToTarget)
         {
-            DockSidecarToScreen("Sidecar: Screen dock mode. Attach is off.");
+            DockSidecarToScreen(_sidecarCollapsedToHandle
+                ? "Sidecar: Edge handle visible in screen dock mode."
+                : "Sidecar: Screen dock mode. Attach is off.");
             return;
         }
 
         if (target is null)
         {
-            DockSidecarToScreen("Sidecar: Attach mode on; waiting for a target window.");
+            DockSidecarToScreen(_sidecarCollapsedToHandle
+                ? "Sidecar: Edge handle visible; waiting for a target window."
+                : "Sidecar: Attach mode on; waiting for a target window.");
             return;
         }
 
@@ -89,14 +129,21 @@ public sealed partial class MainWindow
             var workArea = GetTargetWorkArea(sidecarId, targetWindow.Handle);
 
             var maxWidth = Math.Max(1, workArea.Width - (SidecarScreenMargin * 2));
-            var width = ClampToArea(SidecarDefaultWidth, SidecarMinimumWidth, maxWidth);
+            var width = _sidecarCollapsedToHandle
+                ? ClampToArea(SidecarHandleWidth, SidecarHandleWidth, maxWidth)
+                : ClampToArea(SidecarDefaultWidth, SidecarMinimumWidth, maxWidth);
+
             var maxHeight = Math.Max(1, workArea.Height - (SidecarScreenMargin * 2));
-            var preferredHeight = Math.Max(targetRect.Height, SidecarMinimumHeight);
-            var height = ClampToArea(preferredHeight, SidecarMinimumHeight, maxHeight);
+            var height = _sidecarCollapsedToHandle
+                ? ClampToArea(SidecarHandleHeight, SidecarHandleHeight, maxHeight)
+                : ClampToArea(Math.Max(targetRect.Height, SidecarMinimumHeight), SidecarMinimumHeight, maxHeight);
 
             var minY = workArea.Y + SidecarScreenMargin;
             var maxY = workArea.Y + workArea.Height - height - SidecarScreenMargin;
-            var y = ClampToArea(targetRect.Top, minY, Math.Max(minY, maxY));
+            var desiredY = _sidecarCollapsedToHandle
+                ? targetRect.Top + ((targetRect.Height - height) / 2)
+                : targetRect.Top;
+            var y = ClampToArea(desiredY, minY, Math.Max(minY, maxY));
 
             var rightX = targetRect.Right + SidecarScreenMargin;
             var leftX = targetRect.Left - width - SidecarScreenMargin;
@@ -112,7 +159,8 @@ public sealed partial class MainWindow
             appWindow.Move(new PointInt32(x, y));
 
             var side = x == rightX ? "right" : x == leftX ? "left" : "screen edge";
-            UpdateSidecarAttachmentStatus($"Sidecar: Attached {side} of {targetWindow.ApplicationName} — {targetTitle}. {reason}");
+            var mode = _sidecarCollapsedToHandle ? "Edge handle" : "Attached chat";
+            UpdateSidecarAttachmentStatus($"Sidecar: {mode} on {side} of {targetWindow.ApplicationName} — {targetTitle}. {reason}");
             return true;
         }
         catch
@@ -142,10 +190,20 @@ public sealed partial class MainWindow
             var id = Win32Interop.GetWindowIdFromWindow(hwnd);
             var win = AppWindow.GetFromWindowId(id);
             var area = DisplayArea.GetFromWindowId(id, DisplayAreaFallback.Nearest).WorkArea;
-            var width = ClampToArea(SidecarDefaultWidth, SidecarMinimumWidth, Math.Max(1, area.Width - (SidecarScreenMargin * 2)));
-            var height = ClampToArea(area.Height - 80, SidecarMinimumHeight, Math.Max(1, area.Height - (SidecarScreenMargin * 2)));
+            var maxWidth = Math.Max(1, area.Width - (SidecarScreenMargin * 2));
+            var maxHeight = Math.Max(1, area.Height - (SidecarScreenMargin * 2));
+            var width = _sidecarCollapsedToHandle
+                ? ClampToArea(SidecarHandleWidth, SidecarHandleWidth, maxWidth)
+                : ClampToArea(SidecarDefaultWidth, SidecarMinimumWidth, maxWidth);
+            var height = _sidecarCollapsedToHandle
+                ? ClampToArea(SidecarHandleHeight, SidecarHandleHeight, maxHeight)
+                : ClampToArea(area.Height - 80, SidecarMinimumHeight, maxHeight);
+            var y = _sidecarCollapsedToHandle
+                ? area.Y + Math.Max(SidecarScreenMargin, (area.Height - height) / 2)
+                : area.Y + SidecarScreenTopOffset;
+
             win.Resize(new SizeInt32(width, height));
-            win.Move(new PointInt32(area.X + area.Width - width - 24, area.Y + SidecarScreenTopOffset));
+            win.Move(new PointInt32(area.X + area.Width - width - 24, y));
             UpdateSidecarAttachmentStatus(status);
         }
         catch
