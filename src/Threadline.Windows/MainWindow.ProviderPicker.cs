@@ -33,6 +33,14 @@ public sealed partial class MainWindow
 
     private void ToggleDiagnostics_Click(object sender, RoutedEventArgs e)
     {
+        if (!IsDrawerOpenFor(DiagnosticsTargetPickerPanel))
+        {
+            OpenDiagnosticsTargetPickerPanel();
+            LoadOpenWindows();
+            DiagnosticsPanel.Visibility = Visibility.Visible;
+            return;
+        }
+
         DiagnosticsPanel.Visibility = DiagnosticsPanel.Visibility == Visibility.Visible
             ? Visibility.Collapsed
             : Visibility.Visible;
