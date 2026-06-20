@@ -12,6 +12,7 @@ public sealed partial class MainWindow
             _selectedThreadlineTarget = target;
             _selectedTargetWindow = target.Window;
             _lastForegroundWindow = target.Window;
+            AttachSidecarToTarget(target, force: true);
             _attachment = await _client.AttachWindowAsync(_session!.Id, target.Window);
             _lastContextSummary = await _contentResolver.ResolveAsync(_session!.Id, target);
             UpdateCurrentContextPanel(_lastContextSummary);
