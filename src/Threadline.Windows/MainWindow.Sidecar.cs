@@ -121,16 +121,16 @@ public sealed partial class MainWindow
         }
     }
 
-    private DisplayArea GetTargetWorkArea(WindowId sidecarId, nint targetHandle)
+    private RectInt32 GetTargetWorkArea(WindowId sidecarId, nint targetHandle)
     {
         try
         {
             var targetId = Win32Interop.GetWindowIdFromWindow(targetHandle);
-            return DisplayArea.GetFromWindowId(targetId, DisplayAreaFallback.Nearest);
+            return DisplayArea.GetFromWindowId(targetId, DisplayAreaFallback.Nearest).WorkArea;
         }
         catch
         {
-            return DisplayArea.GetFromWindowId(sidecarId, DisplayAreaFallback.Nearest);
+            return DisplayArea.GetFromWindowId(sidecarId, DisplayAreaFallback.Nearest).WorkArea;
         }
     }
 
