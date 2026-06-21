@@ -96,7 +96,6 @@ public enum RedactionKind
 }
 
 public sealed record RedactionFinding(RedactionKind Kind, string Label, int StartIndex, int Length);
-
 public sealed record RedactionResult(string OriginalText, string RedactedText, IReadOnlyList<RedactionFinding> Findings)
 {
     public bool WasRedacted => Findings.Count > 0;
@@ -204,14 +203,29 @@ public sealed class PromptComposer
 {
     public IReadOnlyList<LlmMessage> Compose(ThreadlinePromptContext context)
     {
-        var system = "You are Threadline, a Windows contextual AI assistant. Help the user understand their current approved work session. Use only the supplied context. If context is missing, say exactly what is missing.";
+        var system = """
+You are Threadline, a context-aware Windows sidecar assistant for real work. Your job is not to give a shallow summary. Produce useful, executive-quality analysis grounded only in the supplied approved context.
+
+Rules:
+- Use the supplied context and be explicit when context is thin or missing.
+- Never pretend you can see page text unless browser-extension context or other supplied page text is present.
+- If the source is only an app/window title, say that the browser extension is needed for deeper page-level understanding.
+- Prefer depth over speed: explain what matters, why it matters, what evidence supports it, what is uncertain, and what the user should do next.
+- Avoid generic filler. Make the answer operationally useful.
+""";
         var user = new StringBuilder();
         user.AppendLine("USER QUESTION:").AppendLine(context.UserQuestion.Trim()).AppendLine();
-        if (!string.IsNullOrWhiteSpace(context.CurrentWindow)) user.AppendLine("CURRENT WINDOW:").AppendLine(context.CurrentWindow).AppendLine();
-        if (!string.IsNullOrWhiteSpace(context.SessionSummary)) user.AppendLine("SESSION SUMMARY:").AppendLine(context.SessionSummary).AppendLine();
-        user.AppendLine("RELEVANT APPROVED EVENTS:");
-        foreach (var item in context.RelevantEvents.OrderBy(e => e.Timestamp)) user.AppendLine($"- [{item.Timestamp:u}] {item.Source}/{item.ContextType}: {Trim(item.Content, 1600)}");
-        user.AppendLine().AppendLine("ANSWER FORMAT:").AppendLine("1. Direct answer").AppendLine("2. Evidence from supplied context").AppendLine("3. Recommended next steps");
+        if (!string.IsNullOrWhiteSpace(context.CurrentWindow)) user.AppendLine("CURRENT RESOLVED CONTEXT:").AppendLine(context.CurrentWindow).AppendLine();
+        if (!string.IsNullOrWhiteSpace(context.SessionSummary)) user.AppendLine("SESSION MEMORY SUMMARY:").AppendLine(context.SessionSummary).AppendLine();
+        user.AppendLine("RECENT APPROVED EVENTS:");
+        foreach (var item in context.RelevantEvents.OrderBy(e => e.Timestamp)) user.AppendLine($"- [{item.Timestamp:u}] {item.Source}/{item.ContextType}: {Trim(item.Content, 2400)}");
+        user.AppendLine();
+        user.AppendLine("ANSWER FORMAT:");
+        user.AppendLine("1. Bottom line — the practical answer in plain English.");
+        user.AppendLine("2. What the context actually shows — cite the supplied context/events, not external knowledge.");
+        user.AppendLine("3. Deeper analysis — meaning, implications, patterns, and why this matters.");
+        user.AppendLine("4. Gaps / uncertainty — what Threadline cannot know yet, including whether browser-extension context is needed.");
+        user.AppendLine("5. Recommended next actions — concrete steps the user can take now.");
         return [LlmMessage.System(system), LlmMessage.User(user.ToString())];
     }
 
