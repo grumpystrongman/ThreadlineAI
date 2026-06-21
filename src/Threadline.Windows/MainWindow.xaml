@@ -7,9 +7,11 @@
     <Border x:Name="EdgeHandlePanel"
             Width="44"
             Visibility="Collapsed"
-            Opacity="0.82"
-            CornerRadius="12"
+            Opacity="0.90"
+            CornerRadius="14"
             BorderThickness="1"
+            BorderBrush="#D7E2F3"
+            Background="#F8FBFF"
             Padding="6"
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch"
@@ -17,53 +19,65 @@
             PointerPressed="ExpandSidecarFromHandle">
       <Grid RowDefinitions="*,Auto,*">
         <StackPanel Grid.Row="1" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
-          <TextBlock Text="✦" FontSize="18" HorizontalAlignment="Center" />
-          <TextBlock Text="AI" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" />
+          <TextBlock Text="◉" FontSize="18" Foreground="#2563EB" HorizontalAlignment="Center" />
+          <TextBlock Text="AI" FontSize="12" FontWeight="SemiBold" Foreground="#111827" HorizontalAlignment="Center" />
         </StackPanel>
       </Grid>
     </Border>
 
     <Grid x:Name="ChatShellPanel"
           Grid.Column="1"
-          Padding="12"
+          Background="#F8FAFF"
           HorizontalAlignment="Stretch"
           VerticalAlignment="Stretch">
-      <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto"
+      <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto"
             RowSpacing="8"
+            Padding="14"
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch">
-        <Border Grid.Row="0" BorderThickness="1" CornerRadius="12" Padding="10">
-          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-            <StackPanel Spacing="3">
-              <TextBlock Text="Work Thread" FontSize="19" FontWeight="SemiBold" />
-              <TextBlock x:Name="WorkThreadStatusText"
-                         Text="Work Thread: loading..."
-                         TextWrapping="WrapWholeWords"
-                         MaxLines="2"
-                         FontSize="12"
-                         FontWeight="SemiBold"
-                         Opacity="0.84" />
+
+        <Border Grid.Row="0" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="18" Padding="14,12">
+          <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Border Width="30" Height="30" CornerRadius="15" Background="#EEF5FF" BorderBrush="#C8DBFF" BorderThickness="1">
+                  <TextBlock Text="◉" FontSize="18" Foreground="#2563EB" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Text="ThreadlineAI" FontSize="18" FontWeight="SemiBold" Foreground="#111827" VerticalAlignment="Center" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                <Button x:Name="AttachSidecarButton" Content="Screen Dock" Click="ToggleAttachSidecar_Click" FontSize="12" Padding="8,4" />
+                <Button Content="×" Click="CollapseSidecarToHandle_Click" FontSize="16" Padding="8,2" />
+              </StackPanel>
+            </Grid>
+
+            <StackPanel Grid.Row="1" Spacing="2">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <TextBlock x:Name="WorkThreadStatusText"
+                           Text="Q2 Product Strategy Review"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Foreground="#111827"
+                           TextWrapping="WrapWholeWords"
+                           MaxLines="1" />
+                <TextBlock Grid.Column="1" Text="✎" FontSize="13" Foreground="#6B7280" VerticalAlignment="Center" />
+              </Grid>
               <TextBox x:Name="WorkThreadTitleBox"
                        PlaceholderText="Name this work thread..."
-                       MinWidth="220"
-                       MaxWidth="440"
                        FontSize="11"
-                       TextWrapping="NoWrap" />
-              <TextBlock x:Name="CurrentWindowText"
-                         Text="Finding active context..."
-                         TextWrapping="WrapWholeWords"
-                         MaxLines="2"
-                         FontSize="12"
-                         Opacity="0.76" />
+                       TextWrapping="NoWrap"
+                       BorderThickness="0"
+                       Background="Transparent"
+                       Foreground="#4B5563" />
               <TextBlock x:Name="SidecarAttachmentText"
-                         Text="Sidecar: Attach mode on; waiting for a target window."
+                         Text="Sidecar: attached to active work."
                          TextWrapping="WrapWholeWords"
                          MaxLines="2"
                          FontSize="11"
-                         Opacity="0.62" />
+                         Foreground="#6B7280" />
             </StackPanel>
 
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
               <Button Content="Sessions" Click="ToggleSessionManagerPanel_Click" FontSize="12" Padding="8,4" />
               <Button Content="Settings" Click="ToggleProviderSettingsPanel_Click" FontSize="12" Padding="8,4" />
               <Button Content="Tools" Click="ToggleDiagnosticsTargetPickerPanel_Click" FontSize="12" Padding="8,4" />
@@ -74,8 +88,10 @@
 
         <Border x:Name="SessionBindingPanel"
                 Grid.Row="1"
+                Background="#FFF7ED"
+                BorderBrush="#FED7AA"
                 BorderThickness="1"
-                CornerRadius="12"
+                CornerRadius="14"
                 Padding="10"
                 Visibility="Collapsed">
           <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
@@ -84,7 +100,7 @@
                        TextWrapping="WrapWholeWords"
                        MaxLines="3"
                        FontSize="11"
-                       Opacity="0.82" />
+                       Foreground="#7C2D12" />
             <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
               <Button Content="Connect Current" Click="ConnectPendingTargetToCurrentSession_Click" FontSize="12" Padding="8,4" />
               <Button Content="New Window Session" Click="StartNewSessionForPendingTarget_Click" FontSize="12" Padding="8,4" />
@@ -93,66 +109,64 @@
           </Grid>
         </Border>
 
-        <Border x:Name="CurrentContextPanel" Grid.Row="2" BorderThickness="1" CornerRadius="12" Padding="10">
-          <Grid RowDefinitions="Auto,Auto" RowSpacing="4">
+        <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="8">
+          <Border Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="14" Padding="10">
+            <StackPanel Spacing="4">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="Work Thread" FontSize="11" FontWeight="SemiBold" Foreground="#111827" />
+                <Border CornerRadius="8" Background="#ECFDF3" Padding="6,1">
+                  <TextBlock Text="● Active" FontSize="10" Foreground="#16A34A" />
+                </Border>
+              </StackPanel>
+              <TextBlock Text="Resumed 2m ago" FontSize="11" Foreground="#6B7280" />
+            </StackPanel>
+          </Border>
+
+          <Border x:Name="CurrentContextPanel" Grid.Column="1" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="14" Padding="10">
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-              <Border x:Name="ContextStatusPill"
-                      BorderThickness="1"
-                      CornerRadius="10"
-                      Padding="8,2"
-                      VerticalAlignment="Center">
-                <TextBlock x:Name="ContextStatusText"
-                           Text="No context"
-                           FontSize="11"
-                           Opacity="0.82" />
+              <Border x:Name="ContextStatusPill" Width="32" Height="32" CornerRadius="16" Background="#EEF5FF">
+                <TextBlock x:Name="ContextStatusText" Text="◉" Foreground="#2563EB" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Border>
-              <TextBlock Grid.Column="1"
-                         Text="Connected context"
-                         FontSize="12"
-                         FontWeight="SemiBold"
-                         Opacity="0.78"
-                         VerticalAlignment="Center" />
+              <StackPanel Grid.Column="1" Spacing="2">
+                <TextBlock Text="Connected context" FontSize="11" FontWeight="SemiBold" Foreground="#111827" />
+                <TextBlock x:Name="CurrentContextText"
+                           Text="12 sources • High confidence"
+                           TextWrapping="WrapWholeWords"
+                           MaxLines="2"
+                           FontSize="11"
+                           Foreground="#6B7280" />
+              </StackPanel>
             </Grid>
+          </Border>
+        </Grid>
 
-            <TextBlock x:Name="CurrentContextText"
-                       Grid.Row="1"
-                       Text="No resolved context yet. Threadline will use the app or tab it is attached to."
-                       TextWrapping="WrapWholeWords"
-                       MaxLines="3"
-                       FontSize="11"
-                       Opacity="0.78" />
-          </Grid>
-        </Border>
-
-        <Border Grid.Row="3" BorderThickness="1" CornerRadius="12" Padding="0">
+        <Border Grid.Row="3" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="18" Padding="0">
           <ScrollViewer x:Name="TranscriptScrollViewer"
                         VerticalScrollBarVisibility="Auto"
                         VerticalScrollMode="Enabled"
                         HorizontalScrollBarVisibility="Disabled"
                         HorizontalScrollMode="Disabled"
                         ZoomMode="Disabled"
-                        Padding="8,6,8,12">
+                        Padding="10,8,10,12">
             <ItemsControl x:Name="TranscriptList">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                  <Border BorderThickness="1"
-                          CornerRadius="10"
-                          Padding="10"
-                          Margin="0,4,0,4"
+                  <Border Background="#FFFFFF"
+                          BorderBrush="#E5EDF8"
+                          BorderThickness="1"
+                          CornerRadius="14"
+                          Padding="12"
+                          Margin="0,5,0,5"
                           HorizontalAlignment="Stretch">
-                    <StackPanel Spacing="4">
+                    <StackPanel Spacing="6">
                       <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Text="{Binding Speaker}"
-                                   FontWeight="SemiBold"
-                                   Opacity="0.90" />
-                        <TextBlock Grid.Column="1"
-                                   Text="{Binding TimestampDisplay}"
-                                   FontSize="11"
-                                   Opacity="0.58" />
+                        <TextBlock Text="{Binding Speaker}" FontSize="12" FontWeight="SemiBold" Foreground="#111827" />
+                        <TextBlock Grid.Column="1" Text="{Binding TimestampDisplay}" FontSize="11" Foreground="#6B7280" />
                       </Grid>
                       <TextBlock Text="{Binding Message}"
                                  TextWrapping="WrapWholeWords"
-                                 IsTextSelectionEnabled="True" />
+                                 IsTextSelectionEnabled="True"
+                                 Foreground="#111827" />
                     </StackPanel>
                   </Border>
                 </DataTemplate>
@@ -161,32 +175,99 @@
           </ScrollViewer>
         </Border>
 
-        <Border Grid.Row="4" BorderThickness="1" CornerRadius="12" Padding="8">
-          <Grid RowDefinitions="*,Auto,Auto" RowSpacing="6">
+        <Border Grid.Row="4" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="16" Padding="10">
+          <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Spacing="2">
+                <TextBlock Text="Context Receipt" FontSize="12" FontWeight="SemiBold" Foreground="#111827" />
+                <TextBlock Text="Shows exactly what Threadline used, skipped, and trusted." FontSize="11" Foreground="#6B7280" TextWrapping="WrapWholeWords" />
+              </StackPanel>
+              <Button Grid.Column="1" Content="View details ›" FontSize="12" Padding="8,4" />
+            </Grid>
+            <Grid Grid.Row="1" ColumnDefinitions="*,*,*" ColumnSpacing="6">
+              <Border Background="#F8FAFF" BorderBrush="#E5EDF8" BorderThickness="1" CornerRadius="12" Padding="8">
+                <StackPanel>
+                  <TextBlock Text="12" FontWeight="SemiBold" Foreground="#111827" />
+                  <TextBlock Text="Used sources" FontSize="11" Foreground="#6B7280" />
+                </StackPanel>
+              </Border>
+              <Border Grid.Column="1" Background="#F8FAFF" BorderBrush="#E5EDF8" BorderThickness="1" CornerRadius="12" Padding="8">
+                <StackPanel>
+                  <TextBlock Text="3" FontWeight="SemiBold" Foreground="#111827" />
+                  <TextBlock Text="Not used" FontSize="11" Foreground="#6B7280" />
+                </StackPanel>
+              </Border>
+              <Border Grid.Column="2" Background="#F8FAFF" BorderBrush="#E5EDF8" BorderThickness="1" CornerRadius="12" Padding="8">
+                <StackPanel>
+                  <TextBlock Text="High" FontWeight="SemiBold" Foreground="#111827" />
+                  <TextBlock Text="Confidence" FontSize="11" Foreground="#6B7280" />
+                </StackPanel>
+              </Border>
+            </Grid>
+          </Grid>
+        </Border>
+
+        <Border Grid.Row="5" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="18" Padding="10">
+          <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
             <TextBox x:Name="QuestionBox"
-                     PlaceholderText="Ask about this app, tab, document, or workflow..."
+                     PlaceholderText="Ask anything about this work thread..."
                      AcceptsReturn="True"
-                     MinHeight="78"
+                     MinHeight="68"
                      TextWrapping="Wrap"
-                     BorderThickness="0" />
-            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6">
-              <TextBlock Text="Artifact actions" FontSize="11" Opacity="0.68" VerticalAlignment="Center" />
-              <Button Content="Summary" Click="CreateSummaryArtifact_Click" FontSize="12" Padding="8,4" />
-              <Button Content="Handoff" Click="CreateHandoffArtifact_Click" FontSize="12" Padding="8,4" />
-              <Button Content="Decisions" Click="CreateDecisionsArtifact_Click" FontSize="12" Padding="8,4" />
-              <Button Content="Risks" Click="CreateRisksArtifact_Click" FontSize="12" Padding="8,4" />
-              <Button Content="Next Actions" Click="CreateNextActionsArtifact_Click" FontSize="12" Padding="8,4" />
+                     BorderThickness="0"
+                     Background="Transparent" />
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="📎" FontSize="14" Foreground="#4B5563" />
+              <TextBlock Text="@" FontSize="14" Foreground="#4B5563" />
+              <TextBlock Text="▣" FontSize="14" Foreground="#4B5563" />
+              <TextBlock Text="⌁" FontSize="14" Foreground="#4B5563" />
+              <TextBlock Text="🌐" FontSize="14" Foreground="#4B5563" />
+              <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+                <Button Content="Copy Last" Click="CopyLastAnswer_Click" FontSize="12" Padding="8,4" />
+                <Button Content="Ask" Click="TrustedAsk_Click" FontSize="12" Padding="14,4" />
+              </StackPanel>
             </StackPanel>
-            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6">
-              <Button Content="Copy Last" Click="CopyLastAnswer_Click" FontSize="12" Padding="8,4" />
-              <Button Content="Copy All" Click="CopyConversation_Click" FontSize="12" Padding="8,4" />
-              <Button Content="Clear" Click="ClearTranscript_Click" FontSize="12" Padding="8,4" />
-              <Button Content="Ask" Click="TrustedAsk_Click" FontSize="12" Padding="12,4" />
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="6">
+              <Button Content="Summary" Click="CreateSummaryArtifact_Click" FontSize="11" Padding="8,4" />
+              <Button Content="Handoff" Click="CreateHandoffArtifact_Click" FontSize="11" Padding="8,4" />
+              <Button Content="Decisions" Click="CreateDecisionsArtifact_Click" FontSize="11" Padding="8,4" />
+              <Button Content="Risks" Click="CreateRisksArtifact_Click" FontSize="11" Padding="8,4" />
+              <Button Content="Next Actions" Click="CreateNextActionsArtifact_Click" FontSize="11" Padding="8,4" />
+              <Button Content="Clear" Click="ClearTranscript_Click" FontSize="11" Padding="8,4" />
             </StackPanel>
           </Grid>
         </Border>
 
-        <ListView x:Name="TimelineList" Grid.Row="5" Height="28" FontSize="10" />
+        <Border Grid.Row="6" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="18" Padding="10">
+          <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Text="Privacy &amp; Trust" FontSize="13" FontWeight="SemiBold" Foreground="#111827" />
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5">
+                <TextBlock Text="●" Foreground="#16A34A" />
+                <TextBlock Text="Protected" FontSize="12" FontWeight="SemiBold" Foreground="#16A34A" />
+              </StackPanel>
+            </Grid>
+            <StackPanel Grid.Row="1" Spacing="4">
+              <CheckBox x:Name="AllowProviderContextToggle" Content="Send resolved context to provider" IsChecked="True" FontSize="12" Foreground="#374151" />
+              <CheckBox x:Name="SaveWorkThreadMemoryToggle" Content="Save Work Thread memory" IsChecked="True" FontSize="12" Foreground="#374151" />
+              <CheckBox x:Name="ShowContextReceiptsToggle" Content="Show Context Receipts" IsChecked="True" FontSize="12" Foreground="#374151" />
+              <TextBlock x:Name="TrustControlStatusText"
+                         Text="Blocked sources stay out of provider prompts. Receipts show what was used and what was not used."
+                         TextWrapping="WrapWholeWords"
+                         FontSize="11"
+                         Foreground="#6B7280" />
+            </StackPanel>
+            <Grid Grid.Row="2" ColumnDefinitions="*,Auto" BorderBrush="#E5EDF8" BorderThickness="0,1,0,0" Padding="0,8,0,0">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="● Memory on" FontSize="11" Foreground="#16A34A" />
+                <TextBlock Text="Resumed 10:24 AM" FontSize="11" Foreground="#6B7280" />
+              </StackPanel>
+              <TextBlock Grid.Column="1" Text="✓ Auto-saved" FontSize="11" Foreground="#16A34A" />
+            </Grid>
+          </Grid>
+        </Border>
+
+        <ListView x:Name="TimelineList" Grid.Row="6" Height="1" Visibility="Collapsed" />
       </Grid>
 
       <Border x:Name="ShellOverlayPanel"
@@ -194,68 +275,32 @@
               MaxWidth="430"
               HorizontalAlignment="Right"
               VerticalAlignment="Stretch"
+              Background="#FFFFFF"
+              BorderBrush="#DCE6F5"
               BorderThickness="1"
-              CornerRadius="14"
+              CornerRadius="18"
               Padding="10"
               Visibility="Collapsed">
         <Grid RowDefinitions="Auto,*" RowSpacing="8">
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-            <TextBlock x:Name="ShellOverlayTitleText"
-                       Text="Panel"
-                       FontSize="16"
-                       FontWeight="SemiBold"
-                       VerticalAlignment="Center" />
+            <TextBlock x:Name="ShellOverlayTitleText" Text="Panel" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
             <Button Grid.Column="1" Content="Close" Click="CloseShellOverlayPanel_Click" FontSize="12" Padding="8,4" />
           </Grid>
-
           <Grid Grid.Row="1">
-            <Border x:Name="WorkThreadSessionManagerPanel"
-                    BorderThickness="1"
-                    CornerRadius="12"
-                    Padding="10"
-                    Visibility="Collapsed">
+            <Border x:Name="WorkThreadSessionManagerPanel" BorderThickness="1" BorderBrush="#E5EDF8" CornerRadius="12" Padding="10" Visibility="Collapsed">
               <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                   <StackPanel>
                     <TextBlock Text="Sessions" FontSize="14" FontWeight="SemiBold" />
-                    <TextBlock x:Name="WorkThreadListStatusText"
-                               Text="Refresh to see recent Work Threads."
-                               TextWrapping="WrapWholeWords"
-                               MaxLines="2"
-                               FontSize="11"
-                               Opacity="0.72" />
+                    <TextBlock x:Name="WorkThreadListStatusText" Text="Refresh to see recent Work Threads." TextWrapping="WrapWholeWords" MaxLines="2" FontSize="11" Opacity="0.72" />
                   </StackPanel>
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
                     <Button Content="Refresh" Click="RefreshWorkThreads_Click" FontSize="12" Padding="8,4" />
                     <Button Content="Resume" Click="ResumeSelectedWorkThread_Click" FontSize="12" Padding="8,4" />
                   </StackPanel>
                 </Grid>
-
-                <ListView x:Name="WorkThreadList"
-                          Grid.Row="1"
-                          Height="160"
-                          SelectionMode="Single"
-                          SelectionChanged="WorkThreadList_SelectionChanged"
-                          FontSize="11"
-                          HorizontalContentAlignment="Stretch">
-                  <ListView.ItemTemplate>
-                    <DataTemplate>
-                      <TextBlock Text="{Binding}"
-                                 FontSize="11"
-                                 TextWrapping="WrapWholeWords"
-                                 MaxLines="3"
-                                 Opacity="0.88"
-                                 Margin="0,2" />
-                    </DataTemplate>
-                  </ListView.ItemTemplate>
-                </ListView>
-
-                <TextBox x:Name="SessionManagerTitleBox"
-                         Grid.Row="2"
-                         PlaceholderText="Rename selected or active Work Thread..."
-                         FontSize="11"
-                         TextWrapping="NoWrap" />
-
+                <ListView x:Name="WorkThreadList" Grid.Row="1" Height="160" SelectionMode="Single" SelectionChanged="WorkThreadList_SelectionChanged" FontSize="11" HorizontalContentAlignment="Stretch" />
+                <TextBox x:Name="SessionManagerTitleBox" Grid.Row="2" PlaceholderText="Rename selected or active Work Thread..." FontSize="11" TextWrapping="NoWrap" />
                 <StackPanel Grid.Row="3" Spacing="6">
                   <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
                     <Button Content="New Thread" Click="NewWorkThread_Click" FontSize="12" Padding="8,4" />
@@ -268,43 +313,26 @@
                     <Button Content="Detach Window" Click="DetachCurrentWindowFromWorkThread_Click" FontSize="12" Padding="8,4" />
                   </StackPanel>
                 </StackPanel>
-
-                <TextBlock x:Name="WorkThreadSelectedText"
-                           Grid.Row="4"
-                           Text="Selected: none"
-                           TextWrapping="WrapWholeWords"
-                           MaxLines="2"
-                           FontSize="11"
-                           Opacity="0.72" />
+                <TextBlock x:Name="WorkThreadSelectedText" Grid.Row="4" Text="Selected: none" TextWrapping="WrapWholeWords" MaxLines="2" FontSize="11" Opacity="0.72" />
               </Grid>
             </Border>
 
-            <Border x:Name="ProviderSettingsPanel"
-                    BorderThickness="1"
-                    CornerRadius="12"
-                    Padding="10"
-                    Visibility="Collapsed">
+            <Border x:Name="ProviderSettingsPanel" BorderThickness="1" BorderBrush="#E5EDF8" CornerRadius="12" Padding="10" Visibility="Collapsed">
               <Grid RowDefinitions="Auto,Auto,*" RowSpacing="8">
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                   <StackPanel>
                     <TextBlock Text="Provider Settings" FontSize="16" FontWeight="SemiBold" />
-                    <TextBlock Text="This panel stays open while you copy and paste provider details." TextWrapping="WrapWholeWords" FontSize="11" Opacity="0.72" />
+                    <TextBlock Text="Provider configuration stays here. Privacy and trust controls are now always visible in the sidecar footer." TextWrapping="WrapWholeWords" FontSize="11" Opacity="0.72" />
                   </StackPanel>
                   <Button Grid.Column="1" Content="Close" Click="CloseProviderSettingsPanel_Click" FontSize="12" Padding="8,4" VerticalAlignment="Top" />
                 </Grid>
-
                 <Grid Grid.Row="1" RowDefinitions="Auto,Auto" RowSpacing="8">
-                  <TextBlock x:Name="ProviderSettingsStatusText"
-                             Text="Provider settings not saved yet."
-                             TextWrapping="WrapWholeWords"
-                             FontSize="11"
-                             Opacity="0.82" />
+                  <TextBlock x:Name="ProviderSettingsStatusText" Text="Provider settings not saved yet." TextWrapping="WrapWholeWords" FontSize="11" Opacity="0.82" />
                   <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                     <Button Content="Use Defaults" Click="UseProviderDefaults_Click" FontSize="12" Padding="8,4" />
                     <Button Content="Save Provider" Click="SaveProviderSettings_Click" FontSize="12" Padding="10,4" />
                   </StackPanel>
                 </Grid>
-
                 <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
                   <StackPanel Spacing="8">
                     <TextBlock Text="Chat provider" FontWeight="SemiBold" Margin="0,4,0,0" />
@@ -316,7 +344,6 @@
                       <ComboBoxItem Content="OpenRouter" />
                       <ComboBoxItem Content="Local" />
                     </ComboBox>
-
                     <TextBlock Text="Settings provider" FontWeight="SemiBold" Margin="0,4,0,0" />
                     <ComboBox x:Name="SettingsProviderBox" SelectedIndex="0" SelectionChanged="SettingsProviderBox_SelectionChanged" HorizontalAlignment="Stretch">
                       <ComboBoxItem Content="OpenAI" />
@@ -326,88 +353,37 @@
                       <ComboBoxItem Content="OpenRouter" />
                       <ComboBoxItem Content="Local" />
                     </ComboBox>
-
                     <TextBox x:Name="ProviderBaseUrlBox" Header="Base URL" PlaceholderText="https://api.openai.com/v1/" TextWrapping="NoWrap" />
                     <TextBox x:Name="ProviderModelBox" Header="Default model" PlaceholderText="gpt-4.1-mini" TextWrapping="NoWrap" />
                     <PasswordBox x:Name="ProviderApiKeyBox" Header="API key" PlaceholderText="Stored through Threadline local secret storage" />
-                    <TextBlock x:Name="ProviderSettingsHintText"
-                               Text="For OpenAI, paste your API key once, then click Save Provider. The key is stored by the local Threadline service."
-                               TextWrapping="WrapWholeWords"
-                               FontSize="11"
-                               Opacity="0.74" />
-
-                    <TextBlock Text="Privacy / trust controls" FontWeight="SemiBold" Margin="0,8,0,0" />
-                    <CheckBox x:Name="AllowProviderContextToggle"
-                              Content="Send resolved context to provider"
-                              IsChecked="True"
-                              FontSize="12" />
-                    <CheckBox x:Name="SaveWorkThreadMemoryToggle"
-                              Content="Save messages and context to Work Thread memory"
-                              IsChecked="True"
-                              FontSize="12" />
-                    <CheckBox x:Name="ShowContextReceiptsToggle"
-                              Content="Show Context Receipt under answers"
-                              IsChecked="True"
-                              FontSize="12" />
-                    <TextBlock x:Name="TrustControlStatusText"
-                               Text="Blocked sources stay out of provider prompts. Receipts show what was used and what was not used."
-                               TextWrapping="WrapWholeWords"
-                               FontSize="11"
-                               Opacity="0.74" />
+                    <TextBlock x:Name="ProviderSettingsHintText" Text="For OpenAI, paste your API key once, then click Save Provider. The key is stored by the local Threadline service." TextWrapping="WrapWholeWords" FontSize="11" Opacity="0.74" />
                   </StackPanel>
                 </ScrollViewer>
               </Grid>
             </Border>
 
-            <Border x:Name="DiagnosticsTargetPickerPanel"
-                    BorderThickness="1"
-                    CornerRadius="12"
-                    Padding="10"
-                    Visibility="Collapsed">
+            <Border x:Name="DiagnosticsTargetPickerPanel" BorderThickness="1" BorderBrush="#E5EDF8" CornerRadius="12" Padding="10" Visibility="Collapsed">
               <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Spacing="8">
                   <TextBlock Text="Diagnostics / Target Picker" FontSize="16" FontWeight="SemiBold" />
                   <TextBlock x:Name="ServiceStatusText" Text="Service: unknown" TextWrapping="WrapWholeWords" FontSize="11" Opacity="0.72" />
                   <TextBlock x:Name="SessionText" Text="No active Threadline session." TextWrapping="WrapWholeWords" FontSize="11" Opacity="0.72" />
-
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <Button Content="New Chat" Click="NewChat_Click" FontSize="12" Padding="8,4" />
                     <Button Content="Use Session" Click="UseActiveSession_Click" FontSize="12" Padding="8,4" />
                     <Button Content="Start Session" Click="StartSession_Click" FontSize="12" Padding="8,4" />
                     <Button Content="Check" Click="CheckService_Click" FontSize="12" Padding="8,4" />
                   </StackPanel>
-
                   <TextBlock Text="Target picker" FontWeight="SemiBold" Margin="0,6,0,0" />
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <Button Content="Refresh" Click="RefreshOpenWindows_Click" FontSize="12" Padding="8,4" />
                     <Button Content="Use" Click="UseSelectedTarget_Click" FontSize="12" Padding="8,4" />
                     <Button Content="Follow / Lock" Click="ToggleFollowLock_Click" FontSize="12" Padding="8,4" />
                   </StackPanel>
-                  <ListView x:Name="OpenWindowsList"
-                            Height="190"
-                            SelectionMode="Single"
-                            FontSize="11"
-                            HorizontalContentAlignment="Stretch">
-                    <ListView.ItemTemplate>
-                      <DataTemplate>
-                        <TextBlock Text="{Binding}"
-                                   FontSize="11"
-                                   TextWrapping="WrapWholeWords"
-                                   MaxLines="3"
-                                   Opacity="0.86"
-                                   Margin="0,2" />
-                      </DataTemplate>
-                    </ListView.ItemTemplate>
-                  </ListView>
-
-                  <Border x:Name="DiagnosticsPanel" BorderThickness="1" CornerRadius="8" Padding="6" Visibility="Collapsed">
-                    <TextBlock x:Name="DiagnosticsText"
-                               Text="No diagnostics yet."
-                               TextWrapping="WrapWholeWords"
-                               FontSize="10"
-                               Opacity="0.82" />
+                  <ListView x:Name="OpenWindowsList" Height="190" SelectionMode="Single" FontSize="11" HorizontalContentAlignment="Stretch" />
+                  <Border x:Name="DiagnosticsPanel" BorderThickness="1" BorderBrush="#E5EDF8" CornerRadius="8" Padding="6" Visibility="Collapsed">
+                    <TextBlock x:Name="DiagnosticsText" Text="No diagnostics yet." TextWrapping="WrapWholeWords" FontSize="10" Opacity="0.82" />
                   </Border>
-
                   <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
                     <Button Content="Diagnostics" Click="ToggleDiagnostics_Click" FontSize="12" Padding="8,4" />
                     <Button Content="Clear Context" Click="ClearSharedContext_Click" FontSize="12" Padding="8,4" />
