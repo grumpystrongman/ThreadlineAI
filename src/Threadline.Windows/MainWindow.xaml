@@ -2,45 +2,44 @@
     x:Class="Threadline.Windows.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Title="ThreadlineAI Sidecar"
-    RequestedTheme="Light">
-
-  <Window.Resources>
-    <!-- Keep custom sidecar buttons readable through WinUI hover/pressed states. -->
-    <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#111827" />
-    <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#111827" />
-    <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="#9CA3AF" />
-    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#EAF2FF" />
-    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#DBEAFE" />
-    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#9DB7DD" />
-    <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#7EA2D6" />
-
-    <Style x:Key="SidecarButtonStyle" TargetType="Button">
-      <Setter Property="Foreground" Value="#111827" />
-      <Setter Property="Background" Value="#F8FAFF" />
-      <Setter Property="BorderBrush" Value="#DCE6F5" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="Padding" Value="7,4" />
-      <Setter Property="FontSize" Value="11" />
-      <Setter Property="MinHeight" Value="30" />
-      <Setter Property="CornerRadius" Value="4" />
-    </Style>
-
-    <Style x:Key="PrimarySidecarButtonStyle" TargetType="Button" BasedOn="{StaticResource SidecarButtonStyle}">
-      <Setter Property="Foreground" Value="#FFFFFF" />
-      <Setter Property="Background" Value="#2563EB" />
-      <Setter Property="BorderBrush" Value="#1D4ED8" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-    </Style>
-
-    <Style x:Key="WarmSidecarButtonStyle" TargetType="Button" BasedOn="{StaticResource SidecarButtonStyle}">
-      <Setter Property="Foreground" Value="#7C2D12" />
-      <Setter Property="Background" Value="#FFEDD5" />
-      <Setter Property="BorderBrush" Value="#FDBA74" />
-    </Style>
-  </Window.Resources>
+    Title="ThreadlineAI Sidecar">
 
   <Grid x:Name="RootShell" ColumnDefinitions="Auto,*" Background="#F8FAFF">
+    <Grid.Resources>
+      <!-- Keep custom sidecar buttons readable through WinUI hover/pressed states. -->
+      <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#111827" />
+      <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#111827" />
+      <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="#9CA3AF" />
+      <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#EAF2FF" />
+      <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#DBEAFE" />
+      <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#9DB7DD" />
+      <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#7EA2D6" />
+
+      <Style x:Key="SidecarButtonStyle" TargetType="Button">
+        <Setter Property="Foreground" Value="#111827" />
+        <Setter Property="Background" Value="#F8FAFF" />
+        <Setter Property="BorderBrush" Value="#DCE6F5" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="7,4" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="CornerRadius" Value="4" />
+      </Style>
+
+      <Style x:Key="PrimarySidecarButtonStyle" TargetType="Button" BasedOn="{StaticResource SidecarButtonStyle}">
+        <Setter Property="Foreground" Value="#FFFFFF" />
+        <Setter Property="Background" Value="#2563EB" />
+        <Setter Property="BorderBrush" Value="#1D4ED8" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+      </Style>
+
+      <Style x:Key="WarmSidecarButtonStyle" TargetType="Button" BasedOn="{StaticResource SidecarButtonStyle}">
+        <Setter Property="Foreground" Value="#7C2D12" />
+        <Setter Property="Background" Value="#FFEDD5" />
+        <Setter Property="BorderBrush" Value="#FDBA74" />
+      </Style>
+    </Grid.Resources>
+
     <Border x:Name="EdgeHandlePanel"
             Width="44"
             Visibility="Collapsed"
