@@ -1,16 +1,80 @@
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Windows.Graphics;
+using WinRT.Interop;
 
 namespace Threadline.Windows;
 
 public sealed partial class MainWindow
 {
     private bool _sidecarSessionBootstrapStarted;
+    private bool _fallbackEdgeTriggerStarted;
+    private readonly DispatcherTimer _fallbackEdgeTriggerTimer = new();
 
     private async void RootShell_Loaded(object sender, RoutedEventArgs e)
     {
+        StartFallbackFloatingTriggerTimer();
+
         if (_sidecarSessionBootstrapStarted) return;
         _sidecarSessionBootstrapStarted = true;
         await RunUiActionAsync(EnsureSidecarSessionReadyAsync);
+    }
+
+    private void StartFallbackFloatingTriggerTimer()
+    {
+        if (_fallbackEdgeTriggerStarted) return;
+
+        _fallbackEdgeTriggerStarted = true;
+        _fallbackEdgeTriggerTimer.Interval = TimeSpan.FromMilliseconds(300);
+        _fallbackEdgeTriggerTimer.Tick += (_, _) => SafeEnsureFallbackFloatingTriggerVisible();
+        _fallbackEdgeTriggerTimer.Start();
+    }
+
+    private void SafeEnsureFallbackFloatingTriggerVisible()
+    {
+        try
+        {
+            EnsureFallbackFloatingTriggerVisible();
+        }
+        catch
+        {
+            // The floating trigger is a recovery path. It should never break the sidecar UI.
+        }
+    }
+
+    private void EnsureFallbackFloatingTriggerVisible()
+    {
+        var trigger = EnsureEdgeTriggerWindow();
+
+        if (!_sidecarWindowHiddenForTrigger || !_attachSidecarToTarget)
+        {
+            trigger.HideTrigger();
+            return;
+        }
+
+        var hasCursor = GetCursorPos(out var cursor);
+        if (hasCursor && trigger.IsVisible && trigger.IsCursorWithinReach(cursor.X, cursor.Y, 420))
+        {
+            _lastFloatingTriggerEligibleAt = DateTimeOffset.Now;
+            return;
+        }
+
+        var hwnd = WindowNative.GetWindowHandle(this);
+        var id = Win32Interop.GetWindowIdFromWindow(hwnd);
+        var area = DisplayArea.GetFromWindowId(id, DisplayAreaFallback.Nearest).WorkArea;
+
+        const int triggerWidth = 64;
+        const int triggerHeight = 144;
+        const int margin = 12;
+
+        var x = area.X + area.Width - triggerWidth - margin;
+        var y = hasCursor
+            ? ClampToArea(cursor.Y - (triggerHeight / 2), area.Y + margin, area.Y + area.Height - triggerHeight - margin)
+            : area.Y + ((area.Height - triggerHeight) / 2);
+
+        _floatingTriggerTarget ??= GetBestSidecarTarget();
+        _lastFloatingTriggerEligibleAt = DateTimeOffset.Now;
+        trigger.ShowAt(new PointInt32(x, y), new SizeInt32(triggerWidth, triggerHeight));
     }
 
     private async Task EnsureSidecarSessionReadyAsync()
