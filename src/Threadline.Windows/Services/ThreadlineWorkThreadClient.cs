@@ -103,6 +103,22 @@ public sealed class ThreadlineWorkThreadClient
         return await ReadRequiredAsync<ContextReceiptDto>(response, cancellationToken);
     }
 
+    public async Task<WorkArtifactDto> SaveArtifactAsync(string workThreadId, string artifactType, string title, string content, string? contextReceiptId = null, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync(
+            $"work-threads/{workThreadId}/artifacts",
+            new { artifactType, title, content, contextReceiptId },
+            _jsonOptions,
+            cancellationToken);
+        return await ReadRequiredAsync<WorkArtifactDto>(response, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<WorkArtifactDto>> GetArtifactsAsync(string workThreadId, int take = 25, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.GetAsync($"work-threads/{workThreadId}/artifacts?take={take}", cancellationToken);
+        return await ReadRequiredAsync<List<WorkArtifactDto>>(response, cancellationToken);
+    }
+
     private async Task<T> ReadRequiredAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         await EnsureSuccessAsync(response, cancellationToken);
@@ -121,3 +137,4 @@ public sealed class ThreadlineWorkThreadClient
 public sealed record WorkThreadDto(string Id, string Title, string? Description, string Status, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, DateTimeOffset? ClosedAt, DateTimeOffset? LastResumedAt);
 public sealed record ConversationMessageDto(string Id, string WorkThreadId, string Role, string Content, DateTimeOffset CreatedAt, string? ContextReceiptId);
 public sealed record ContextReceiptDto(string Id, string WorkThreadId, string UsedSourcesJson, string? NotUsedSourcesJson, string? Limitations, DateTimeOffset CreatedAt);
+public sealed record WorkArtifactDto(string Id, string WorkThreadId, string ArtifactType, string Title, string Content, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, string? ContextReceiptId);
