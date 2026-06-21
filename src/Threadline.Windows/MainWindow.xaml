@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="ThreadlineAI Sidecar">
 
-  <Grid x:Name="RootShell" ColumnDefinitions="Auto,*" Background="#F8FAFF">
+  <Grid x:Name="RootShell" ColumnDefinitions="Auto,*" Background="#F8FAFF" Loaded="RootShell_Loaded">
     <Grid.Resources>
       <!-- Keep custom sidecar buttons readable through WinUI hover/pressed states. -->
       <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#111827" />
