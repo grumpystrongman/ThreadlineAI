@@ -15,6 +15,7 @@ public sealed partial class MainWindow
     private async void RootShell_Loaded(object sender, RoutedEventArgs e)
     {
         StartFallbackFloatingTriggerTimer();
+        StartBrowserExtensionGuidanceTimer();
 
         if (_sidecarSessionBootstrapStarted) return;
         _sidecarSessionBootstrapStarted = true;
@@ -26,7 +27,7 @@ public sealed partial class MainWindow
         if (_fallbackEdgeTriggerStarted) return;
 
         _fallbackEdgeTriggerStarted = true;
-        _fallbackEdgeTriggerTimer.Interval = TimeSpan.FromMilliseconds(300);
+        _fallbackEdgeTriggerTimer.Interval = TimeSpan.FromMilliseconds(900);
         _fallbackEdgeTriggerTimer.Tick += (_, _) => SafeEnsureFallbackFloatingTriggerVisible();
         _fallbackEdgeTriggerTimer.Start();
     }
@@ -53,13 +54,15 @@ public sealed partial class MainWindow
             return;
         }
 
-        var hasCursor = GetCursorPos(out var cursor);
-        if (hasCursor && trigger.IsVisible && trigger.IsCursorWithinReach(cursor.X, cursor.Y, 420))
+        // Important: if the fallback trigger is already visible, keep it stable.
+        // Repeated ShowAt calls cause the visual blink Jeff saw when hovering near the AI button.
+        if (trigger.IsVisible)
         {
             _lastFloatingTriggerEligibleAt = DateTimeOffset.Now;
             return;
         }
 
+        var hasCursor = GetCursorPos(out var cursor);
         var hwnd = WindowNative.GetWindowHandle(this);
         var id = Win32Interop.GetWindowIdFromWindow(hwnd);
         var area = DisplayArea.GetFromWindowId(id, DisplayAreaFallback.Nearest).WorkArea;
