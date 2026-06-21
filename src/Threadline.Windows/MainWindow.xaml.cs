@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -23,6 +24,7 @@ public sealed partial class MainWindow : Window
     private WindowActionDto? _lastAction;
     private NativeUiAutomationResult? _lastNativeUiResult;
     private SummarizedContext? _lastContextSummary;
+    private string? _lastTrustedContextReceiptId;
 
     public MainWindow()
     {
@@ -45,12 +47,18 @@ public sealed partial class MainWindow : Window
     private async void StoreWindow_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(StoreWindowAsync);
     private async void PreviewNativeUi_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(PreviewNativeUiAsync);
     private async void Ask_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(AskAsync);
+    private async void TrustedAsk_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(TrustedAskAsync);
     private async void ProposeInsert_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(ProposeInsertActionAsync);
     private async void CompleteLastAction_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(CompleteLastActionAsync);
     private async void CopyConversation_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => { CopyConversationToClipboard(); return Task.CompletedTask; });
     private async void CopyLastAnswer_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => { CopyLastAnswerToClipboard(); return Task.CompletedTask; });
     private async void JumpTranscriptTop_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => { ScrollTranscriptToTop(); return Task.CompletedTask; });
     private async void JumpTranscriptBottom_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => { ScrollTranscriptToBottom(force: true); return Task.CompletedTask; });
+    private async void CreateSummaryArtifact_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => CreateArtifactFromConversationAsync("Summary", "Thread Summary"));
+    private async void CreateHandoffArtifact_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => CreateArtifactFromConversationAsync("Handoff", "Work Handoff"));
+    private async void CreateDecisionsArtifact_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => CreateArtifactFromConversationAsync("Decisions", "Decision Log"));
+    private async void CreateRisksArtifact_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => CreateArtifactFromConversationAsync("Risks", "Risks and Watchouts"));
+    private async void CreateNextActionsArtifact_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => CreateArtifactFromConversationAsync("NextActions", "Next Actions"));
 
     private async void ClearTranscript_Click(object sender, RoutedEventArgs e)
     {
@@ -183,6 +191,88 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async Task TrustedAskAsync()
+    {
+        EnsureSession();
+        var question = QuestionBox.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(question)) return;
+
+        await EnsureDurableWorkThreadAsync();
+
+        QuestionBox.Text = string.Empty;
+        AppendTranscript("You", question);
+        if (IsWorkThreadMemoryEnabled())
+        {
+            await PersistTranscriptMessageAsync("user", question);
+        }
+
+        var pendingMessage = AppendTranscript("Threadline", "Thinking… checking trust controls, resolving context, and preparing a response.");
+        AddTimeline("Checking trust controls for Ask...");
+
+        string? currentWindow = null;
+        if (IsProviderContextAllowed())
+        {
+            currentWindow = await ResolveContextForAskAsync();
+            if (IsWorkThreadMemoryEnabled())
+            {
+                await PersistTargetContextEventAsync(_selectedThreadlineTarget ?? _lastFollowTarget, _selectedThreadlineTarget is null ? "Inferred" : "Followed");
+            }
+        }
+        else
+        {
+            TrustControlStatusText.Text = "Provider context send is off. This Ask sends the question without the resolved app context.";
+            AddTimeline("Provider context send blocked by privacy control.");
+        }
+
+        ContextReceiptDto? contextReceipt = null;
+        if (IsContextReceiptEnabled())
+        {
+            contextReceipt = await PersistContextReceiptForAskAsync(currentWindow);
+            _lastTrustedContextReceiptId = contextReceipt?.Id;
+        }
+
+        AddTimeline("Sending trusted Ask request to provider path...");
+
+        try
+        {
+            var response = await _client.AskAsync(_session!.Id, question, currentWindow, IsProviderContextAllowed() ? 20 : 0);
+            var answer = string.IsNullOrWhiteSpace(response.Answer)
+                ? "The provider returned an empty answer."
+                : response.Answer;
+
+            var answerWithReceipt = IsContextReceiptEnabled()
+                ? answer + "\n\n" + BuildContextReceiptText(contextReceipt, currentWindow)
+                : answer + "\n\nContext Receipt hidden by privacy/trust controls.";
+
+            UpdateTranscript(pendingMessage, answerWithReceipt);
+            if (IsWorkThreadMemoryEnabled())
+            {
+                await PersistTranscriptMessageAsync("assistant", answerWithReceipt, contextReceipt?.Id);
+            }
+
+            AddTimeline("Received trusted provider response.");
+            TrustControlStatusText.Text = IsProviderContextAllowed()
+                ? "Provider answer returned with current trust controls."
+                : "Provider answer returned without resolved app context or recent service context.";
+        }
+        catch (ThreadlineEndpointNotFoundException ex)
+        {
+            await ShowLocalAskFallbackAsync(pendingMessage, question, currentWindow, "Ask endpoint missing", ex.Message);
+            if (IsWorkThreadMemoryEnabled())
+            {
+                await PersistTranscriptMessageAsync("assistant", pendingMessage.Message, contextReceipt?.Id);
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            await ShowLocalAskFallbackAsync(pendingMessage, question, currentWindow, "Ask provider call failed", ex.Message);
+            if (IsWorkThreadMemoryEnabled())
+            {
+                await PersistTranscriptMessageAsync("assistant", pendingMessage.Message, contextReceipt?.Id);
+            }
+        }
+    }
+
     private async Task ShowLocalAskFallbackAsync(TranscriptMessage pendingMessage, string question, string? currentWindow, string reason, string detail)
     {
         try
@@ -223,6 +313,172 @@ public sealed partial class MainWindow : Window
         _lastAction = await _client.CompleteActionAsync(_lastAction.Id, "Completed from Windows companion UI.");
         AddTimeline($"Completed action {_lastAction.Id}");
         AppendTranscript("Threadline Action", $"Action {_lastAction.Id} marked {_lastAction.Status}.");
+    }
+
+    private async Task EnsureDurableWorkThreadAsync()
+    {
+        if (!IsWorkThreadMemoryEnabled() && !IsContextReceiptEnabled()) return;
+        if (_activeWorkThread is not null && !_activeWorkThread.Status.Equals("Closed", StringComparison.OrdinalIgnoreCase)) return;
+
+        var active = await _workThreadClient.GetActiveWorkThreadAsync();
+        _activeWorkThread = active is null
+            ? await _workThreadClient.StartWorkThreadAsync(BuildDefaultWorkThreadTitle(), BuildCurrentTargetDescription())
+            : await _workThreadClient.ResumeWorkThreadAsync(active.Id);
+
+        UpdateWorkThreadUi();
+        AddTimeline(active is null ? "Started Work Thread memory for Ask." : "Resumed Work Thread memory for Ask.");
+    }
+
+    private async Task CreateArtifactFromConversationAsync(string artifactType, string title)
+    {
+        await EnsureArtifactWorkThreadAsync();
+        var content = BuildArtifactContent(artifactType, title);
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            AppendTranscript("Threadline Artifact", "There is not enough conversation content to create that artifact yet.");
+            return;
+        }
+
+        var saved = await _workThreadClient.SaveArtifactAsync(_activeWorkThread!.Id, artifactType, title, content, _lastTrustedContextReceiptId);
+        var message = $"Saved artifact: {saved.Title}\nType: {saved.ArtifactType}\nID: {saved.Id}\n\n{saved.Content}";
+        AppendTranscript("Threadline Artifact", message);
+        if (IsWorkThreadMemoryEnabled())
+        {
+            await PersistTranscriptMessageAsync("artifact", message, saved.ContextReceiptId);
+        }
+
+        AddTimeline($"Saved artifact action: {saved.ArtifactType}.");
+    }
+
+    private async Task EnsureArtifactWorkThreadAsync()
+    {
+        if (_activeWorkThread is not null && !_activeWorkThread.Status.Equals("Closed", StringComparison.OrdinalIgnoreCase)) return;
+
+        var active = await _workThreadClient.GetActiveWorkThreadAsync();
+        _activeWorkThread = active is null
+            ? await _workThreadClient.StartWorkThreadAsync(BuildDefaultWorkThreadTitle(), BuildCurrentTargetDescription())
+            : await _workThreadClient.ResumeWorkThreadAsync(active.Id);
+
+        UpdateWorkThreadUi();
+    }
+
+    private string BuildArtifactContent(string artifactType, string title)
+    {
+        var latestAnswer = GetLatestThreadlineMessage();
+        var transcript = GetRecentTranscriptText(12);
+        var builder = new StringBuilder();
+        builder.AppendLine($"# {title}");
+        builder.AppendLine();
+        builder.AppendLine($"Created: {DateTimeOffset.Now:g}");
+        builder.AppendLine($"Work Thread: {_activeWorkThread?.Title ?? "None"}");
+        builder.AppendLine("Source: current sidecar transcript");
+        if (!string.IsNullOrWhiteSpace(_lastTrustedContextReceiptId))
+        {
+            builder.AppendLine($"Context Receipt: {_lastTrustedContextReceiptId}");
+        }
+
+        builder.AppendLine();
+
+        switch (artifactType)
+        {
+            case "Summary":
+                builder.AppendLine("## Summary");
+                builder.AppendLine(SummarizeBlock(latestAnswer ?? transcript));
+                builder.AppendLine();
+                builder.AppendLine("## Recent conversation");
+                builder.AppendLine(transcript);
+                break;
+            case "Handoff":
+                builder.AppendLine("## Current state");
+                builder.AppendLine(SummarizeBlock(latestAnswer ?? transcript));
+                builder.AppendLine();
+                builder.AppendLine("## Handoff notes");
+                builder.AppendLine("- Continue from the active Work Thread and current context receipt.");
+                builder.AppendLine("- Validate any inferred detail before acting outside the current app context.");
+                builder.AppendLine("- Use the artifact actions again after the next major answer.");
+                break;
+            case "Decisions":
+                builder.AppendLine("## Decisions / commitments");
+                AppendFilteredLines(builder, transcript, new[] { "decid", "decision", "choose", "selected", "will ", "agreed", "commit" }, "No explicit decisions detected yet.");
+                break;
+            case "Risks":
+                builder.AppendLine("## Risks / watchouts");
+                AppendFilteredLines(builder, transcript, new[] { "risk", "warning", "limitation", "blocked", "error", "failed", "not used", "privacy" }, "No explicit risks detected yet.");
+                break;
+            case "NextActions":
+                builder.AppendLine("## Next actions");
+                AppendFilteredLines(builder, transcript, new[] { "next", "action", "todo", "follow up", "should", "need to", "verify", "validate" }, "No explicit next actions detected yet.");
+                break;
+            default:
+                builder.AppendLine(transcript);
+                break;
+        }
+
+        return builder.ToString().Trim();
+    }
+
+    private string? GetLatestThreadlineMessage()
+    {
+        return _transcriptMessages
+            .LastOrDefault(message => message.Speaker.StartsWith("Threadline", StringComparison.OrdinalIgnoreCase)
+                                      && !string.IsNullOrWhiteSpace(message.Message))
+            ?.Message;
+    }
+
+    private string GetRecentTranscriptText(int take)
+    {
+        var messages = _transcriptMessages.TakeLast(Math.Max(1, take));
+        var builder = new StringBuilder();
+        foreach (var message in messages)
+        {
+            if (builder.Length > 0) builder.AppendLine();
+            builder.AppendLine($"{message.Speaker}: {message.Message}");
+        }
+
+        return builder.ToString().Trim();
+    }
+
+    private static string SummarizeBlock(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "No content available yet.";
+        var normalized = value.Replace("\r", " ").Trim();
+        return normalized.Length <= 1200 ? normalized : normalized[..1200].TrimEnd() + "...";
+    }
+
+    private static void AppendFilteredLines(StringBuilder builder, string transcript, string[] keywords, string fallback)
+    {
+        var lines = transcript
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(line => keywords.Any(keyword => line.Contains(keyword, StringComparison.OrdinalIgnoreCase)))
+            .Take(12)
+            .ToList();
+
+        if (lines.Count == 0)
+        {
+            builder.AppendLine($"- {fallback}");
+            return;
+        }
+
+        foreach (var line in lines)
+        {
+            builder.AppendLine($"- {line}");
+        }
+    }
+
+    private bool IsProviderContextAllowed() => GetToggleValue(AllowProviderContextToggle, defaultValue: true);
+    private bool IsWorkThreadMemoryEnabled() => GetToggleValue(SaveWorkThreadMemoryToggle, defaultValue: true);
+    private bool IsContextReceiptEnabled() => GetToggleValue(ShowContextReceiptsToggle, defaultValue: true);
+
+    private static bool GetToggleValue(CheckBox toggle, bool defaultValue)
+    {
+        try
+        {
+            return toggle.IsChecked ?? defaultValue;
+        }
+        catch
+        {
+            return defaultValue;
+        }
     }
 
     private void RefreshActiveWindow()
