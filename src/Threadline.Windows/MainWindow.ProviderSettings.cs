@@ -25,24 +25,25 @@ public sealed partial class MainWindow
 
     private void ToggleProviderSettingsPanel_Click(object sender, RoutedEventArgs e)
     {
-        ProviderSettingsPanel.Visibility = ProviderSettingsPanel.Visibility == Visibility.Visible
-            ? Visibility.Collapsed
-            : Visibility.Visible;
-
-        if (ProviderSettingsPanel.Visibility == Visibility.Visible)
+        if (IsDrawerOpenFor(ProviderSettingsPanel))
         {
-            ProviderSettingsStatusText.Text = "Provider settings panel open. It will stay open while you copy and paste values.";
-            ApplyProviderDefaults(GetSelectedSettingsProvider(), overwriteExisting: false);
+            CloseShellDrawer();
+            return;
         }
+
+        OpenSettingsDrawer();
+        ProviderSettingsStatusText.Text = "Provider settings panel open. It will stay open while you copy and paste values.";
+        ApplyProviderDefaults(GetSelectedSettingsProvider(), overwriteExisting: false);
     }
 
     private void CloseProviderSettingsPanel_Click(object sender, RoutedEventArgs e)
     {
-        ProviderSettingsPanel.Visibility = Visibility.Collapsed;
+        CloseShellDrawer();
     }
 
     private void UseProviderDefaults_Click(object sender, RoutedEventArgs e)
     {
+        OpenSettingsDrawer();
         ApplyProviderDefaults(GetSelectedSettingsProvider(), overwriteExisting: true);
         ProviderSettingsStatusText.Text = "Defaults applied. Add or confirm the credential, then click Save Provider.";
     }
@@ -50,7 +51,7 @@ public sealed partial class MainWindow
     private async void SaveProviderSettings_Click(object sender, RoutedEventArgs e)
     {
         var provider = GetSelectedSettingsProvider();
-        ProviderSettingsPanel.Visibility = Visibility.Visible;
+        OpenSettingsDrawer();
         ProviderSettingsStatusText.Text = $"Saving {provider} provider settings...";
         ServiceStatusText.Text = $"Saving provider: {provider}";
 
@@ -101,7 +102,7 @@ public sealed partial class MainWindow
 
         SelectComboBoxItem(ProviderBox, provider);
         SelectComboBoxItem(SettingsProviderBox, provider);
-        ProviderSettingsPanel.Visibility = Visibility.Visible;
+        OpenSettingsDrawer();
         ProviderSettingsStatusText.Text = $"Saved {provider}. Start or restart a session to use this provider.";
         ServiceStatusText.Text = $"Provider saved: {provider}";
         AppendTranscript("Threadline Settings", $"Saved provider settings for {provider}. Start or restart a session with Provider set to {provider}.");

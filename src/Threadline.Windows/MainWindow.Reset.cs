@@ -32,6 +32,7 @@ public sealed partial class MainWindow
         _lastAction = null;
         _lastNativeUiResult = null;
         _lastContextSummary = null;
+        _pendingConnectionTarget = null;
         _selectedTargetWindow = null;
         _selectedThreadlineTarget = null;
         _lastAutoFollowTargetId = null;
@@ -40,6 +41,7 @@ public sealed partial class MainWindow
             _lastFollowTarget = null;
         }
         ResetCurrentContextPanel();
+        UpdateSessionBindingStatus("Window session: no pending connection. Click AI on another window to choose how to connect it.");
         PlaceSidecarForTarget(GetBestSidecarTarget(), "Local context reset.");
         QuestionBox.Text = string.Empty;
         OpenWindowsList.SelectedItem = null;
