@@ -66,6 +66,10 @@ public sealed partial class MainWindow
             AddTimeline($"Provider save failed for {provider}: {ex.Message}");
             AppendTranscript("Threadline Settings", $"Provider settings were not saved for {provider}.\n\nReason: {ex.Message}");
         }
+        finally
+        {
+            RestoreSidecarLayoutAfterProviderSettings();
+        }
     }
 
     private async Task SaveProviderSettingsAsync()
@@ -107,6 +111,23 @@ public sealed partial class MainWindow
         ServiceStatusText.Text = $"Provider saved: {provider}";
         AppendTranscript("Threadline Settings", $"Saved provider settings for {provider}. Start or restart a session with Provider set to {provider}.");
         AddTimeline($"Saved provider settings for {provider}.");
+    }
+
+    private void RestoreSidecarLayoutAfterProviderSettings()
+    {
+        try
+        {
+            if (_sidecarWindowHiddenForTrigger)
+            {
+                return;
+            }
+
+            PlaceSidecarForTarget(GetBestSidecarTarget(), "Provider settings updated; restored sidecar size and placement.");
+        }
+        catch
+        {
+            // Provider saves should never fail because visual placement could not be restored.
+        }
     }
 
     private void ApplyProviderDefaults(string provider, bool overwriteExisting)
