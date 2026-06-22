@@ -95,6 +95,10 @@ public sealed record RegisterAdapterRequest(
     string? Version = null,
     IReadOnlyDictionary<string, string>? Metadata = null);
 
+public sealed record AdapterHeartbeatRequest(
+    string? Version = null,
+    IReadOnlyDictionary<string, string>? Metadata = null);
+
 public sealed record ProviderTestResult(
     string ProviderName,
     bool Success,
