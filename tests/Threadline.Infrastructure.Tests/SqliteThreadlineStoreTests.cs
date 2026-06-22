@@ -79,5 +79,5 @@ public sealed class SqliteThreadlineStoreTests : IDisposable
         }
     }
 
-    private SqliteThreadlineStore CreateStore() => new(new SqliteOptions($"Data Source={_databasePath};Pooling=False"));
+    private SqliteThreadlineStore CreateStore() => new(new SqliteOptions($"Data Source={_databasePath};Pooling=False", _databasePath));
 }
