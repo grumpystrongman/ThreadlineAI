@@ -48,23 +48,23 @@ public sealed class ProcessIntelligenceService
             new(
                 CaptureMethodKind.Screenshot,
                 "Screenshot/Vision",
-                false,
-                "Consent-gated fallback. Threadline must not capture screenshots, OCR, or visual layout unless the user explicitly allows it."),
+                true,
+                "Implemented as a last-resort fallback, but blocked unless the user gives visible one-time approval and the app is not denied."),
             new(
                 CaptureMethodKind.Ocr,
                 "OCR",
-                false,
-                "Planned fallback after screenshot capture; not treated as implemented without explicit consent and OCR wiring."),
+                true,
+                "Implemented after approved screenshot capture. OCR text is redacted before prompt/provider handoff where possible."),
             new(
                 CaptureMethodKind.ImageExtraction,
                 "Image Extraction",
                 false,
-                "Planned for visual documents and dashboards."),
+                "Raw image provider handoff is intentionally not implemented yet; Build 19 sends redacted OCR/summary text only."),
             new(
                 CaptureMethodKind.LayoutAnalysis,
                 "Layout Analysis",
                 false,
-                "Planned for screenshots, PDFs, and dashboard-like apps."),
+                "Only a local text vision summary is produced in Build 19. Full visual layout analysis remains future work."),
             new(
                 CaptureMethodKind.TitleProcessFallback,
                 "Title/process fallback",
