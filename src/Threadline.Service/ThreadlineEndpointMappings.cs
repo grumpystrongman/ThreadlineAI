@@ -276,16 +276,109 @@ public static class ThreadlineEndpointMappings
             return Results.Created($"/providers/{saved.ProviderName}", new { provider = saved, credential = SecretDescriptorResponse.FromDescriptor(descriptor) });
         });
 
-        api.MapPost("/adapters", async (RegisterAdapterRequest request, IAdapterRegistry adapters, IClock clock, CancellationToken ct) =>
+        api.MapGet("/adapters", async (IAdapterRegistry adapters, CancellationToken ct) =>
+            Results.Ok(await adapters.ListAsync(ct)));
+
+        api.MapGet("/adapters/{adapterId}", async (string adapterId, IAdapterRegistry adapters, CancellationToken ct) =>
+        {
+            var invalidAdapterId = ValidateAdapterId(adapterId);
+            if (invalidAdapterId is not null) return invalidAdapterId;
+
+            var adapter = await adapters.GetAsync(adapterId.Trim(), ct);
+            IResult result = adapter is null ? Results.NotFound() : Results.Ok(adapter);
+            return result;
+        });
+
+        api.MapPost("/adapters", async (RegisterAdapterRequest request, IAdapterRegistry adapters, IAuditRepository audit, IClock clock, CancellationToken ct) =>
         {
             var invalidAdapter = RequestValidator.ValidateAdapter(request);
             if (invalidAdapter is not null) return invalidAdapter;
 
-            var registered = AdapterRegistration.Create(request.Kind, request.DisplayName.Trim(), request.Permissions, clock.UtcNow, request.Version, request.Metadata);
+            var registered = AdapterRegistration.Create(request.Kind, request.DisplayName.Trim(), request.Permissions, clock.UtcNow, request.Version, NormalizeMetadata(request.Metadata));
             await adapters.RegisterAsync(registered, ct);
+            await audit.AppendAuditEventAsync(
+                AuditEvent.Create(
+                    null,
+                    AuditEventType.AdapterRegistered,
+                    clock.UtcNow,
+                    $"Adapter registered: {registered.DisplayName} ({registered.Kind}).",
+                    new Dictionary<string, string>
+                    {
+                        ["adapterId"] = registered.Id,
+                        ["adapterKind"] = registered.Kind.ToString(),
+                        ["adapterVersion"] = registered.Version ?? "unknown"
+                    }),
+                ct);
             return Results.Created($"/adapters/{registered.Id}", registered);
         });
 
+        api.MapPost("/adapters/{adapterId}/heartbeat", async (string adapterId, AdapterHeartbeatRequest request, IAdapterRegistry adapters, IAuditRepository audit, IClock clock, CancellationToken ct) =>
+        {
+            var invalidAdapterId = ValidateAdapterId(adapterId);
+            if (invalidAdapterId is not null) return invalidAdapterId;
+
+            var registration = await adapters.GetAsync(adapterId.Trim(), ct);
+            if (registration is null) return Results.NotFound(new { error = "Adapter is not registered. Register the extension before sending heartbeat." });
+
+            var metadata = MergeMetadata(registration.Metadata, request.Metadata);
+            metadata["lastHeartbeatAt"] = clock.UtcNow.ToString("O");
+            if (!string.IsNullOrWhiteSpace(request.Version)) metadata["heartbeatVersion"] = request.Version.Trim();
+
+            var updated = registration with
+            {
+                LastSeenAt = clock.UtcNow,
+                Version = string.IsNullOrWhiteSpace(request.Version) ? registration.Version : request.Version.Trim(),
+                Metadata = metadata
+            };
+
+            await adapters.RegisterAsync(updated, ct);
+            await audit.AppendAuditEventAsync(
+                AuditEvent.Create(
+                    null,
+                    AuditEventType.AdapterHeartbeat,
+                    clock.UtcNow,
+                    $"Adapter heartbeat received: {updated.DisplayName} ({updated.Kind}).",
+                    new Dictionary<string, string>
+                    {
+                        ["adapterId"] = updated.Id,
+                        ["adapterKind"] = updated.Kind.ToString(),
+                        ["adapterVersion"] = updated.Version ?? "unknown"
+                    }),
+                ct);
+
+            return Results.Ok(updated);
+        });
+
         return app;
+    }
+
+    private static IResult? ValidateAdapterId(string? adapterId)
+    {
+        if (string.IsNullOrWhiteSpace(adapterId) || !adapterId.StartsWith("adp_", StringComparison.Ordinal))
+        {
+            return Results.BadRequest(new { error = "A valid Threadline adapter id is required." });
+        }
+
+        return null;
+    }
+
+    private static Dictionary<string, string> NormalizeMetadata(IReadOnlyDictionary<string, string>? metadata) =>
+        metadata is null
+            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            : metadata.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
+
+    private static Dictionary<string, string> MergeMetadata(
+        IReadOnlyDictionary<string, string>? existing,
+        IReadOnlyDictionary<string, string>? incoming)
+    {
+        var metadata = NormalizeMetadata(existing);
+        if (incoming is null) return metadata;
+
+        foreach (var item in incoming)
+        {
+            if (!string.IsNullOrWhiteSpace(item.Key)) metadata[item.Key] = item.Value;
+        }
+
+        return metadata;
     }
 }
