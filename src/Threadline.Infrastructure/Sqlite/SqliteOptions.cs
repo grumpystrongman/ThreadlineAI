@@ -1,6 +1,6 @@
 namespace Threadline.Infrastructure.Sqlite;
 
-public sealed record SqliteOptions(string ConnectionString)
+public sealed record SqliteOptions(string ConnectionString, string DatabasePath)
 {
     public static SqliteOptions LocalAppData(string? databasePath = null)
     {
@@ -9,7 +9,10 @@ public sealed record SqliteOptions(string ConnectionString)
             "ThreadlineAI");
 
         Directory.CreateDirectory(root);
-        var path = databasePath ?? Path.Combine(root, "threadline.db");
-        return new SqliteOptions($"Data Source={path}");
+        var path = string.IsNullOrWhiteSpace(databasePath) ? Path.Combine(root, "threadline.db") : databasePath;
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
+
+        return new SqliteOptions($"Data Source={path}", path);
     }
 }
