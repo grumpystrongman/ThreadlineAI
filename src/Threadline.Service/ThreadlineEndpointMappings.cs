@@ -9,14 +9,22 @@ public static class ThreadlineEndpointMappings
 {
     public static WebApplication MapThreadlineHealth(this WebApplication app, ThreadlineServiceOptions options)
     {
-        app.MapGet("/health", () => Results.Ok(new
+        app.MapGet("/health", (ThreadlineCommercialLifecycleService lifecycle) =>
         {
-            status = "ok",
-            service = "Threadline.Service",
-            storage = "sqlite",
-            authRequired = options.RequireApiToken,
-            maxContextCharacters = options.MaxContextCharacters
-        }));
+            var version = lifecycle.BuildVersionInfo();
+            return Results.Ok(new
+            {
+                status = "ok",
+                service = "Threadline.Service",
+                storage = "sqlite",
+                authRequired = options.RequireApiToken,
+                maxContextCharacters = options.MaxContextCharacters,
+                productVersion = version.ProductVersion,
+                serviceVersion = version.ServiceAssemblyVersion,
+                apiCompatibility = version.ApiCompatibility,
+                expectedBrowserExtensionVersion = version.ExpectedBrowserExtensionVersion
+            });
+        });
 
         return app;
     }
