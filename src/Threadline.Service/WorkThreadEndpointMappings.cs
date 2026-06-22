@@ -1,5 +1,6 @@
 using Threadline.Core;
 using Threadline.Infrastructure.Security;
+using Threadline.Infrastructure.Sqlite;
 
 namespace Threadline.Service;
 
@@ -55,13 +56,57 @@ public static class WorkThreadEndpointMappings
             return Results.Ok(closed);
         });
 
+        api.MapGet("/work-threads/{workThreadId}/export", async (string workThreadId, SqlitePrivacyAndMaintenanceStore maintenance, IAuditRepository audit, IClock clock, CancellationToken ct) =>
+        {
+            var export = await maintenance.ExportWorkThreadAsync(workThreadId, ct);
+            if (export is null) return Results.NotFound();
+            await audit.AppendAuditEventAsync(AuditEvent.Create(null, AuditEventType.ContextPreviewed, clock.UtcNow, $"Work thread exported: {workThreadId}", new Dictionary<string, string> { ["workThreadId"] = workThreadId }), ct);
+            return Results.Ok(export);
+        });
+
+        api.MapDelete("/work-threads/{workThreadId}", async (string workThreadId, SqlitePrivacyAndMaintenanceStore maintenance, IAuditRepository audit, IClock clock, CancellationToken ct) =>
+        {
+            var deleted = await maintenance.DeleteWorkThreadAsync(workThreadId, ct);
+            if (!deleted) return Results.NotFound();
+            await audit.AppendAuditEventAsync(AuditEvent.Create(null, AuditEventType.ContextBlocked, clock.UtcNow, $"Work thread deleted: {workThreadId}", new Dictionary<string, string> { ["workThreadId"] = workThreadId }), ct);
+            return Results.NoContent();
+        });
+
         api.MapGet("/work-threads/{workThreadId}/context-events", async (string workThreadId, int? take, IWorkThreadRepository repository, CancellationToken ct) =>
             Results.Ok(await repository.GetRecentWorkContextEventsAsync(workThreadId, take ?? 20, ct)));
 
-        api.MapPost("/work-threads/{workThreadId}/context-events", async (string workThreadId, SaveWorkContextEventRequest request, IWorkThreadRepository repository, IClock clock, CancellationToken ct) =>
+        api.MapPost("/work-threads/{workThreadId}/context-events", async (string workThreadId, SaveWorkContextEventRequest request, IWorkThreadRepository repository, CapturePolicy capturePolicy, SecretRedactor redactor, IAuditRepository audit, IClock clock, CancellationToken ct) =>
         {
             var thread = await repository.GetWorkThreadAsync(workThreadId, ct);
             if (thread is null) return Results.NotFound();
+
+            var probe = ContextEvent.Create(
+                workThreadId,
+                ContextSource.Manual,
+                request.SourceType,
+                request.ContentSummary ?? request.SourceName,
+                clock.UtcNow,
+                request.AppName,
+                processName: null,
+                request.WindowTitle,
+                request.Url,
+                SensitivityLevel.Normal,
+                userApproved: true);
+            var decision = capturePolicy.Evaluate(probe);
+            if (!decision.IsAllowed || decision.RequiresExplicitApproval)
+            {
+                await audit.AppendAuditEventAsync(AuditEvent.Create(null, AuditEventType.ContextBlocked, clock.UtcNow, decision.Reason, new Dictionary<string, string>
+                {
+                    ["workThreadId"] = workThreadId,
+                    ["sourceType"] = request.SourceType,
+                    ["sourceName"] = request.SourceName,
+                    ["appName"] = request.AppName ?? string.Empty,
+                    ["url"] = request.Url ?? string.Empty
+                }), ct);
+                return Results.Json(new { error = "Work Thread context was blocked by privacy policy.", reason = decision.Reason }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var redactedSummary = request.ContentSummary is null ? null : redactor.Redact(request.ContentSummary);
             var contextEvent = WorkContextEvent.Create(
                 workThreadId,
                 request.SourceType,
@@ -71,7 +116,7 @@ public static class WorkThreadEndpointMappings
                 request.AppName,
                 request.WindowTitle,
                 request.Url,
-                request.ContentSummary);
+                redactedSummary);
             await repository.AppendWorkContextEventAsync(contextEvent, ct);
             return Results.Json(contextEvent, statusCode: StatusCodes.Status202Accepted);
         });
@@ -79,32 +124,32 @@ public static class WorkThreadEndpointMappings
         api.MapGet("/work-threads/{workThreadId}/messages", async (string workThreadId, int? take, IWorkThreadRepository repository, CancellationToken ct) =>
             Results.Ok(await repository.GetConversationMessagesAsync(workThreadId, take ?? 100, ct)));
 
-        api.MapPost("/work-threads/{workThreadId}/messages", async (string workThreadId, SaveConversationMessageRequest request, IWorkThreadRepository repository, IClock clock, CancellationToken ct) =>
+        api.MapPost("/work-threads/{workThreadId}/messages", async (string workThreadId, SaveConversationMessageRequest request, IWorkThreadRepository repository, SecretRedactor redactor, IClock clock, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(request.Content)) return Results.BadRequest("Message content is required.");
             var thread = await repository.GetWorkThreadAsync(workThreadId, ct);
             if (thread is null) return Results.NotFound();
-            var message = ConversationMessage.Create(workThreadId, request.Role, request.Content, clock.UtcNow, request.ContextReceiptId);
+            var message = ConversationMessage.Create(workThreadId, request.Role, redactor.Redact(request.Content), clock.UtcNow, request.ContextReceiptId);
             await repository.AppendConversationMessageAsync(message, ct);
             return Results.Json(message, statusCode: StatusCodes.Status202Accepted);
         });
 
-        api.MapPost("/work-threads/{workThreadId}/context-receipts", async (string workThreadId, SaveContextReceiptRequest request, IWorkThreadRepository repository, IClock clock, CancellationToken ct) =>
+        api.MapPost("/work-threads/{workThreadId}/context-receipts", async (string workThreadId, SaveContextReceiptRequest request, IWorkThreadRepository repository, SecretRedactor redactor, IClock clock, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(request.UsedSourcesJson)) return Results.BadRequest("Used sources are required.");
             var thread = await repository.GetWorkThreadAsync(workThreadId, ct);
             if (thread is null) return Results.NotFound();
-            var receipt = ContextReceiptRecord.Create(workThreadId, request.UsedSourcesJson, clock.UtcNow, request.NotUsedSourcesJson, request.Limitations);
+            var receipt = ContextReceiptRecord.Create(workThreadId, redactor.Redact(request.UsedSourcesJson), clock.UtcNow, request.NotUsedSourcesJson is null ? null : redactor.Redact(request.NotUsedSourcesJson), request.Limitations is null ? null : redactor.Redact(request.Limitations));
             await repository.SaveContextReceiptAsync(receipt, ct);
             return Results.Created($"/work-threads/{workThreadId}/context-receipts/{receipt.Id}", receipt);
         });
 
-        api.MapPost("/work-threads/{workThreadId}/artifacts", async (string workThreadId, SaveArtifactRequest request, IWorkThreadRepository repository, IClock clock, CancellationToken ct) =>
+        api.MapPost("/work-threads/{workThreadId}/artifacts", async (string workThreadId, SaveArtifactRequest request, IWorkThreadRepository repository, SecretRedactor redactor, IClock clock, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(request.Content)) return Results.BadRequest("Artifact content is required.");
             var thread = await repository.GetWorkThreadAsync(workThreadId, ct);
             if (thread is null) return Results.NotFound();
-            var artifact = WorkArtifact.Create(workThreadId, request.ArtifactType, request.Title, request.Content, clock.UtcNow, request.ContextReceiptId);
+            var artifact = WorkArtifact.Create(workThreadId, request.ArtifactType, request.Title, redactor.Redact(request.Content), clock.UtcNow, request.ContextReceiptId);
             await repository.SaveArtifactAsync(artifact, ct);
             return Results.Created($"/work-threads/{workThreadId}/artifacts/{artifact.Id}", artifact);
         });
