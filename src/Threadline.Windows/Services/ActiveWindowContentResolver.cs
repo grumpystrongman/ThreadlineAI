@@ -7,6 +7,7 @@ public sealed class ActiveWindowContentResolver
     private readonly ContextSummarizer _contextSummarizer = new();
     private readonly FileBackedTextResolver _fileResolver = new();
     private readonly ProcessIntelligenceService _processIntelligence = new();
+    private readonly ScreenshotVisionContextProvider _screenshotVisionProvider = new();
 
     public async Task<SummarizedContext> ResolveAsync(string sessionId, ThreadlineTarget target, CancellationToken cancellationToken = default) =>
         await ResolveAsync(sessionId, target, ContextCaptureConsent.None, cancellationToken);
@@ -80,13 +81,27 @@ public sealed class ActiveWindowContentResolver
             attempts.Add(new ContextProviderAttempt("Clipboard/selection provider", ContextProviderAttemptStatus.Blocked, "Not attempted. Clipboard and selected text require explicit user approval for this capture."));
         }
 
-        if (consent.ScreenshotVisionAllowed)
+        if (consent.CanUseScreenshotVision)
         {
-            attempts.Add(new ContextProviderAttempt("Screenshot/OCR/vision provider", ContextProviderAttemptStatus.Missed, "Explicit consent was supplied, but screenshot capture, OCR, and vision extraction are not wired in this build."));
+            try
+            {
+                var screenshotVision = await _screenshotVisionProvider.CaptureAsync(target, consent, cancellationToken);
+                if (screenshotVision.Success)
+                {
+                    attempts.Add(new ContextProviderAttempt("Screenshot/OCR/vision provider", ContextProviderAttemptStatus.Captured, $"Captured approved window-region screenshot, extracted {screenshotVision.RedactedOcrText.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)} redacted OCR characters, and discarded raw image bytes."));
+                    return FinalizeContext(BuildScreenshotVisionContext(target, process, screenshotVision), target, process, "screenshot-ocr-vision", attempts);
+                }
+
+                attempts.Add(new ContextProviderAttempt("Screenshot/OCR/vision provider", ContextProviderAttemptStatus.Failed, string.Join(" ", screenshotVision.Warnings)));
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or ExternalException or UnauthorizedAccessException or TaskCanceledException)
+            {
+                attempts.Add(new ContextProviderAttempt("Screenshot/OCR/vision provider", ContextProviderAttemptStatus.Failed, $"Approved screenshot/OCR/vision capture failed safely: {ex.Message}"));
+            }
         }
         else
         {
-            attempts.Add(new ContextProviderAttempt("Screenshot/OCR/vision provider", ContextProviderAttemptStatus.Blocked, "Not attempted. Screenshot, OCR, and vision capture require explicit user approval for this capture."));
+            attempts.Add(new ContextProviderAttempt("Screenshot/OCR/vision provider", ContextProviderAttemptStatus.Blocked, $"Not attempted. {consent.ScreenshotVisionConsentReason}"));
         }
 
         attempts.Add(new ContextProviderAttempt("Title/process fallback", ContextProviderAttemptStatus.Captured, "Only window title and process metadata are available."));
@@ -148,6 +163,83 @@ public sealed class ActiveWindowContentResolver
             warnings,
             summary.RawPreview,
             ContextConfidence.High,
+            process,
+            null,
+            receipt);
+    }
+
+    private static SummarizedContext BuildScreenshotVisionContext(ThreadlineTarget target, ProcessIntelligence process, ScreenshotVisionCaptureResult result)
+    {
+        var redactedLines = result.RedactedOcrText
+            .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(12)
+            .ToList();
+
+        var details = new List<string>
+        {
+            "Resolver route: screenshot/OCR/vision provider",
+            "Provider selected: screenshot-ocr-vision",
+            "Capture kind: ScreenshotVision",
+            $"Confidence: {result.Confidence}",
+            $"Target: {target}",
+            $"Window region: {result.Region.ToDisplayText()}",
+            $"Redacted OCR characters: {result.RedactedOcrText.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"Redaction count: {result.RedactionCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            "Raw screenshot stored: No"
+        };
+        details.AddRange(redactedLines);
+
+        var captured = new List<string>
+        {
+            $"User-approved screenshot region tied to the attached window: {result.Region.ToDisplayText()}",
+            $"OCR text characters after redaction: {result.RedactedOcrText.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"Vision summary characters: {result.VisionSummary.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            "Raw screenshot bytes were discarded after OCR.",
+            "Only redacted OCR text and a text vision summary are eligible for prompt/provider handoff in this build."
+        };
+
+        if (result.RedactionCount > 0)
+        {
+            captured.Add($"Redaction applied before provider handoff: {result.RedactionCount.ToString(System.Globalization.CultureInfo.InvariantCulture)} replacement(s) across {string.Join(", ", result.RedactionCategories)}.");
+        }
+
+        var notCaptured = new List<string>
+        {
+            "No silent screenshot capture was performed.",
+            "Raw screenshots were not stored.",
+            "Raw screenshots were not sent to the provider as image payloads in this build.",
+            "Offscreen document/page content outside the visible window region was not captured.",
+            "Clipboard and selected text were not captured by this fallback."
+        };
+
+        foreach (var warning in result.Warnings)
+        {
+            notCaptured.Add($"Screenshot/OCR warning: {warning}");
+        }
+
+        var receipt = new ContextReceipt(
+            "screenshot/ocr/vision provider",
+            result.Confidence,
+            ContextCaptureKind.ScreenshotVision,
+            captured,
+            notCaptured,
+            false,
+            "Threadline used an explicitly approved screenshot/OCR fallback for the attached window. Raw screenshots were not stored; redacted OCR/summary text may be used.",
+            []);
+
+        var rawPreview = string.IsNullOrWhiteSpace(result.RedactedOcrText)
+            ? result.VisionSummary
+            : result.RedactedOcrText;
+
+        return new SummarizedContext(
+            target.Title,
+            "screenshot-ocr-vision",
+            result.VisionSummary,
+            details,
+            result.Warnings,
+            rawPreview,
+            result.Confidence,
             process,
             null,
             receipt);
@@ -291,7 +383,7 @@ public sealed class ActiveWindowContentResolver
             target.Window.ProcessId,
             method,
             string.IsNullOrWhiteSpace(context.RawPreview) ? 0 : context.RawPreview.Length,
-            0,
+            context.Receipt?.IsScreenshotVision == true ? 1 : 0,
             context.Summary.Length,
             context.Confidence,
             details);
@@ -324,8 +416,8 @@ public sealed class ActiveWindowContentResolver
     private static bool IsMissingRealWorkingContent(ThreadlineTarget target, ProcessIntelligence process, ContextCaptureKind captureKind)
     {
         if (captureKind == ContextCaptureKind.TitleOnly || captureKind == ContextCaptureKind.None) return true;
-        if (process.AppType == ActiveAppType.Browser && captureKind is not (ContextCaptureKind.PageText or ContextCaptureKind.SelectedText)) return true;
-        if (target.ProviderKey.Equals("notepad-tabs", StringComparison.OrdinalIgnoreCase) && captureKind != ContextCaptureKind.FileBacked) return true;
+        if (process.AppType == ActiveAppType.Browser && captureKind is not (ContextCaptureKind.PageText or ContextCaptureKind.SelectedText or ContextCaptureKind.ScreenshotVision or ContextCaptureKind.Ocr)) return true;
+        if (target.ProviderKey.Equals("notepad-tabs", StringComparison.OrdinalIgnoreCase) && captureKind is not (ContextCaptureKind.FileBacked or ContextCaptureKind.ScreenshotVision or ContextCaptureKind.Ocr)) return true;
         return false;
     }
 
