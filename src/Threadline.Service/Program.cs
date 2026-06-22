@@ -35,12 +35,16 @@ builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddSingleton<SecretRedactor>();
 builder.Services.AddSingleton(new CapturePolicy(DefaultRules.Create(DateTimeOffset.UtcNow)));
 builder.Services.AddSingleton<ContextPreviewBuilder>();
+builder.Services.AddSingleton<CapabilityRegistry>();
+builder.Services.AddSingleton<ThreadlineActionCatalog>();
 builder.Services.AddSingleton<SessionService>();
 builder.Services.AddSingleton<ProviderConnectionService>();
 builder.Services.AddSingleton<SecretService>();
 builder.Services.AddSingleton<WindowAttachmentService>();
 builder.Services.AddSingleton<PromptComposer>();
 builder.Services.AddSingleton<ThreadlineAskService>();
+builder.Services.AddSingleton<ThreadlineProviderProbeService>();
+builder.Services.AddSingleton<ThreadlineDoctorService>();
 
 var app = builder.Build();
 
