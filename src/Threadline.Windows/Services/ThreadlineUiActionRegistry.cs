@@ -15,14 +15,25 @@ public sealed class ThreadlineUiActionRegistry
         _actions[id.Trim()] = new ThreadlineUiActionRegistration(id.Trim(), displayName.Trim(), capabilityId, handler);
     }
 
-    public Task ExecuteAsync(string id)
+    public async Task ExecuteAsync(string id)
     {
         if (!_actions.TryGetValue(id, out var action))
         {
-            throw new InvalidOperationException($"Threadline action '{id}' is not registered.");
+            throw new ThreadlineUiActionException(id, $"Threadline action '{id}' is not registered.");
         }
 
-        return action.Handler();
+        try
+        {
+            await action.Handler();
+        }
+        catch (ThreadlineUiActionException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new ThreadlineUiActionException(action.Id, $"Action '{action.DisplayName}' failed: {ex.Message}", ex);
+        }
     }
 
     public IReadOnlyList<ThreadlineUiActionRegistration> List() =>
@@ -34,3 +45,11 @@ public sealed record ThreadlineUiActionRegistration(
     string DisplayName,
     string? CapabilityId,
     Func<Task> Handler);
+
+public sealed class ThreadlineUiActionException : InvalidOperationException
+{
+    public ThreadlineUiActionException(string actionId, string message, Exception? innerException = null)
+        : base(message, innerException) => ActionId = actionId;
+
+    public string ActionId { get; }
+}
