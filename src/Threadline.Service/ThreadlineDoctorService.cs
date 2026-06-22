@@ -1,4 +1,5 @@
 using Threadline.Core;
+using Threadline.Infrastructure;
 
 namespace Threadline.Service;
 
@@ -336,148 +337,204 @@ public sealed class ThreadlineDoctorService
     {
         var baseCapabilities = _capabilities.List()
             .Where(c => !string.Equals(c.Id, "provider.configured", StringComparison.OrdinalIgnoreCase)
-                     && !string.Equals(c.Id, "provider.configured-provider", StringComparison.OrdinalIgnoreCase)
-                     && !string.Equals(c.Id, "browser-extension.bridge", StringComparison.OrdinalIgnoreCase)
-                     && !string.Equals(c.Id, "memory.work-thread", StringComparison.OrdinalIgnoreCase)
-                     && !string.Equals(c.Id, "context.active-window", StringComparison.OrdinalIgnoreCase));
+                     && !string.Equals(c.Id, "provider.configured-missing", StringComparison.OrdinalIgnoreCase)
+                     && !string.Equals(c.Id, "context.current", StringComparison.OrdinalIgnoreCase))
+            .ToList();
 
         foreach (var capability in baseCapabilities)
         {
             yield return capability;
         }
 
-        yield return new ThreadlineCapability(
-            "provider.configured",
-            "ProviderCapability",
-            "Configured Provider",
-            readyProviders.Count > 0 ? ThreadlineCapabilityStatus.Ready : providers.Count > 0 ? ThreadlineCapabilityStatus.Degraded : ThreadlineCapabilityStatus.NeedsSetup,
-            readyProviders.Count > 0 ? "At least one provider is Ready." : "Provider setup is incomplete.",
-            new Dictionary<string, string> { ["providerCount"] = providers.Count.ToString(), ["readyProviderCount"] = readyProviders.Count.ToString() });
-
-        foreach (var provider in providers)
+        if (readyProviders.Count > 0)
         {
-            yield return new ProviderCapability(
-                provider.ProviderName,
-                provider.Status == ProviderConnectionStatus.Ready ? ThreadlineCapabilityStatus.Ready : ThreadlineCapabilityStatus.NeedsSetup,
-                $"Provider status: {provider.Status}.",
-                new Dictionary<string, string>
-                {
-                    ["status"] = provider.Status.ToString(),
-                    ["authType"] = provider.AuthType.ToString(),
-                    ["model"] = provider.DefaultModel ?? "None"
-                }).ToCapability();
+            yield return new ThreadlineCapability(
+                "provider.configured",
+                "Provider configured",
+                $"Ready provider(s): {string.Join(", ", readyProviders.Select(p => p.ProviderName))}.",
+                true,
+                false,
+                providers.Select(p => p.ProviderName).ToArray());
+        }
+        else
+        {
+            yield return new ThreadlineCapability(
+                "provider.configured-missing",
+                "Provider not ready",
+                providers.Count == 0 ? "No provider settings have been saved." : "Provider settings exist, but no provider is Ready.",
+                false,
+                true,
+                ["Settings", "ProviderTest"]);
         }
 
-        yield return new ContextCapability(
-            "Active Window",
-            currentEvent is null ? ThreadlineCapabilityStatus.Degraded : ThreadlineCapabilityStatus.Ready,
-            currentEvent is null ? "No current session context has been stored yet." : $"Current source: {currentEvent.Source}/{currentEvent.ContextType}.",
-            new Dictionary<string, string> { ["activeSession"] = (activeSession is not null).ToString() }).ToCapability();
+        yield return new ThreadlineCapability(
+            "session.active",
+            "Active session",
+            activeSession is null ? "No active session exists." : $"Active session: {activeSession.Name}.",
+            activeSession is not null,
+            activeSession is null,
+            ["SessionBootstrap"]);
 
-        yield return new MemoryCapability(
-            "Work Thread",
-            activeWorkThread is null ? ThreadlineCapabilityStatus.Degraded : ThreadlineCapabilityStatus.Ready,
-            activeWorkThread is null ? "Work Thread memory is available but no active Work Thread is selected." : $"Active Work Thread: {activeWorkThread.Title}.",
-            new Dictionary<string, string> { ["activeWorkThread"] = (activeWorkThread is not null).ToString() }).ToCapability();
+        yield return new ThreadlineCapability(
+            "work-thread.active",
+            "Active Work Thread",
+            activeWorkThread is null ? "No active Work Thread exists." : $"Active Work Thread: {activeWorkThread.Title}.",
+            activeWorkThread is not null,
+            activeWorkThread is null,
+            ["Resume", "NewThread"]);
 
-        var latestBrowserAdapter = GetLatestBrowserAdapter(browserAdapters);
-        var browserStatus = latestBrowserAdapter is null
-            ? ThreadlineCapabilityStatus.NeedsSetup
-            : IsHeartbeatFresh(latestBrowserAdapter, _clock.UtcNow) && IsBrowserExtensionCompatible(latestBrowserAdapter)
-                ? ThreadlineCapabilityStatus.Ready
-                : ThreadlineCapabilityStatus.Degraded;
+        var latestBrowser = GetLatestBrowserAdapter(browserAdapters);
+        yield return new ThreadlineCapability(
+            "browser-extension.bridge",
+            "Browser extension bridge",
+            latestBrowser is null ? "Browser extension is not registered." : $"Browser extension registered: {latestBrowser.DisplayName}.",
+            latestBrowser is not null,
+            latestBrowser is null,
+            ["BrowserExtension", "ContextCapture"]);
 
-        var browserDescription = latestBrowserAdapter is null
-            ? "Browser extension is not registered with the local service yet."
-            : browserStatus == ThreadlineCapabilityStatus.Ready
-                ? "Browser extension heartbeat and Build 17 version are compatible."
-                : "Browser extension is registered but needs a fresh heartbeat or compatible Build 17 version.";
-
-        yield return new BrowserExtensionCapability(
-            browserStatus,
-            browserDescription,
-            latestBrowserAdapter is null
-                ? new Dictionary<string, string> { ["adapterCount"] = browserAdapters.Count.ToString(), ["expectedVersion"] = ExpectedBrowserExtensionVersion }
-                : BuildBrowserAdapterMetadata(latestBrowserAdapter, _clock.UtcNow)).ToCapability();
+        yield return new ThreadlineCapability(
+            "context.current",
+            "Current context",
+            currentEvent is null ? "No approved current context has been stored for the active session." : $"Current context source: {currentEvent.Source}/{currentEvent.ContextType}.",
+            currentEvent is not null,
+            currentEvent is null,
+            ["Follow", "Lock", "StoreWindow", "BrowserExtension"]);
     }
 
-    private static ThreadlineReadinessState DetermineReadiness(IReadOnlyList<ThreadlineDoctorCheck> checks)
+    private static IReadOnlyList<ThreadlineActionDescriptor> BuildRecommendedActions(ThreadlineDoctorCheckStatus readiness, IReadOnlyList<ThreadlineDoctorCheck> checks, ThreadlineActionCatalog actions)
     {
-        if (checks.Any(c => c.Status == ThreadlineDoctorCheckStatus.Fail && c.Id is "sqlite.writable" or "service.running"))
+        var recommended = new List<ThreadlineActionDescriptor>();
+        var actionList = actions.List();
+
+        void Add(string actionId)
         {
-            return ThreadlineReadinessState.Degraded;
+            var action = actionList.FirstOrDefault(a => string.Equals(a.Id, actionId, StringComparison.OrdinalIgnoreCase));
+            if (action is not null && recommended.All(r => !string.Equals(r.Id, action.Id, StringComparison.OrdinalIgnoreCase)))
+            {
+                recommended.Add(action);
+            }
         }
 
-        if (checks.Any(c => c.Id == "provider.configured" && c.Status == ThreadlineDoctorCheckStatus.Fail))
+        foreach (var check in checks.Where(c => c.Status is ThreadlineDoctorCheckStatus.Fail or ThreadlineDoctorCheckStatus.Warning))
         {
-            return ThreadlineReadinessState.NeedsSetup;
+            switch (check.Id)
+            {
+                case "provider.configured":
+                case "provider.test":
+                case "provider.last-error":
+                    Add("provider.test");
+                    break;
+                case "session.active":
+                    Add("work.resume");
+                    break;
+                case "work-thread.active":
+                    Add("work.resume");
+                    Add("artifact.next-actions");
+                    break;
+                case "browser-extension.reachable":
+                case "browser-extension.compatibility":
+                    Add("adapter.browser-extension.reconnect");
+                    break;
+                case "context.current-source":
+                    Add("context.refresh");
+                    break;
+            }
         }
 
-        if (checks.Any(c => c.Status is ThreadlineDoctorCheckStatus.Fail or ThreadlineDoctorCheckStatus.Warning))
+        if (readiness == ThreadlineDoctorCheckStatus.Pass)
         {
-            return ThreadlineReadinessState.Degraded;
+            Add("provider.test");
+            Add("artifact.summary");
+            Add("artifact.next-actions");
         }
 
-        return ThreadlineReadinessState.Ready;
+        return recommended;
+    }
+
+    private static ThreadlineDoctorCheckStatus DetermineReadiness(IReadOnlyList<ThreadlineDoctorCheck> checks)
+    {
+        if (checks.Any(c => c.Status == ThreadlineDoctorCheckStatus.Fail))
+        {
+            return ThreadlineDoctorCheckStatus.Fail;
+        }
+
+        if (checks.Any(c => c.Status == ThreadlineDoctorCheckStatus.Warning))
+        {
+            return ThreadlineDoctorCheckStatus.Warning;
+        }
+
+        if (checks.Any(c => c.Status == ThreadlineDoctorCheckStatus.Unknown))
+        {
+            return ThreadlineDoctorCheckStatus.Unknown;
+        }
+
+        return ThreadlineDoctorCheckStatus.Pass;
     }
 
     private static bool IsProviderTestAudit(AuditEvent auditEvent) =>
-        string.Equals(GetMetadataValue(auditEvent, "source"), "ThreadlineProviderTest", StringComparison.OrdinalIgnoreCase);
+        auditEvent.EventType is AuditEventType.ProviderCallCompleted or AuditEventType.ProviderCallFailed
+        && string.Equals(GetMetadataValue(auditEvent, "source"), "ProviderTest", StringComparison.OrdinalIgnoreCase);
 
-    private static string? GetMetadataValue(AuditEvent auditEvent, string key) =>
-        auditEvent.Metadata is not null && auditEvent.Metadata.TryGetValue(key, out var value) ? value : null;
+    private static string? GetMetadataValue(AuditEvent auditEvent, string key)
+    {
+        if (auditEvent.Metadata is null)
+        {
+            return null;
+        }
+
+        return auditEvent.Metadata.TryGetValue(key, out var value) ? value : null;
+    }
 
     private static AdapterRegistration? GetLatestBrowserAdapter(IReadOnlyList<AdapterRegistration> browserAdapters) =>
         browserAdapters.OrderByDescending(a => a.LastSeenAt ?? a.RegisteredAt).FirstOrDefault();
 
-    private static bool IsBrowserExtensionCompatible(AdapterRegistration adapter) =>
-        string.Equals(GetAdapterVersion(adapter), ExpectedBrowserExtensionVersion, StringComparison.OrdinalIgnoreCase);
-
     private static string? GetAdapterVersion(AdapterRegistration adapter)
     {
-        if (!string.IsNullOrWhiteSpace(adapter.Version)) return adapter.Version;
-        if (adapter.Metadata is not null && adapter.Metadata.TryGetValue("extensionVersion", out var version) && !string.IsNullOrWhiteSpace(version)) return version;
-        if (adapter.Metadata is not null && adapter.Metadata.TryGetValue("heartbeatVersion", out var heartbeatVersion) && !string.IsNullOrWhiteSpace(heartbeatVersion)) return heartbeatVersion;
-        return null;
-    }
+        if (adapter.Metadata is null)
+        {
+            return null;
+        }
 
-    private static bool IsHeartbeatFresh(AdapterRegistration adapter, DateTimeOffset now) =>
-        now - (adapter.LastSeenAt ?? adapter.RegisteredAt) <= BrowserHeartbeatFreshnessWindow;
+        return adapter.Metadata.TryGetValue("extensionVersion", out var extensionVersion) ? extensionVersion :
+            adapter.Metadata.TryGetValue("version", out var version) ? version : null;
+    }
 
     private static Dictionary<string, string> BuildBrowserAdapterMetadata(AdapterRegistration adapter, DateTimeOffset now)
     {
-        var lastSeenAt = adapter.LastSeenAt ?? adapter.RegisteredAt;
+        var lastSeen = adapter.LastSeenAt ?? adapter.RegisteredAt;
         var metadata = new Dictionary<string, string>
         {
             ["adapterId"] = adapter.Id,
-            ["adapterCountedKind"] = adapter.Kind.ToString(),
             ["displayName"] = adapter.DisplayName,
             ["registeredAt"] = adapter.RegisteredAt.ToString("O"),
-            ["lastSeenAt"] = lastSeenAt.ToString("O"),
-            ["heartbeatAgeSeconds"] = Math.Max(0, (int)(now - lastSeenAt).TotalSeconds).ToString(),
-            ["version"] = GetAdapterVersion(adapter) ?? "unknown",
-            ["expectedVersion"] = ExpectedBrowserExtensionVersion
+            ["lastSeenAt"] = lastSeen.ToString("O"),
+            ["ageSeconds"] = Math.Max(0, (int)(now - lastSeen).TotalSeconds).ToString()
         };
 
-        if (adapter.Metadata is not null)
+        var version = GetAdapterVersion(adapter);
+        if (!string.IsNullOrWhiteSpace(version))
         {
-            foreach (var item in adapter.Metadata)
-            {
-                metadata[item.Key] = item.Value;
-            }
+            metadata["extensionVersion"] = version;
         }
 
         return metadata;
     }
 
-    private static bool LooksLikeBrowser(ContextEvent currentEvent)
+    private static bool LooksLikeBrowser(ContextEvent contextEvent)
     {
-        static bool Contains(string? value, string pattern) => !string.IsNullOrWhiteSpace(value) && value.Contains(pattern, StringComparison.OrdinalIgnoreCase);
-        return Contains(currentEvent.ProcessName, "chrome")
-            || Contains(currentEvent.ProcessName, "msedge")
-            || Contains(currentEvent.ProcessName, "firefox")
-            || Contains(currentEvent.ApplicationName, "chrome")
-            || Contains(currentEvent.ApplicationName, "edge")
-            || Contains(currentEvent.ApplicationName, "firefox");
+        if (contextEvent.Metadata is not null)
+        {
+            var process = contextEvent.Metadata.TryGetValue("processName", out var processName) ? processName : string.Empty;
+            if (process.Contains("chrome", StringComparison.OrdinalIgnoreCase) ||
+                process.Contains("msedge", StringComparison.OrdinalIgnoreCase) ||
+                process.Contains("edge", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return contextEvent.Content.Contains("Chrome", StringComparison.OrdinalIgnoreCase)
+            || contextEvent.Content.Contains("Microsoft Edge", StringComparison.OrdinalIgnoreCase)
+            || contextEvent.Content.Contains("msedge", StringComparison.OrdinalIgnoreCase);
     }
 }
