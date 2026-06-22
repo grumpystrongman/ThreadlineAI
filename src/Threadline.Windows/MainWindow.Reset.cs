@@ -17,13 +17,17 @@ public sealed partial class MainWindow
         });
     }
 
-    private void ClearSharedContext_Click(object sender, RoutedEventArgs e)
+    private async void ClearSharedContext_Click(object sender, RoutedEventArgs e) =>
+        await RunUiActionAsync(() => RunRegisteredUiActionAsync("context.clear"));
+
+    private Task ClearSharedContextActionAsync()
     {
         ClearLocalWorkingState();
         _transcriptMessages.Clear();
         AppendTranscript("Threadline", "Shared local context cleared. Start New Chat for a clean service session.");
         CurrentWindowText.Text = "No target window.";
-        AddTimeline("Cleared local shared context.");
+        AddTimeline("Cleared local shared context through registered action.");
+        return Task.CompletedTask;
     }
 
     private void ClearLocalWorkingState()
