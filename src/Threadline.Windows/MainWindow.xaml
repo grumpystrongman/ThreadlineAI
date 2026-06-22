@@ -247,19 +247,20 @@
                      Background="Transparent" />
 
             <Grid Grid.Row="1" ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
-              <Button Content="Summary" Click="CreateSummaryArtifact_Click" Style="{StaticResource SidecarButtonStyle}" />
-              <Button Grid.Column="1" Content="Handoff" Click="CreateHandoffArtifact_Click" Style="{StaticResource SidecarButtonStyle}" />
+              <Button Content="Summary" Click="SummaryArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
+              <Button Grid.Column="1" Content="Handoff" Click="HandoffArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
               <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
-                <Button Content="Copy" Click="CopyLastAnswer_Click" MinWidth="54" Style="{StaticResource SidecarButtonStyle}" />
+                <Button Content="Copy Art" Click="CopyArtifactAction_Click" MinWidth="62" Style="{StaticResource SidecarButtonStyle}" />
+                <Button Content="Export" Click="ExportArtifactAction_Click" MinWidth="58" Style="{StaticResource SidecarButtonStyle}" />
                 <Button Content="Ask" Click="TrustedAsk_Click" MinWidth="62" Style="{StaticResource PrimarySidecarButtonStyle}" />
               </StackPanel>
             </Grid>
 
             <Grid Grid.Row="2" ColumnDefinitions="*,*,*,*" ColumnSpacing="6">
-              <Button Content="Decide" Click="CreateDecisionsArtifact_Click" Style="{StaticResource SidecarButtonStyle}" />
-              <Button Grid.Column="1" Content="Risks" Click="CreateRisksArtifact_Click" Style="{StaticResource SidecarButtonStyle}" />
-              <Button Grid.Column="2" Content="Next" Click="CreateNextActionsArtifact_Click" Style="{StaticResource SidecarButtonStyle}" />
-              <Button Grid.Column="3" Content="Clear" Click="ClearTranscript_Click" Style="{StaticResource SidecarButtonStyle}" />
+              <Button Content="Decide" Click="DecisionsArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
+              <Button Grid.Column="1" Content="Risks" Click="RisksArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
+              <Button Grid.Column="2" Content="Next" Click="NextActionsArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
+              <Button Grid.Column="3" Content="Regen" Click="RegenerateArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
             </Grid>
           </Grid>
         </Border>
@@ -408,6 +409,8 @@
                   <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
                     <Button Content="Diagnostics" Click="ToggleDiagnostics_Click" Style="{StaticResource SidecarButtonStyle}" />
                     <Button Content="Clear Context" Click="ClearSharedContext_Click" Style="{StaticResource SidecarButtonStyle}" />
+                    <Button Content="Clear Chat" Click="ClearConversationAction_Click" Style="{StaticResource SidecarButtonStyle}" />
+                    <Button Content="Clear Memory" Click="ClearMemoryAction_Click" Style="{StaticResource WarmSidecarButtonStyle}" />
                   </StackPanel>
                 </StackPanel>
               </ScrollViewer>
