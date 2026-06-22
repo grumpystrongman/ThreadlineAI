@@ -9,6 +9,7 @@ public sealed class ThreadlineLocalClient
 {
     private readonly Uri _baseAddress;
     private readonly HttpClient _httpClient;
+    private readonly NativeWindowContextProvider _nativeWindowContextProvider = new();
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter() }
@@ -56,6 +57,19 @@ public sealed class ThreadlineLocalClient
 
     public async Task<WindowAttachmentDto> AttachWindowAsync(string sessionId, ActiveWindowSnapshot snapshot, CancellationToken cancellationToken = default)
     {
+        var nativeContext = _nativeWindowContextProvider.Capture(snapshot);
+        var metadata = new Dictionary<string, string>
+        {
+            ["source"] = "Threadline.Windows",
+            ["windowHandle"] = snapshot.Handle.ToString(),
+            ["build"] = "18-native-window-context-providers"
+        };
+
+        foreach (var pair in nativeContext.ToWindowMetadata())
+        {
+            metadata[pair.Key] = pair.Value;
+        }
+
         var request = new
         {
             applicationName = snapshot.ApplicationName,
@@ -64,11 +78,7 @@ public sealed class ThreadlineLocalClient
             processId = snapshot.ProcessId,
             executablePath = snapshot.ExecutablePath,
             isForeground = true,
-            metadata = new Dictionary<string, string>
-            {
-                ["source"] = "Threadline.Windows",
-                ["windowHandle"] = snapshot.Handle.ToString()
-            }
+            metadata
         };
 
         var response = await _httpClient.PostAsJsonAsync($"sessions/{sessionId}/windows/attach", request, _jsonOptions, cancellationToken);
