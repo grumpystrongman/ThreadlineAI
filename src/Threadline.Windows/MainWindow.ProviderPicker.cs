@@ -7,6 +7,7 @@ namespace Threadline.Windows;
 public sealed partial class MainWindow
 {
     private readonly ActiveWindowContentResolver _contentResolver = new();
+    private readonly ScreenshotVisionConsentPolicy _screenshotVisionPolicy = new();
 
     private async void UseSelectedTarget_Click(object sender, RoutedEventArgs e)
     {
@@ -25,7 +26,9 @@ public sealed partial class MainWindow
             CurrentWindowText.Text = $"Selected target:\n{selected}\n\n{selected.Window.ToDisplayText()}";
             PlaceSidecarForTarget(selected, "Selected target attached.");
             _attachment = await _client.AttachWindowAsync(_session!.Id, selected.Window);
-            _lastContextSummary = await _contentResolver.ResolveAsync(_session!.Id, selected);
+            var consent = BuildContextCaptureConsent(selected);
+            _lastContextSummary = await _contentResolver.ResolveAsync(_session!.Id, selected, consent);
+            ResetScreenshotVisionOneTimeApproval(_lastContextSummary);
             UpdateCurrentContextPanel(_lastContextSummary);
             AppendTranscript("Selected Target Preview", _lastContextSummary.ToPromptContext());
             AddTimeline($"Selected target {selected.Title}; context source: {_lastContextSummary.Source}; receipt: {_lastContextSummary.Receipt?.CaptureKind.ToString() ?? "none"}");
@@ -54,6 +57,43 @@ public sealed partial class MainWindow
             DiagnosticsText.Text = "Gathering diagnostics...";
             await ShowProductDiagnosticsAsync();
         }
+    }
+
+    private async void AllowScreenshotVisionForSelectedApp_Click(object sender, RoutedEventArgs e)
+    {
+        await RunUiActionAsync(() =>
+        {
+            var window = GetScreenshotVisionPolicyWindow() ?? throw new InvalidOperationException("Select or attach a target app first.");
+            _screenshotVisionPolicy.Allow(window);
+            UpdateScreenshotVisionTrustStatus(window, "Screenshot/OCR app allowed. One-time approval is still required for every capture.");
+            AddTimeline($"Screenshot/OCR allowed for app: {window.ApplicationName}");
+            return Task.CompletedTask;
+        });
+    }
+
+    private async void DenyScreenshotVisionForSelectedApp_Click(object sender, RoutedEventArgs e)
+    {
+        await RunUiActionAsync(() =>
+        {
+            var window = GetScreenshotVisionPolicyWindow() ?? throw new InvalidOperationException("Select or attach a target app first.");
+            _screenshotVisionPolicy.Deny(window);
+            ScreenshotVisionConsentToggle.IsChecked = false;
+            UpdateScreenshotVisionTrustStatus(window, "Screenshot/OCR app denied. Capture is blocked for this app.");
+            AddTimeline($"Screenshot/OCR denied for app: {window.ApplicationName}");
+            return Task.CompletedTask;
+        });
+    }
+
+    private async void ResetScreenshotVisionForSelectedApp_Click(object sender, RoutedEventArgs e)
+    {
+        await RunUiActionAsync(() =>
+        {
+            var window = GetScreenshotVisionPolicyWindow() ?? throw new InvalidOperationException("Select or attach a target app first.");
+            _screenshotVisionPolicy.ResetToPromptEachTime(window);
+            UpdateScreenshotVisionTrustStatus(window, "Screenshot/OCR reset to ask each time.");
+            AddTimeline($"Screenshot/OCR reset to ask-each-time for app: {window.ApplicationName}");
+            return Task.CompletedTask;
+        });
     }
 
     private void UpdateCurrentContextPanel(SummarizedContext context)
@@ -98,6 +138,7 @@ public sealed partial class MainWindow
             if (receipt.IsSelectedText) return $"Selected text • {receipt.Confidence}";
             if (receipt.IsFileBacked) return $"File-backed • {receipt.Confidence}";
             if (receipt.IsUiAutomation) return $"UI Automation • {receipt.Confidence}";
+            if (receipt.IsScreenshotVision) return $"Screenshot/OCR • {receipt.Confidence}";
             if (receipt.IsOcr) return $"OCR • {receipt.Confidence}";
             if (receipt.IsTitleOnly) return $"Title only • {receipt.Confidence}";
         }
@@ -130,7 +171,7 @@ public sealed partial class MainWindow
         if (source.Contains("screenshot", StringComparison.OrdinalIgnoreCase) ||
             source.Contains("ocr", StringComparison.OrdinalIgnoreCase))
         {
-            return $"Screenshot required • {context.Confidence}";
+            return $"Screenshot/OCR • {context.Confidence}";
         }
 
         if (context.Confidence == ContextConfidence.None)
@@ -139,5 +180,65 @@ public sealed partial class MainWindow
         }
 
         return $"{context.Source} • {context.Confidence}";
+    }
+
+    private ContextCaptureConsent BuildContextCaptureConsent(ThreadlineTarget target)
+    {
+        var oneTimeApproval = IsScreenshotVisionOneTimeApproved();
+        var decision = _screenshotVisionPolicy.Evaluate(target.Window, oneTimeApproval, rawScreenshotStorageAllowed: false);
+        UpdateScreenshotVisionTrustStatus(target.Window, decision.ToStatusText());
+
+        return new ContextCaptureConsent(
+            ClipboardSelectionAllowed: false,
+            ScreenshotVisionAllowed: decision.Allowed,
+            ScreenshotVisionUserApproved: decision.UserApprovedThisCapture,
+            ScreenshotVisionAppAllowed: decision.AppPolicyAllowsCapture,
+            RawScreenshotStorageAllowed: decision.RawScreenshotStorageAllowed,
+            ScreenshotVisionConsentReason: decision.Reason);
+    }
+
+    private bool IsScreenshotVisionOneTimeApproved() => GetToggleValue(ScreenshotVisionConsentToggle, defaultValue: false);
+
+    private void ResetScreenshotVisionOneTimeApproval(SummarizedContext context)
+    {
+        if (!IsScreenshotVisionOneTimeApproved())
+        {
+            return;
+        }
+
+        ScreenshotVisionConsentToggle.IsChecked = false;
+        var window = GetScreenshotVisionPolicyWindow();
+        var status = context.Receipt?.IsScreenshotVision == true || context.Receipt?.IsOcr == true
+            ? "Screenshot/OCR used once; approval reset."
+            : "Screenshot/OCR approval reset; no screenshot was needed for this context.";
+
+        if (window is not null)
+        {
+            UpdateScreenshotVisionTrustStatus(window, status);
+        }
+        else
+        {
+            ScreenshotVisionPolicyText.Text = status;
+            TrustControlStatusText.Text = status;
+        }
+    }
+
+    private ActiveWindowSnapshot? GetScreenshotVisionPolicyWindow()
+    {
+        if (OpenWindowsList.SelectedItem is ThreadlineTarget selected)
+        {
+            return selected.Window;
+        }
+
+        if (_selectedThreadlineTarget is not null) return _selectedThreadlineTarget.Window;
+        if (_lastFollowTarget is not null) return _lastFollowTarget.Window;
+        return _lastForegroundWindow;
+    }
+
+    private void UpdateScreenshotVisionTrustStatus(ActiveWindowSnapshot window, string status)
+    {
+        var policyText = _screenshotVisionPolicy.DescribePolicy(window);
+        ScreenshotVisionPolicyText.Text = $"Vision: {policyText} {status}";
+        TrustControlStatusText.Text = status;
     }
 }
