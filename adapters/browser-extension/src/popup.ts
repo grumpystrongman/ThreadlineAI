@@ -1,7 +1,10 @@
 type PopupResponse = { ok: boolean; error?: string; health?: unknown; status?: ExtensionStatus; heartbeat?: unknown; registration?: unknown };
 
 type ExtensionStatus = {
+  extensionVersion?: string;
   identity?: {
+    tabId?: number;
+    windowId?: number;
     title?: string;
     url?: string;
     status?: string;
@@ -9,6 +12,7 @@ type ExtensionStatus = {
   };
   heartbeatAgeLabel?: string;
   titleOnlyGuidance?: string;
+  unavailableReason?: string;
 };
 
 const statusElement = document.querySelector<HTMLParagraphElement>('#status')!;
@@ -29,6 +33,15 @@ function sendMessage(message: unknown): Promise<PopupResponse> {
   return chrome.runtime.sendMessage(message);
 }
 
+function formatCurrentTab(identity: ExtensionStatus['identity']): string {
+  if (!identity) return 'Current tab: unavailable.';
+  const title = identity.title?.trim() || '(untitled tab)';
+  const url = identity.url?.trim() || '(no URL exposed yet)';
+  const status = identity.status ? `, status: ${identity.status}` : '';
+  const incognito = identity.incognito ? ', incognito' : '';
+  return `Current tab: ${title}\n${url}${status}${incognito}`;
+}
+
 async function refresh(): Promise<void> {
   const response = await sendMessage({ type: 'THREADLINE_GET_EXTENSION_STATUS' });
   if (!response.ok || !response.status) {
@@ -36,10 +49,9 @@ async function refresh(): Promise<void> {
     return;
   }
 
-  const identity = response.status.identity;
-  tabElement.textContent = identity?.title ? `Current tab: ${identity.title}` : 'Current tab: unavailable.';
-  heartbeatElement.textContent = `Extension heartbeat: ${response.status.heartbeatAgeLabel ?? 'never'}.`;
-  guidanceElement.textContent = response.status.titleOnlyGuidance ?? '';
+  tabElement.textContent = formatCurrentTab(response.status.identity);
+  heartbeatElement.textContent = `Extension heartbeat: ${response.status.heartbeatAgeLabel ?? 'never'}; version ${response.status.extensionVersion ?? 'unknown'}.`;
+  guidanceElement.textContent = response.status.titleOnlyGuidance ?? response.status.unavailableReason ?? '';
 }
 
 testConnection.addEventListener('click', async () => {
