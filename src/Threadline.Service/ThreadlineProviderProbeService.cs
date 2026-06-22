@@ -10,18 +10,31 @@ public sealed class ThreadlineProviderProbeService
     private readonly ProviderConnectionService _providers;
     private readonly SecretService _secrets;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IAuditRepository _audit;
+    private readonly IClock _clock;
 
     public ThreadlineProviderProbeService(
         ProviderConnectionService providers,
         SecretService secrets,
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory httpClientFactory,
+        IAuditRepository audit,
+        IClock clock)
     {
         _providers = providers;
         _secrets = secrets;
         _httpClientFactory = httpClientFactory;
+        _audit = audit;
+        _clock = clock;
     }
 
     public async Task<ProviderTestResult> TestAsync(string? providerName = null, CancellationToken cancellationToken = default)
+    {
+        var result = await RunTestAsync(providerName, cancellationToken);
+        await AppendProviderTestAuditAsync(result, cancellationToken);
+        return result;
+    }
+
+    private async Task<ProviderTestResult> RunTestAsync(string? providerName, CancellationToken cancellationToken)
     {
         var provider = await ResolveProviderAsync(providerName, cancellationToken);
         if (provider is null)
@@ -88,6 +101,41 @@ public sealed class ThreadlineProviderProbeService
                 stopwatch.ElapsedMilliseconds,
                 provider.DefaultModel);
         }
+    }
+
+    private async Task AppendProviderTestAuditAsync(ProviderTestResult result, CancellationToken cancellationToken)
+    {
+        var metadata = new Dictionary<string, string>
+        {
+            ["source"] = "ThreadlineProviderTest",
+            ["provider"] = result.ProviderName,
+            ["success"] = result.Success.ToString(),
+            ["status"] = result.Status.ToString(),
+            ["detail"] = result.Detail,
+            ["durationMs"] = result.DurationMs.ToString()
+        };
+
+        if (!string.IsNullOrWhiteSpace(result.Model))
+        {
+            metadata["model"] = result.Model;
+        }
+
+        if (result.Metadata is not null)
+        {
+            foreach (var pair in result.Metadata)
+            {
+                metadata[$"provider.{pair.Key}"] = pair.Value;
+            }
+        }
+
+        await _audit.AppendAuditEventAsync(
+            AuditEvent.Create(
+                null,
+                result.Success ? AuditEventType.ProviderCallCompleted : AuditEventType.ProviderCallFailed,
+                _clock.UtcNow,
+                result.Success ? $"Provider test succeeded: {result.ProviderName}" : $"Provider test failed: {result.ProviderName}",
+                metadata),
+            cancellationToken);
     }
 
     private async Task<ProviderConnection?> ResolveProviderAsync(string? providerName, CancellationToken cancellationToken)
