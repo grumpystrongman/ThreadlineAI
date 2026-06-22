@@ -1,4 +1,5 @@
-import { callThreadline, ExtractionLimits, getActiveSessionId, getSettings, limitText, redactText, ThreadlineSettings } from './threadlineClient.js';
+import { callThreadline, getActiveSessionId, getSettings, limitText, redactText } from './threadlineClient.js';
+import type { ExtractionLimits, ThreadlineSettings } from './threadlineClient.js';
 
 export type ThreadlinePageContext = {
   title: string;
