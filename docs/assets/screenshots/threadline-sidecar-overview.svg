@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="780" viewBox="0 0 1280 780" role="img" aria-labelledby="title desc">
+  <title id="title">ThreadlineAI sidecar overview screenshot-style visual</title>
+  <desc id="desc">A screenshot-style illustration of the ThreadlineAI Windows sidecar attached beside a work application.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#1f2937"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f9fafb"/>
+      <stop offset="100%" stop-color="#eef2f7"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#000" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <rect width="1280" height="780" fill="url(#bg)"/>
+  <rect x="50" y="58" width="730" height="620" rx="18" fill="#ffffff" filter="url(#shadow)"/>
+  <rect x="50" y="58" width="730" height="54" rx="18" fill="#e5e7eb"/>
+  <circle cx="82" cy="86" r="7" fill="#ef4444"/><circle cx="106" cy="86" r="7" fill="#f59e0b"/><circle cx="130" cy="86" r="7" fill="#22c55e"/>
+  <text x="164" y="91" font-family="Segoe UI, Arial" font-size="18" fill="#111827">Current work app: KPI Dashboard Requirements.docx</text>
+  <rect x="86" y="150" width="650" height="86" rx="12" fill="#f3f4f6"/>
+  <text x="112" y="184" font-family="Segoe UI, Arial" font-size="22" font-weight="700" fill="#111827">Decision Review</text>
+  <text x="112" y="212" font-family="Segoe UI, Arial" font-size="16" fill="#4b5563">Metrics, owners, due dates, and unanswered questions for launch readiness.</text>
+  <rect x="86" y="274" width="305" height="130" rx="12" fill="#eef2ff"/>
+  <text x="112" y="310" font-family="Segoe UI, Arial" font-size="18" font-weight="700" fill="#1e3a8a">Open Questions</text>
+  <text x="112" y="342" font-family="Segoe UI, Arial" font-size="15" fill="#374151">• Who owns numerator validation?</text>
+  <text x="112" y="370" font-family="Segoe UI, Arial" font-size="15" fill="#374151">• Which clinics are in scope?</text>
+  <rect x="431" y="274" width="305" height="130" rx="12" fill="#ecfdf5"/>
+  <text x="457" y="310" font-family="Segoe UI, Arial" font-size="18" font-weight="700" fill="#065f46">Next Actions</text>
+  <text x="457" y="342" font-family="Segoe UI, Arial" font-size="15" fill="#374151">• Confirm source system</text>
+  <text x="457" y="370" font-family="Segoe UI, Arial" font-size="15" fill="#374151">• Capture decision receipt</text>
+  <rect x="86" y="440" width="650" height="180" rx="12" fill="#f9fafb" stroke="#d1d5db"/>
+  <text x="112" y="476" font-family="Segoe UI, Arial" font-size="18" font-weight="700" fill="#111827">Approved context visible to ThreadlineAI</text>
+  <text x="112" y="510" font-family="Segoe UI, Arial" font-size="15" fill="#374151">Only approved window, document, browser, terminal, and session context is used.</text>
+  <text x="112" y="540" font-family="Segoe UI, Arial" font-size="15" fill="#374151">Sensitive apps and blocked sources are excluded before provider calls.</text>
+  <rect x="825" y="58" width="405" height="620" rx="22" fill="url(#panel)" filter="url(#shadow)"/>
+  <rect x="845" y="80" width="365" height="64" rx="14" fill="#111827"/>
+  <text x="870" y="119" font-family="Segoe UI, Arial" font-size="24" font-weight="700" fill="#ffffff">ThreadlineAI</text>
+  <text x="870" y="166" font-family="Segoe UI, Arial" font-size="13" fill="#4b5563">Attached sidecar • Locked to KPI Dashboard Requirements</text>
+  <rect x="845" y="188" width="365" height="92" rx="14" fill="#ffffff" stroke="#d1d5db"/>
+  <text x="865" y="220" font-family="Segoe UI, Arial" font-size="16" font-weight="700" fill="#111827">Current Context</text>
+  <text x="865" y="248" font-family="Segoe UI, Arial" font-size="13" fill="#374151">Source: Native document resolver</text>
+  <text x="865" y="268" font-family="Segoe UI, Arial" font-size="13" fill="#047857">Confidence: HIGH</text>
+  <rect x="845" y="302" width="365" height="174" rx="14" fill="#ffffff" stroke="#d1d5db"/>
+  <text x="865" y="334" font-family="Segoe UI, Arial" font-size="16" font-weight="700" fill="#111827">Ask Threadline</text>
+  <rect x="865" y="354" width="325" height="72" rx="10" fill="#f3f4f6"/>
+  <text x="884" y="384" font-family="Segoe UI, Arial" font-size="13" fill="#374151">What are we missing before this goes live?</text>
+  <rect x="1068" y="438" width="122" height="26" rx="13" fill="#2563eb"/>
+  <text x="1109" y="456" text-anchor="middle" font-family="Segoe UI, Arial" font-size="13" fill="#ffffff">Ask</text>
+  <rect x="845" y="498" width="365" height="132" rx="14" fill="#ffffff" stroke="#d1d5db"/>
+  <text x="865" y="530" font-family="Segoe UI, Arial" font-size="16" font-weight="700" fill="#111827">Artifact Actions</text>
+  <rect x="865" y="552" width="82" height="28" rx="14" fill="#e0e7ff"/><text x="906" y="571" text-anchor="middle" font-family="Segoe UI, Arial" font-size="12" fill="#3730a3">Summary</text>
+  <rect x="957" y="552" width="82" height="28" rx="14" fill="#e0e7ff"/><text x="998" y="571" text-anchor="middle" font-family="Segoe UI, Arial" font-size="12" fill="#3730a3">Handoff</text>
+  <rect x="1049" y="552" width="82" height="28" rx="14" fill="#e0e7ff"/><text x="1090" y="571" text-anchor="middle" font-family="Segoe UI, Arial" font-size="12" fill="#3730a3">Decisions</text>
+  <rect x="865" y="592" width="82" height="28" rx="14" fill="#fee2e2"/><text x="906" y="611" text-anchor="middle" font-family="Segoe UI, Arial" font-size="12" fill="#991b1b">Risks</text>
+  <rect x="957" y="592" width="108" height="28" rx="14" fill="#dcfce7"/><text x="1011" y="611" text-anchor="middle" font-family="Segoe UI, Arial" font-size="12" fill="#166534">Next Actions</text>
+</svg>
