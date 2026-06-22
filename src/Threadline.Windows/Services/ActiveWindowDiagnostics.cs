@@ -3,6 +3,7 @@ namespace Threadline.Windows.Services;
 public sealed class ActiveWindowDiagnostics
 {
     private readonly NativeUiAutomationReader _nativeUiAutomationReader = new();
+    private readonly NativeWindowContextProvider _nativeWindowContextProvider = new();
 
     public IReadOnlyList<string> Inspect(ThreadlineTarget target)
     {
@@ -16,6 +17,22 @@ public sealed class ActiveWindowDiagnostics
             $"Diagnostic can read body: {target.CanReadBody}",
             $"Diagnostic confidence: {target.Confidence}"
         };
+
+        var nativeContext = _nativeWindowContextProvider.Capture(target.Window);
+        details.Add($"Native context provider: {nativeContext.ProviderName}");
+        details.Add($"Native context level: {nativeContext.LevelDisplayName}");
+        details.Add($"Native context content length: {nativeContext.Content.Length}");
+        details.Add($"Native context guidance: {nativeContext.Guidance}");
+
+        foreach (var metadata in nativeContext.Metadata.Take(8))
+        {
+            details.Add($"Native context metadata: {metadata.Key}={metadata.Value}");
+        }
+
+        foreach (var warning in nativeContext.Warnings.Take(5))
+        {
+            details.Add($"Native context warning: {warning}");
+        }
 
         var native = _nativeUiAutomationReader.ReadWindow(target.Window.Handle);
         details.Add($"Native UI success: {native.Success}");
