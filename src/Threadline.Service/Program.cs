@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Hosting.WindowsServices;
 using Threadline.Core;
 using Threadline.Infrastructure;
 using Threadline.Infrastructure.Security;
@@ -7,6 +8,10 @@ using Threadline.Infrastructure.Windowing;
 using Threadline.Service;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseWindowsService(options =>
+{
+    options.ServiceName = "ThreadlineAI Service";
+});
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -63,6 +68,7 @@ builder.Services.AddSingleton<PromptComposer>();
 builder.Services.AddSingleton<ThreadlineAskService>();
 builder.Services.AddSingleton<ThreadlineProviderProbeService>();
 builder.Services.AddSingleton<ThreadlineDoctorService>();
+builder.Services.AddSingleton<ThreadlineCommercialLifecycleService>();
 
 var app = builder.Build();
 
@@ -87,6 +93,7 @@ await app.Services.GetRequiredService<PrivacyRuntimeState>().InitializeAsync(
     app.Services.GetRequiredService<SqlitePrivacyAndMaintenanceStore>());
 
 app.MapThreadlineHealth(serviceOptions);
+app.MapThreadlineCommercialLifecycleApi();
 app.MapThreadlineReliabilityApi();
 app.MapThreadlineSecurityPrivacyApi();
 app.MapThreadlineProviderAuditApi();
@@ -94,6 +101,8 @@ app.MapThreadlineWorkThreadApi();
 app.MapThreadlineApi();
 
 app.Run();
+
+public partial class Program;
 
 internal static class DefaultRules
 {
