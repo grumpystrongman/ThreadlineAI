@@ -144,19 +144,41 @@ public static class WorkThreadEndpointMappings
             return Results.Created($"/work-threads/{workThreadId}/context-receipts/{receipt.Id}", receipt);
         });
 
-        api.MapPost("/work-threads/{workThreadId}/artifacts", async (string workThreadId, SaveArtifactRequest request, IWorkThreadRepository repository, SecretRedactor redactor, IClock clock, CancellationToken ct) =>
+        api.MapPost("/work-threads/{workThreadId}/artifacts", async (string workThreadId, SaveArtifactRequest request, IWorkThreadRepository repository, IArtifactHistoryRepository history, SecretRedactor redactor, IClock clock, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(request.Content)) return Results.BadRequest("Artifact content is required.");
             var thread = await repository.GetWorkThreadAsync(workThreadId, ct);
             if (thread is null) return Results.NotFound();
             var artifact = WorkArtifact.Create(workThreadId, request.ArtifactType, request.Title, redactor.Redact(request.Content), clock.UtcNow, request.ContextReceiptId);
             await repository.SaveArtifactAsync(artifact, ct);
+            await history.SaveArtifactVersionAsync(artifact, "saved", "work-thread.artifacts.save", ct);
             return Results.Created($"/work-threads/{workThreadId}/artifacts/{artifact.Id}", artifact);
         });
 
         api.MapGet("/work-threads/{workThreadId}/artifacts", async (string workThreadId, int? take, IWorkThreadRepository repository, CancellationToken ct) =>
             Results.Ok(await repository.GetArtifactsAsync(workThreadId, take ?? 25, ct)));
 
+        api.MapGet("/work-threads/{workThreadId}/artifacts/{artifactId}/history", async (string workThreadId, string artifactId, IArtifactHistoryRepository history, CancellationToken ct) =>
+            Results.Ok((await history.GetArtifactHistoryAsync(artifactId, ct)).Where(version => string.Equals(version.WorkThreadId, workThreadId, StringComparison.OrdinalIgnoreCase))));
+
+        api.MapGet("/work-threads/{workThreadId}/artifacts/{artifactId}/export", async (string workThreadId, string artifactId, IWorkThreadRepository repository, CancellationToken ct) =>
+        {
+            var artifact = (await repository.GetArtifactsAsync(workThreadId, 100, ct))
+                .FirstOrDefault(item => string.Equals(item.Id, artifactId, StringComparison.OrdinalIgnoreCase));
+            if (artifact is null) return Results.NotFound();
+            return Results.Ok(new ArtifactExportResponse(BuildExportFileName(artifact), "text/markdown", artifact.Content, artifact));
+        });
+
+        api.MapPost("/work-threads/{workThreadId}/artifacts/{artifactId}/regenerate", async (string workThreadId, string artifactId, RegenerateArtifactRequest request, ThreadlineActionExecutionService actions, CancellationToken ct) =>
+            Results.Ok(await actions.ExecuteAsync("artifact.regenerate", new ThreadlineActionRunRequest(workThreadId, request.Transcript, request.ContextSummary, artifactId), ct)));
+
         return app;
+    }
+
+    private static string BuildExportFileName(WorkArtifact artifact)
+    {
+        var safeTitle = new string(artifact.Title.Select(ch => char.IsLetterOrDigit(ch) ? ch : '-').ToArray()).Trim('-');
+        if (string.IsNullOrWhiteSpace(safeTitle)) safeTitle = artifact.ArtifactType;
+        return $"{safeTitle}-{artifact.UpdatedAt:yyyyMMdd-HHmmss}.md";
     }
 }
