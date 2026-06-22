@@ -86,9 +86,18 @@ public sealed record CaptureDiagnostics(
 
 public sealed record ContextCaptureConsent(
     bool ClipboardSelectionAllowed = false,
-    bool ScreenshotVisionAllowed = false)
+    bool ScreenshotVisionAllowed = false,
+    bool ScreenshotVisionUserApproved = false,
+    bool ScreenshotVisionAppAllowed = false,
+    bool RawScreenshotStorageAllowed = false,
+    string ScreenshotVisionConsentReason = "Screenshot, OCR, and vision capture require explicit user approval for this capture.")
 {
     public static ContextCaptureConsent None { get; } = new();
+
+    public bool CanUseScreenshotVision =>
+        ScreenshotVisionAllowed &&
+        ScreenshotVisionUserApproved &&
+        ScreenshotVisionAppAllowed;
 }
 
 public enum ContextCaptureKind
@@ -144,7 +153,7 @@ public sealed record ContextReceipt(
 
     public string ToPromptText()
     {
-        return $"Context receipt:\n- Source used: {SourceUsed}\n- Confidence: {Confidence}\n- Capture kind: {CaptureKind}\n- Is page text: {IsPageText}\n- Is selected text: {IsSelectedText}\n- Is title-only: {IsTitleOnly}\n- Is OCR: {IsOcr}\n- Is file-backed: {IsFileBacked}\n- Is UI Automation: {IsUiAutomation}\n- Missing real working content: {MissingRealWorkingContent}\n- Receipt message: {UserMessage}\n\nWhat was captured:\n{FormatList(Captured)}\n\nWhat was not captured:\n{FormatList(NotCaptured)}\n\nProvider ladder:\n{FormatAttempts(ProviderAttempts)}";
+        return $"Context receipt:\n- Source used: {SourceUsed}\n- Confidence: {Confidence}\n- Capture kind: {CaptureKind}\n- Is page text: {IsPageText}\n- Is selected text: {IsSelectedText}\n- Is title-only: {IsTitleOnly}\n- Is OCR: {IsOcr}\n- Is file-backed: {IsFileBacked}\n- Is UI Automation: {IsUiAutomation}\n- Is screenshot/vision: {IsScreenshotVision}\n- Missing real working content: {MissingRealWorkingContent}\n- Receipt message: {UserMessage}\n\nWhat was captured:\n{FormatList(Captured)}\n\nWhat was not captured:\n{FormatList(NotCaptured)}\n\nProvider ladder:\n{FormatAttempts(ProviderAttempts)}";
     }
 
     private static string FormatList(IReadOnlyList<string> items) => items.Count == 0
