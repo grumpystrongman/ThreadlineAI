@@ -29,6 +29,24 @@ public sealed class ThreadlineLocalClient
     public async Task<ServiceHealth> GetHealthAsync(CancellationToken cancellationToken = default) =>
         await GetRequiredAsync<ServiceHealth>("health", cancellationToken);
 
+    public async Task<ThreadlineVersionInfoDto> GetVersionAsync(CancellationToken cancellationToken = default) =>
+        await GetRequiredAsync<ThreadlineVersionInfoDto>("version", cancellationToken);
+
+    public async Task<ThreadlineDiagnosticsExportDto> ExportDiagnosticsAsync(CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsync("diagnostics/export", null, cancellationToken);
+        return await ReadRequiredAsync<ThreadlineDiagnosticsExportDto>(response, cancellationToken);
+    }
+
+    public async Task<ThreadlineLocalDataPlanDto> GetLocalDataClearPlanAsync(CancellationToken cancellationToken = default) =>
+        await GetRequiredAsync<ThreadlineLocalDataPlanDto>("local-data/clear-plan", cancellationToken);
+
+    public async Task<ThreadlineLocalDataClearResultDto> ClearLocalDataAsync(bool includeDiagnostics = true, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync("local-data/clear", new { confirmation = "CLEAR THREADLINE LOCAL DATA", includeDiagnostics }, _jsonOptions, cancellationToken);
+        return await ReadRequiredAsync<ThreadlineLocalDataClearResultDto>(response, cancellationToken);
+    }
+
     public async Task<ThreadlineDoctorReportDto> GetDoctorAsync(CancellationToken cancellationToken = default) =>
         await GetRequiredAsync<ThreadlineDoctorReportDto>("doctor", cancellationToken);
 
@@ -63,7 +81,7 @@ public sealed class ThreadlineLocalClient
         {
             ["source"] = "Threadline.Windows",
             ["windowHandle"] = snapshot.Handle.ToString(),
-            ["build"] = "20-security-privacy-hardening"
+            ["build"] = "21-commercial-lifecycle"
         };
 
         foreach (var pair in nativeContext.ToWindowMetadata())
@@ -231,7 +249,14 @@ public sealed class ThreadlineEndpointNotFoundException : InvalidOperationExcept
     }
 }
 
-public sealed record ServiceHealth(string Status, string Service, string Storage, bool AuthRequired, int MaxContextCharacters);
+public sealed record ServiceHealth(string Status, string Service, string Storage, bool AuthRequired, int MaxContextCharacters, string? ProductVersion = null, string? ServiceVersion = null, string? ApiCompatibility = null, string? ExpectedBrowserExtensionVersion = null);
+public sealed record ThreadlineVersionInfoDto(string ProductName, string ProductVersion, string ServiceName, string ServiceAssemblyVersion, string EntryAssemblyVersion, string BuildChannel, string ApiCompatibility, string DatabaseSchemaVersion, string ExpectedBrowserExtensionVersion, DateTimeOffset GeneratedAt);
+public sealed record ThreadlineDiagnosticsExportDto(string ExportPath, DateTimeOffset CreatedAt, ThreadlineLifecycleManifestDto Manifest);
+public sealed record ThreadlineLifecycleManifestDto(ThreadlineVersionInfoDto Version, string Readiness, bool LocalOnlyMode, bool ApiTokenRequired, bool ApiTokenPresent, IReadOnlyList<string> CorsAllowedOrigins, string DatabasePath, string DiagnosticsRoot, string ContentRootPath, string EnvironmentName, IReadOnlyList<ThreadlineLocalDataTargetDto> LocalDataTargets, IReadOnlyList<string> Notes);
+public sealed record ThreadlineLocalDataPlanDto(string ConfirmationPhrase, string Warning, IReadOnlyList<ThreadlineLocalDataTargetDto> Targets);
+public sealed record ThreadlineLocalDataTargetDto(string Id, string DisplayName, string Kind, string Path, bool Exists);
+public sealed record ThreadlineLocalDataClearResultDto(bool Success, string Message, IReadOnlyList<ThreadlineLocalDataRemovalDto> Removals);
+public sealed record ThreadlineLocalDataRemovalDto(string Id, string Path, bool Removed, string Detail);
 public sealed record ThreadlineDoctorReportDto(string Readiness, DateTimeOffset CreatedAt, IReadOnlyList<ThreadlineDoctorCheckDto> Checks, IReadOnlyList<ThreadlineCapabilityDto>? Capabilities, IReadOnlyList<ThreadlineActionDefinitionDto>? Actions);
 public sealed record ThreadlineDoctorCheckDto(string Id, string DisplayName, string Status, string Detail, string? Remediation, IReadOnlyDictionary<string, string>? Metadata);
 public sealed record ThreadlineCapabilityDto(string Id, string Category, string DisplayName, string Status, string Description, IReadOnlyDictionary<string, string>? Metadata);
