@@ -1,12 +1,10 @@
 using Threadline.Core;
-using Threadline.Infrastructure.Sqlite;
 
 namespace Threadline.Service;
 
 public sealed class ThreadlineDoctorService
 {
     private readonly ThreadlineServiceOptions _options;
-    private readonly SqliteThreadlineStore _sqliteStore;
     private readonly ProviderConnectionService _providers;
     private readonly ISessionRepository _sessions;
     private readonly IWorkThreadRepository _workThreads;
@@ -18,7 +16,6 @@ public sealed class ThreadlineDoctorService
 
     public ThreadlineDoctorService(
         ThreadlineServiceOptions options,
-        SqliteThreadlineStore sqliteStore,
         ProviderConnectionService providers,
         ISessionRepository sessions,
         IWorkThreadRepository workThreads,
@@ -29,7 +26,6 @@ public sealed class ThreadlineDoctorService
         IClock clock)
     {
         _options = options;
-        _sqliteStore = sqliteStore;
         _providers = providers;
         _sessions = sessions;
         _workThreads = workThreads;
@@ -88,8 +84,15 @@ public sealed class ThreadlineDoctorService
     {
         try
         {
-            await _sqliteStore.ProbeWritableAsync(cancellationToken);
-            return ThreadlineDoctorCheck.Pass("sqlite.writable", "SQLite writable", "SQLite opened and accepted a temporary write probe.");
+            await _audit.AppendAuditEventAsync(
+                AuditEvent.Create(
+                    null,
+                    AuditEventType.AdapterHeartbeat,
+                    _clock.UtcNow,
+                    "Threadline Doctor SQLite write probe.",
+                    new Dictionary<string, string> { ["source"] = "ThreadlineDoctor" }),
+                cancellationToken);
+            return ThreadlineDoctorCheck.Pass("sqlite.writable", "SQLite writable", "SQLite accepted the Doctor audit write probe.");
         }
         catch (Exception ex)
         {
@@ -253,6 +256,7 @@ public sealed class ThreadlineDoctorService
     {
         var baseCapabilities = _capabilities.List()
             .Where(c => !string.Equals(c.Id, "provider.configured", StringComparison.OrdinalIgnoreCase)
+                     && !string.Equals(c.Id, "provider.configured-provider", StringComparison.OrdinalIgnoreCase)
                      && !string.Equals(c.Id, "browser-extension.bridge", StringComparison.OrdinalIgnoreCase)
                      && !string.Equals(c.Id, "memory.work-thread", StringComparison.OrdinalIgnoreCase)
                      && !string.Equals(c.Id, "context.active-window", StringComparison.OrdinalIgnoreCase));
