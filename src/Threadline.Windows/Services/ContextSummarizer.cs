@@ -11,14 +11,16 @@ public sealed record SummarizedContext(
     string RawPreview,
     ContextConfidence Confidence = ContextConfidence.None,
     ProcessIntelligence? Process = null,
-    CaptureDiagnostics? Diagnostics = null)
+    CaptureDiagnostics? Diagnostics = null,
+    ContextReceipt? Receipt = null)
 {
     public string ToPromptContext()
     {
         var details = KeyDetails.Count == 0 ? "None detected." : string.Join(Environment.NewLine, KeyDetails.Select(detail => $"- {detail}"));
         var warnings = Warnings.Count == 0 ? "None." : string.Join(Environment.NewLine, Warnings.Select(warning => $"- {warning}"));
         var process = Process is null ? "Process intelligence: not available." : Process.ToDisplayText();
-        return $"Context summary: {Title}\nSource: {Source}\nConfidence: {Confidence}\n\nWhat Threadline can see:\n{process}\n\nSummary:\n{Summary}\n\nKey details:\n{details}\n\nWarnings:\n{warnings}";
+        var receipt = Receipt is null ? "Context receipt: not available." : Receipt.ToPromptText();
+        return $"Context summary: {Title}\nSource: {Source}\nConfidence: {Confidence}\n\nWhat Threadline can see:\n{process}\n\nSummary:\n{Summary}\n\nKey details:\n{details}\n\nWarnings:\n{warnings}\n\n{receipt}";
     }
 }
 
