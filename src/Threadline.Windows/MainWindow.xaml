@@ -188,11 +188,11 @@
                 </StackPanel>
               </Grid>
             </Border>
-            <Border Grid.Column="1" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="14" Padding="9,7" MinWidth="106">
+            <Border Grid.Column="1" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="14" Padding="9,7" MinWidth="126">
               <StackPanel Spacing="1">
                 <TextBlock Text="Receipt" FontSize="11" FontWeight="SemiBold" Foreground="#111827" />
-                <TextBlock Text="12 used" FontSize="10" Foreground="#6B7280" />
-                <TextBlock Text="High trust" FontSize="10" Foreground="#16A34A" />
+                <TextBlock x:Name="ReceiptSourceText" Text="No receipt" FontSize="10" Foreground="#6B7280" TextWrapping="WrapWholeWords" MaxLines="2" />
+                <TextBlock x:Name="ReceiptTrustText" Text="No context" FontSize="10" Foreground="#16A34A" TextWrapping="WrapWholeWords" MaxLines="1" />
               </StackPanel>
             </Border>
           </Grid>
