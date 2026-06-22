@@ -1,3 +1,4 @@
+using System;
 using Microsoft.UI.Xaml;
 
 namespace Threadline.Windows;
@@ -68,11 +69,11 @@ public sealed partial class MainWindow
         }
 
         _browserExtensionGuidanceShown = true;
-        TrustControlStatusText.Text = "Use browser extension for page depth";
+        TrustControlStatusText.Text = "Browser window detected - send page for deeper context";
         AppendTranscript(
             "Threadline Context",
-            "I can see the browser/app shell, but deeper page-aware answers need the Threadline browser extension. Click the extension, choose Send Page, then refresh or ask again so I can use the page title, URL, and page text instead of only the window title.");
-        AddTimeline("Showed browser extension guidance for deeper page context.");
+            "It looks like you're using a browser but I'm limited to the window title. For deeper page-aware answers, please send this page using the Threadline browser extension (click the extension icon and choose 'Send Page'), then ask again so I can use the page title, URL, and page text.");
+        AddTimeline("Browser extension guidance displayed.");
     }
 
     private static bool ContainsAny(string value, params string[] needles) =>
