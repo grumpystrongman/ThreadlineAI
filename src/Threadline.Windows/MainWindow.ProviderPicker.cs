@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Threadline.Windows.Services;
+using System.Threading.Tasks;
 
 namespace Threadline.Windows;
 
@@ -31,19 +32,28 @@ public sealed partial class MainWindow
         });
     }
 
-    private void ToggleDiagnostics_Click(object sender, RoutedEventArgs e)
+    private async void ToggleDiagnostics_Click(object sender, RoutedEventArgs e)
     {
         if (!IsDrawerOpenFor(DiagnosticsTargetPickerPanel))
         {
             OpenDiagnosticsTargetPickerPanel();
             LoadOpenWindows();
             DiagnosticsPanel.Visibility = Visibility.Visible;
+            DiagnosticsText.Text = "Gathering diagnostics...";
+            await ShowProductDiagnosticsAsync();
             return;
         }
 
         DiagnosticsPanel.Visibility = DiagnosticsPanel.Visibility == Visibility.Visible
             ? Visibility.Collapsed
             : Visibility.Visible;
+
+        // If we just showed the diagnostics panel, refresh diagnostics.
+        if (DiagnosticsPanel.Visibility == Visibility.Visible)
+        {
+            DiagnosticsText.Text = "Gathering diagnostics...";
+            await ShowProductDiagnosticsAsync();
+        }
     }
 
     private void UpdateCurrentContextPanel(SummarizedContext context)

@@ -1,3 +1,7 @@
+using System;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -66,6 +70,10 @@ public sealed partial class MainWindow
             AddTimeline($"Provider save failed for {provider}: {ex.Message}");
             AppendTranscript("Threadline Settings", $"Provider settings were not saved for {provider}.\n\nReason: {ex.Message}");
         }
+        finally
+        {
+            RestoreSidecarLayoutAfterProviderSettings();
+        }
     }
 
     private async Task SaveProviderSettingsAsync()
@@ -107,6 +115,23 @@ public sealed partial class MainWindow
         ServiceStatusText.Text = $"Provider saved: {provider}";
         AppendTranscript("Threadline Settings", $"Saved provider settings for {provider}. Start or restart a session with Provider set to {provider}.");
         AddTimeline($"Saved provider settings for {provider}.");
+    }
+
+    private void RestoreSidecarLayoutAfterProviderSettings()
+    {
+        try
+        {
+            if (_sidecarWindowHiddenForTrigger)
+            {
+                return;
+            }
+
+            PlaceSidecarForTarget(GetBestSidecarTarget(), "Provider settings updated; restored sidecar size and placement.");
+        }
+        catch
+        {
+            // Provider saves should never fail because visual placement could not be restored.
+        }
     }
 
     private void ApplyProviderDefaults(string provider, bool overwriteExisting)
@@ -163,4 +188,55 @@ public sealed partial class MainWindow
     }
 
     private sealed record ProviderDefaults(string BaseUrl, string DefaultModel, string Hint);
+
+    /// <summary>
+    /// Tests the currently entered provider settings for connectivity and required fields.
+    /// Returns a descriptive message summarizing success or failure.
+    /// </summary>
+    private async Task<string> TestProviderSettingsAsync()
+    {
+        var provider = GetSelectedSettingsProvider();
+        var baseUrl = ProviderBaseUrlBox.Text?.Trim() ?? string.Empty;
+        var model = ProviderModelBox.Text?.Trim() ?? string.Empty;
+        var apiKey = ProviderApiKeyBox.Password?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            return "Provider base URL is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            return "Provider default model is required.";
+        }
+
+        if (!IsLocalProvider(provider) && string.IsNullOrWhiteSpace(apiKey))
+        {
+            return $"{provider} requires an API key.";
+        }
+
+        try
+        {
+            using var client = new HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(10);
+
+            var request = new HttpRequestMessage(HttpMethod.Get, baseUrl);
+            if (!IsLocalProvider(provider))
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            }
+
+            var response = await client.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                return $"Success: {provider} responded with {response.StatusCode}.";
+            }
+
+            return $"Response from {provider}: {response.StatusCode}";
+        }
+        catch (Exception ex)
+        {
+            return $"Test failed: {ex.Message}";
+        }
+    }
 }

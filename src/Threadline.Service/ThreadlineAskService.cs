@@ -7,7 +7,7 @@ namespace Threadline.Service;
 
 public sealed class ThreadlineAskService
 {
-    private const int DefaultMaxOutputTokens = 1200;
+    private const int DefaultMaxOutputTokens = 2200;
 
     private readonly ISessionRepository _sessions;
     private readonly ProviderConnectionService _providers;

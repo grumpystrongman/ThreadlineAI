@@ -94,13 +94,13 @@ public sealed class ThreadlineLocalClient
         return await ReadRequiredAsync<List<LlmMessageDto>>(response, cancellationToken);
     }
 
-    public async Task<AskResponseDto> AskAsync(string sessionId, string question, string? currentWindow, CancellationToken cancellationToken = default)
+    public async Task<AskResponseDto> AskAsync(string sessionId, string question, string? currentWindow, int takeRecentEvents = 20, CancellationToken cancellationToken = default)
     {
         var request = new
         {
             question,
             currentWindow,
-            takeRecentEvents = 20
+            takeRecentEvents
         };
 
         var path = $"sessions/{sessionId}/ask";
