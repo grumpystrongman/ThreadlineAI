@@ -16,6 +16,7 @@ public sealed partial class MainWindow
     {
         StartFallbackFloatingTriggerTimer();
         StartBrowserExtensionGuidanceTimer();
+        await ShowFirstRunSetupWizardIfNeededAsync();
 
         if (_sidecarSessionBootstrapStarted) return;
         _sidecarSessionBootstrapStarted = true;
@@ -102,6 +103,6 @@ public sealed partial class MainWindow
             AppendTranscript("Threadline Session", "Loaded your active chat session. You can ask now.");
         }
 
-        SessionText.Text = $"Session: {_session.Status} / {_session.ActiveProvider ?? \"None\"}";
+        SessionText.Text = $"Session: {_session.Status} / {_session.ActiveProvider ?? "None"}";
     }
 }
