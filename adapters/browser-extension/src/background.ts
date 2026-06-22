@@ -1,6 +1,5 @@
 import { sendActiveTab, sendBrowserContext } from './browserContext.js';
 import {
-  BrowserTabIdentity,
   extensionVersion,
   formatHeartbeatAge,
   getLastHeartbeatAgeMs,
@@ -8,6 +7,7 @@ import {
   sendExtensionHeartbeat,
   testThreadlineConnection
 } from './threadlineClient.js';
+import type { BrowserTabIdentity } from './threadlineClient.js';
 
 const heartbeatAlarmName = 'threadline-extension-heartbeat';
 const heartbeatPeriodMinutes = 1;
