@@ -40,15 +40,27 @@ public sealed record CaptureDecision(bool IsAllowed, string Reason, bool Require
 
 public sealed class CapturePolicy
 {
-    private readonly IReadOnlyList<CaptureRule> _rules;
-    public CapturePolicy(IEnumerable<CaptureRule> rules) => _rules = rules.ToArray();
+    private readonly Func<IReadOnlyList<CaptureRule>> _ruleProvider;
+
+    public CapturePolicy(IEnumerable<CaptureRule> rules)
+    {
+        var snapshot = rules.ToArray();
+        _ruleProvider = () => snapshot;
+    }
+
+    public CapturePolicy(Func<IReadOnlyList<CaptureRule>> ruleProvider)
+    {
+        _ruleProvider = ruleProvider;
+    }
+
+    public IReadOnlyList<CaptureRule> Rules => _ruleProvider();
 
     public CaptureDecision Evaluate(ContextEvent contextEvent)
     {
         if (contextEvent.Sensitivity is SensitivityLevel.Blocked or SensitivityLevel.ContainsSecret)
             return CaptureDecision.Block($"Blocked sensitivity: {contextEvent.Sensitivity}");
 
-        foreach (var rule in _rules)
+        foreach (var rule in Rules)
         {
             if (!Matches(rule, contextEvent)) continue;
             return rule.Action switch
