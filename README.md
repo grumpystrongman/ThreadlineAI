@@ -16,7 +16,7 @@ ThreadlineAI is in early alpha engineering.
 - Phase 6: window attachment and action proposal service APIs are in place.
 - Phase 7: first Windows companion UI is in place for service connection, session start/use, foreground-window attachment, preview/store context, prompt composition, and action proposal tracking.
 - Phase 8: browser extension bridge is in place for user-triggered page/selection capture into the active Threadline session through the local service.
-- Phase 9: PowerShell terminal adapter is in place for explicit terminal context capture, command-output capture, and command action tracking.
+- Phase 9: PowerShell terminal adapter is in place for explicit terminal context capture, command-output capture, and action tracking.
 - Build 11.5: Windows Ask routes to the provider-response contract and appends assistant answers into a stable chat transcript when the local service exposes `/sessions/{sessionId}/ask`; older service builds fall back to prompt composition with a readable transcript message.
 - Build 11.7: the local service now exposes `/sessions/{sessionId}/ask`, resolves the active configured provider, calls the OpenAI-compatible provider path, returns answer metadata, and audit-logs provider call start/completion/failure without storing secrets or prompt content.
 - Build 11.8: the Windows sidecar now has a confidence-based deep active-app resolver with process intelligence, provider/UIA/file/screenshot pipeline ordering, a Current Context panel, and hidden diagnostics for selected targets.
@@ -24,10 +24,11 @@ ThreadlineAI is in early alpha engineering.
 - Build 11.9.1: missing-Ask-endpoint fallback now reports the local resolved context visibility instead of only showing a service plumbing message.
 - Build 11.10: the sidecar moves Current Context above the conversation, frees the left column for Open Apps and Tabs, defaults the provider picker to OpenAI, and falls back to local visibility when Ask provider calls fail.
 - Build 11.11: provider setup now lives in a Settings flyout in the Windows sidecar, with provider defaults, API-key entry, and save actions wired to Threadline's provider and secret-storage service endpoints.
+- Build 23: testing and release confidence gates are in place for registries, provider success/failure, browser extension reachability, session bootstrap, geometry save/restore, SQLite migration/writability, context source classification, fake UI Automation windows, artifact action execution, local service API contracts, smoke testing, manual QA, and release validation.
 
 ## What is in this scaffold
 
-- Core domain model for sessions, context events, capture rules, prompt composition, privacy rules, provider abstraction, provider connections, artifacts, audit events, context preview, adapter registration, secure secret references, window attachment, and window actions.
+- Core domain model for sessions, context events, capture rules, prompt composition, privacy rules, provider abstraction, provider connections, artifacts, audit events, context preview, adapter registration, secure secret references, window attachment, window actions, release-confidence context classification, and sidecar geometry state.
 - Infrastructure for SQLite persistence, in-memory adapter registration, in-memory testing, secure local secret storage, in-memory window attachment runtime state, and OpenAI-compatible HTTP providers.
 - Local service API for adapters, the Windows shell, and provider-backed Ask execution.
 - Windows companion UI scaffold wired to the local service for session, window attachment, context preview/storage, Ask response routing, prompt composition fallback, confidence-scored context resolution, visible context status, provider settings, diagnostics, and action proposal flows.
@@ -61,10 +62,11 @@ adapters/
   browser-extension/         Chrome/Edge extension scaffold
   powershell/                PowerShell terminal adapter module
 docs/
-  Architecture, provider, privacy, roadmap, and service API notes
+  Architecture, provider, privacy, roadmap, QA, and service API notes
 tests/
   Threadline.Core.Tests/
   Threadline.Infrastructure.Tests/
+  Threadline.Service.Tests/
 ```
 
 ## Development prerequisites
@@ -106,13 +108,20 @@ Run the local service:
 dotnet run --project src/Threadline.Service/Threadline.Service.csproj --urls "http://localhost:5057"
 ```
 
-Then run the local smoke test:
+Then run the local smoke tests:
 
 ```powershell
 ./eng/smoke.ps1 -BaseUrl http://localhost:5057
+./eng/smoke-build23.ps1 -BaseUrl http://localhost:5057
 ```
 
-See `docs/SERVICE_API.md` for local API details.
+Run release validation before tagging a release candidate:
+
+```powershell
+./eng/release-validate.ps1
+```
+
+See `docs/SERVICE_API.md` for local API details and `docs/BUILD_23_TESTING_RELEASE_CONFIDENCE.md` for the release confidence checklist.
 
 ## Privacy-first defaults
 
