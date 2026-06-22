@@ -55,6 +55,21 @@ function coerceLimits(input: ExtractionLimits | undefined): Required<ExtractionL
   return { ...defaultLimits, ...(input ?? {}) };
 }
 
+function snapshotLimits(limits: Required<ExtractionLimits>): Record<string, number> {
+  return {
+    maxCharacters: limits.maxCharacters,
+    maxSelectedTextCharacters: limits.maxSelectedTextCharacters,
+    maxVisibleTextCharacters: limits.maxVisibleTextCharacters,
+    maxArticleTextCharacters: limits.maxArticleTextCharacters,
+    maxHeadings: limits.maxHeadings,
+    maxLinks: limits.maxLinks,
+    maxImages: limits.maxImages,
+    maxTables: limits.maxTables,
+    maxTableCharacters: limits.maxTableCharacters,
+    maxLinkTextCharacters: limits.maxLinkTextCharacters
+  };
+}
+
 function limitText(value: string, maxCharacters: number, label: string, warnings: string[]): string {
   if (value.length <= maxCharacters) return value;
   warnings.push(`${label} was trimmed to ${maxCharacters} characters.`);
@@ -104,7 +119,7 @@ function collectPageSnapshot(inputLimits?: ExtractionLimits): BrowserSnapshot {
       .slice(0, limits.maxTables),
     warnings,
     extractionMode: articleRaw ? 'article-or-main-dom' : 'generic-dom',
-    limits
+    limits: snapshotLimits(limits)
   };
 }
 
