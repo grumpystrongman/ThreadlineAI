@@ -31,25 +31,30 @@ public sealed class ProcessIntelligenceService
                 target.Kind == ThreadlineTargetKind.BrowserTab || target.ProviderKey.Equals("browser-extension", StringComparison.OrdinalIgnoreCase) || target.ProviderKey.Equals("notepad-tabs", StringComparison.OrdinalIgnoreCase),
                 ProviderNotes(target)),
             new(
-                CaptureMethodKind.UiAutomation,
-                "UI Automation",
-                target.CanReadBody || appType is ActiveAppType.OfficeDocument or ActiveAppType.MailClient or ActiveAppType.PdfViewer or ActiveAppType.AnalyticsTool or ActiveAppType.DesktopApp,
-                "Windows accessibility text can be attempted, but confidence depends on what the app exposes."),
-            new(
                 CaptureMethodKind.FileResolver,
                 "Document/File Resolver",
                 target.ProviderKey.Equals("notepad-tabs", StringComparison.OrdinalIgnoreCase) || appType == ActiveAppType.TextEditor,
-                "Available when the visible document title can be mapped to a unique local file."),
+                "Available when the visible document title can be mapped to a unique local file. Threadline will not guess across multiple matches."),
+            new(
+                CaptureMethodKind.UiAutomation,
+                "UI Automation",
+                target.CanReadBody || appType is ActiveAppType.OfficeDocument or ActiveAppType.MailClient or ActiveAppType.PdfViewer or ActiveAppType.AnalyticsTool or ActiveAppType.DesktopApp,
+                "Windows accessibility text can be attempted, but confidence depends on what the app exposes. Browser and tabbed-editor body text should use stronger providers."),
+            new(
+                CaptureMethodKind.ClipboardSelection,
+                "Clipboard/Selection",
+                false,
+                "Consent-gated. Threadline must not read clipboard or selected text unless the user explicitly allows it for that capture."),
             new(
                 CaptureMethodKind.Screenshot,
-                "Screenshot",
-                true,
-                "Fallback only. Used when provider, UI Automation, and file resolution do not produce reliable text."),
+                "Screenshot/Vision",
+                false,
+                "Consent-gated fallback. Threadline must not capture screenshots, OCR, or visual layout unless the user explicitly allows it."),
             new(
                 CaptureMethodKind.Ocr,
                 "OCR",
                 false,
-                "Planned fallback after screenshot capture; not treated as implemented in this build."),
+                "Planned fallback after screenshot capture; not treated as implemented without explicit consent and OCR wiring."),
             new(
                 CaptureMethodKind.ImageExtraction,
                 "Image Extraction",
@@ -59,7 +64,12 @@ public sealed class ProcessIntelligenceService
                 CaptureMethodKind.LayoutAnalysis,
                 "Layout Analysis",
                 false,
-                "Planned for screenshots, PDFs, and dashboard-like apps.")
+                "Planned for screenshots, PDFs, and dashboard-like apps."),
+            new(
+                CaptureMethodKind.TitleProcessFallback,
+                "Title/process fallback",
+                true,
+                "Always available. This is metadata only and must say when Threadline lacks the real page or document body.")
         };
 
         return methods;
