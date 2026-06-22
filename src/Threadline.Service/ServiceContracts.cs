@@ -94,3 +94,12 @@ public sealed record RegisterAdapterRequest(
     AdapterPermission Permissions,
     string? Version = null,
     IReadOnlyDictionary<string, string>? Metadata = null);
+
+public sealed record ProviderTestResult(
+    string ProviderName,
+    bool Success,
+    ThreadlineDoctorCheckStatus Status,
+    string Detail,
+    long DurationMs = 0,
+    string? Model = null,
+    IReadOnlyDictionary<string, string>? Metadata = null);
