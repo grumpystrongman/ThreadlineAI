@@ -1,3 +1,7 @@
+using System;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -184,4 +188,55 @@ public sealed partial class MainWindow
     }
 
     private sealed record ProviderDefaults(string BaseUrl, string DefaultModel, string Hint);
+
+    /// <summary>
+    /// Tests the currently entered provider settings for connectivity and required fields.
+    /// Returns a descriptive message summarizing success or failure.
+    /// </summary>
+    private async Task<string> TestProviderSettingsAsync()
+    {
+        var provider = GetSelectedSettingsProvider();
+        var baseUrl = ProviderBaseUrlBox.Text?.Trim() ?? string.Empty;
+        var model = ProviderModelBox.Text?.Trim() ?? string.Empty;
+        var apiKey = ProviderApiKeyBox.Password?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            return "Provider base URL is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            return "Provider default model is required.";
+        }
+
+        if (!IsLocalProvider(provider) && string.IsNullOrWhiteSpace(apiKey))
+        {
+            return $"{provider} requires an API key.";
+        }
+
+        try
+        {
+            using var client = new HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(10);
+
+            var request = new HttpRequestMessage(HttpMethod.Get, baseUrl);
+            if (!IsLocalProvider(provider))
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            }
+
+            var response = await client.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                return $"Success: {provider} responded with {response.StatusCode}.";
+            }
+
+            return $"Response from {provider}: {response.StatusCode}";
+        }
+        catch (Exception ex)
+        {
+            return $"Test failed: {ex.Message}";
+        }
+    }
 }
