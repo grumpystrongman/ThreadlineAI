@@ -20,14 +20,27 @@ public sealed partial class MainWindow
     private async void ClearSharedContext_Click(object sender, RoutedEventArgs e) =>
         await RunUiActionAsync(() => RunRegisteredUiActionAsync("context.clear"));
 
-    private Task ClearSharedContextActionAsync()
+    private async Task ClearSharedContextActionAsync()
     {
+        string? serviceMessage = null;
+        if (_activeWorkThread is not null)
+        {
+            try
+            {
+                var result = await _workThreadClient.RunActionAsync("context.clear", _activeWorkThread.Id);
+                serviceMessage = result.Message;
+            }
+            catch (Exception ex)
+            {
+                AddTimeline("Durable context clear failed: " + ex.Message);
+                serviceMessage = "Local context cleared, but durable Work Thread context clear failed: " + ex.Message;
+            }
+        }
+
         ClearLocalWorkingState();
-        _transcriptMessages.Clear();
-        AppendTranscript("Threadline", "Shared local context cleared. Start New Chat for a clean service session.");
+        AppendTranscript("Threadline", serviceMessage ?? "Shared local context cleared. Conversation and Work Thread memory were not deleted.");
         CurrentWindowText.Text = "No target window.";
-        AddTimeline("Cleared local shared context through registered action.");
-        return Task.CompletedTask;
+        AddTimeline("Cleared shared context through registered action.");
     }
 
     private void ClearLocalWorkingState()
@@ -36,6 +49,7 @@ public sealed partial class MainWindow
         _lastAction = null;
         _lastNativeUiResult = null;
         _lastContextSummary = null;
+        _lastArtifact = null;
         _pendingConnectionTarget = null;
         _selectedTargetWindow = null;
         _selectedThreadlineTarget = null;
