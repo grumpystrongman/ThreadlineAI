@@ -27,6 +27,16 @@ public sealed class ThreadlineLocalClient
     public async Task<ServiceHealth> GetHealthAsync(CancellationToken cancellationToken = default) =>
         await GetRequiredAsync<ServiceHealth>("health", cancellationToken);
 
+    public async Task<ThreadlineDoctorReportDto> GetDoctorAsync(CancellationToken cancellationToken = default) =>
+        await GetRequiredAsync<ThreadlineDoctorReportDto>("doctor", cancellationToken);
+
+    public async Task<ProviderTestResultDto> TestProviderAsync(string providerName, CancellationToken cancellationToken = default)
+    {
+        var path = $"providers/{Uri.EscapeDataString(providerName)}/test";
+        var response = await _httpClient.PostAsync(path, null, cancellationToken);
+        return await ReadRequiredAsync<ProviderTestResultDto>(response, cancellationToken);
+    }
+
     public async Task<ThreadlineSessionDto> StartSessionAsync(string name, string provider, CancellationToken cancellationToken = default)
     {
         var response = await _httpClient.PostAsJsonAsync("sessions", new { name, provider }, _jsonOptions, cancellationToken);
@@ -203,6 +213,11 @@ public sealed class ThreadlineEndpointNotFoundException : InvalidOperationExcept
 }
 
 public sealed record ServiceHealth(string Status, string Service, string Storage, bool AuthRequired, int MaxContextCharacters);
+public sealed record ThreadlineDoctorReportDto(string Readiness, DateTimeOffset CreatedAt, IReadOnlyList<ThreadlineDoctorCheckDto> Checks, IReadOnlyList<ThreadlineCapabilityDto>? Capabilities, IReadOnlyList<ThreadlineActionDefinitionDto>? Actions);
+public sealed record ThreadlineDoctorCheckDto(string Id, string DisplayName, string Status, string Detail, string? Remediation, IReadOnlyDictionary<string, string>? Metadata);
+public sealed record ThreadlineCapabilityDto(string Id, string Category, string DisplayName, string Status, string Description, IReadOnlyDictionary<string, string>? Metadata);
+public sealed record ThreadlineActionDefinitionDto(string Id, string Kind, string DisplayName, string Description, string? RequiredCapabilityId, bool RequiresActiveSession, bool RequiresActiveWorkThread);
+public sealed record ProviderTestResultDto(string ProviderName, bool Success, string Status, string Detail, long DurationMs, string? Model, IReadOnlyDictionary<string, string>? Metadata);
 public sealed record ThreadlineSessionDto(string Id, string Name, string Status, string? ActiveProvider);
 public sealed record WindowSnapshotDto(string Id, string ApplicationName, string ProcessName, string WindowTitle, int? ProcessId, string? ExecutablePath, string? Uri, bool IsForeground);
 public sealed record WindowAttachmentDto(string Id, string SessionId, WindowSnapshotDto Snapshot, string Status, DateTimeOffset AttachedAt, DateTimeOffset? DetachedAt);
