@@ -34,14 +34,53 @@ public sealed class BrowserExtensionContextProvider
         var preview = BuildPreview(lines);
         var contextType = $"Context type: {browserEvent.ContextType}";
         var keyDetails = new List<string> { title, url, extraction, contextType, preview }.Where(item => !string.IsNullOrWhiteSpace(item)).ToList();
+        var isSelection = browserEvent.ContextType.Contains("selection", StringComparison.OrdinalIgnoreCase) || extraction.Contains("selection", StringComparison.OrdinalIgnoreCase);
+        var captureKind = isSelection ? ContextCaptureKind.SelectedText : ContextCaptureKind.PageText;
+        var captured = new List<string>
+        {
+            isSelection ? "Browser selected text supplied by extension." : "Browser page text supplied by extension.",
+            title,
+            string.IsNullOrWhiteSpace(url) ? "URL was not supplied by the extension payload." : url,
+            $"Stored browser event: {browserEvent.ContextType}",
+            $"Captured characters: {browserEvent.Content.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
+        };
+        var notCaptured = new List<string>
+        {
+            "Native browser page body was not read through UI Automation.",
+            "The Windows client has not yet verified this event against the active tab URL; it is the latest browser context event in the session."
+        };
+        if (isSelection)
+        {
+            notCaptured.Add("Full page text was not captured unless it was also included by the extension event.");
+        }
+        else
+        {
+            notCaptured.Add("Explicit selected text was not captured unless it was also included by the extension event.");
+        }
+
+        var receipt = new ContextReceipt(
+            "browser-extension",
+            ContextConfidence.High,
+            captureKind,
+            captured,
+            notCaptured,
+            false,
+            isSelection
+                ? "Threadline has selected text from the browser extension."
+                : "Threadline has page text from the browser extension.",
+            []);
 
         return new SummarizedContext(
             target.Title,
             "browser-extension",
-            "Threadline found browser extension page context for this session.",
+            isSelection
+                ? "Threadline found browser extension selected-text context for this session."
+                : "Threadline found browser extension page context for this session.",
             keyDetails,
             [],
-            browserEvent.Content);
+            browserEvent.Content,
+            ContextConfidence.High,
+            Receipt: receipt);
     }
 
     private static string BuildPreview(IReadOnlyList<string> lines)
