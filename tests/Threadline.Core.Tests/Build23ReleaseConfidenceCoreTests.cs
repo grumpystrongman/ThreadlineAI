@@ -23,12 +23,15 @@ public sealed class Build23ReleaseConfidenceCoreTests
     {
         var catalog = new ThreadlineActionCatalog();
         var registry = new CapabilityRegistry();
+        var knownCapabilityIds = registry.List().Select(capability => capability.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        knownCapabilityIds.Add("provider.configured"); // Doctor projects this dynamic capability from provider state.
+
         var actions = catalog.List();
         var duplicateIds = actions.GroupBy(action => action.Id, StringComparer.OrdinalIgnoreCase).Where(group => group.Count() > 1).ToArray();
 
         Assert.Empty(duplicateIds);
         Assert.All(actions.Where(action => action.RequiredCapabilityId is not null), action =>
-            Assert.NotNull(registry.Get(action.RequiredCapabilityId!)));
+            Assert.Contains(action.RequiredCapabilityId!, knownCapabilityIds));
     }
 
     [Fact]
