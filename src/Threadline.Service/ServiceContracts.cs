@@ -107,3 +107,20 @@ public sealed record ProviderTestResult(
     long DurationMs = 0,
     string? Model = null,
     IReadOnlyDictionary<string, string>? Metadata = null);
+
+public sealed record PrivacyExclusionRequest(string Pattern, string? Reason = null);
+
+public sealed record NeverSendRequest(
+    string? AppName = null,
+    string? ProcessName = null,
+    string? Domain = null,
+    string? Uri = null,
+    string? Reason = null);
+
+public sealed record PrivacyStatusResponse(
+    bool AuthRequired,
+    string ApiTokenPath,
+    int RetentionDays,
+    bool LocalOnlyMode,
+    IReadOnlySet<string> CorsAllowedOrigins,
+    int ActivePrivacyRuleCount);
