@@ -14,4 +14,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 dotnet test tests/Threadline.Infrastructure.Tests/Threadline.Infrastructure.Tests.csproj --configuration Release
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+dotnet test tests/Threadline.Service.Tests/Threadline.Service.Tests.csproj --configuration Release
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 Write-Host 'Tests complete.'
