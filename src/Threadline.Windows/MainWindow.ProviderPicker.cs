@@ -28,7 +28,7 @@ public sealed partial class MainWindow
             _lastContextSummary = await _contentResolver.ResolveAsync(_session!.Id, selected);
             UpdateCurrentContextPanel(_lastContextSummary);
             AppendTranscript("Selected Target Preview", _lastContextSummary.ToPromptContext());
-            AddTimeline($"Selected target {selected.Title}; context source: {_lastContextSummary.Source}");
+            AddTimeline($"Selected target {selected.Title}; context source: {_lastContextSummary.Source}; receipt: {_lastContextSummary.Receipt?.CaptureKind.ToString() ?? "none"}");
         });
     }
 
@@ -61,6 +61,20 @@ public sealed partial class MainWindow
         var status = BuildContextStatus(context);
         ContextStatusText.Text = status;
         CurrentContextText.Text = $"Source: {context.Source} • Confidence: {context.Confidence}\nSummary: {context.Summary}";
+
+        if (context.Receipt is null)
+        {
+            ReceiptSourceText.Text = "No receipt";
+            ReceiptTrustText.Text = "Unknown trust";
+        }
+        else
+        {
+            ReceiptSourceText.Text = $"{context.Receipt.CaptureKind} • {context.Receipt.SourceUsed}";
+            ReceiptTrustText.Text = context.Receipt.MissingRealWorkingContent
+                ? "Missing real content"
+                : $"{context.Receipt.Confidence} trust";
+        }
+
         DiagnosticsText.Text = context.Diagnostics?.ToDisplayText() ?? "No diagnostics are available for the current context.";
     }
 
@@ -68,17 +82,30 @@ public sealed partial class MainWindow
     {
         ContextStatusText.Text = "No context";
         CurrentContextText.Text = "No resolved context yet. Select a target and click Use.";
+        ReceiptSourceText.Text = "No receipt";
+        ReceiptTrustText.Text = "No context";
         DiagnosticsText.Text = "No diagnostics yet.";
         DiagnosticsPanel.Visibility = Visibility.Collapsed;
     }
 
     private static string BuildContextStatus(SummarizedContext context)
     {
+        var receipt = context.Receipt;
+        if (receipt is not null)
+        {
+            if (receipt.MissingRealWorkingContent) return $"Missing content • {receipt.Confidence}";
+            if (receipt.IsPageText) return $"Page text • {receipt.Confidence}";
+            if (receipt.IsSelectedText) return $"Selected text • {receipt.Confidence}";
+            if (receipt.IsFileBacked) return $"File-backed • {receipt.Confidence}";
+            if (receipt.IsUiAutomation) return $"UI Automation • {receipt.Confidence}";
+            if (receipt.IsOcr) return $"OCR • {receipt.Confidence}";
+            if (receipt.IsTitleOnly) return $"Title only • {receipt.Confidence}";
+        }
+
         var source = context.Source ?? string.Empty;
 
         if (source.Contains("needed", StringComparison.OrdinalIgnoreCase) ||
-            source.Contains("missing", StringComparison.OrdinalIgnoreCase) ||
-            source.Contains("provider", StringComparison.OrdinalIgnoreCase))
+            source.Contains("missing", StringComparison.OrdinalIgnoreCase))
         {
             return $"Provider needed • {context.Confidence}";
         }
