@@ -35,7 +35,7 @@ public sealed record WindowSnapshot(
             sessionId,
             ContextSource.ActiveWindow,
             "window-snapshot",
-            $"Application: {ApplicationName}\nProcess: {ProcessName}\nWindow: {WindowTitle}",
+            BuildContextContent(),
             CapturedAt,
             applicationName: ApplicationName,
             processName: ProcessName,
@@ -43,6 +43,40 @@ public sealed record WindowSnapshot(
             uri: Uri,
             userApproved: userApproved,
             metadata: BuildContextMetadata());
+
+    private string BuildContextContent()
+    {
+        var builder = new System.Text.StringBuilder();
+        builder.AppendLine($"Application: {ApplicationName}");
+        builder.AppendLine($"Process: {ProcessName}");
+        builder.AppendLine($"Window: {WindowTitle}");
+
+        var provider = TryGetMetadata("nativeContext.providerName");
+        var level = TryGetMetadata("nativeContext.levelDisplay") ?? TryGetMetadata("nativeContext.level");
+        var guidance = TryGetMetadata("nativeContext.guidance");
+        var nativeContent = TryGetMetadata("nativeContext.content");
+        var warnings = TryGetMetadata("nativeContext.warnings");
+
+        if (!string.IsNullOrWhiteSpace(provider)) builder.AppendLine($"Native provider: {provider}");
+        if (!string.IsNullOrWhiteSpace(level)) builder.AppendLine($"Context level: {level}");
+        if (!string.IsNullOrWhiteSpace(guidance)) builder.AppendLine($"Capture note: {guidance}");
+        if (!string.IsNullOrWhiteSpace(warnings)) builder.AppendLine($"Capture warnings: {warnings}");
+
+        if (!string.IsNullOrWhiteSpace(nativeContent))
+        {
+            builder.AppendLine();
+            builder.AppendLine("Captured context:");
+            builder.AppendLine(nativeContent);
+        }
+
+        return builder.ToString().TrimEnd();
+    }
+
+    private string? TryGetMetadata(string key)
+    {
+        if (Metadata is null) return null;
+        return Metadata.TryGetValue(key, out var value) ? value : null;
+    }
 
     private IReadOnlyDictionary<string, string> BuildContextMetadata()
     {
