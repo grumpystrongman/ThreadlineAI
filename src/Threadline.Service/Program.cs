@@ -89,6 +89,7 @@ await app.Services.GetRequiredService<PrivacyRuntimeState>().InitializeAsync(
 app.MapThreadlineHealth(serviceOptions);
 app.MapThreadlineReliabilityApi();
 app.MapThreadlineSecurityPrivacyApi();
+app.MapThreadlineProviderAuditApi();
 app.MapThreadlineWorkThreadApi();
 app.MapThreadlineApi();
 
