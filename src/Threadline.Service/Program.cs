@@ -54,6 +54,7 @@ foreach (var initializer in app.Services.GetServices<IThreadlineStoreInitializer
 }
 
 app.MapThreadlineHealth(serviceOptions);
+app.MapThreadlineReliabilityApi();
 app.MapThreadlineWorkThreadApi();
 app.MapThreadlineApi();
 
