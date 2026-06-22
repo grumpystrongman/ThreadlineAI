@@ -8,6 +8,7 @@
 <body>
   <main>
     <h1>ThreadlineAI Browser Bridge</h1>
+    <p class="help">Use this page to tune the Chrome/Edge capture path. Browser capture is explicit: Send page and Send selection push approved page context into the active Threadline session.</p>
     <label>
       Local service URL
       <input id="baseUrl" type="url" placeholder="http://localhost:5057" />
@@ -16,10 +17,21 @@
       Local access token, optional
       <input id="localAccessToken" type="password" />
     </label>
+    <fieldset>
+      <legend>DOM extraction limits</legend>
+      <label>Max total characters per capture <input id="maxCharacters" type="number" min="1000" max="50000" step="1000" /></label>
+      <label>Max selected text characters <input id="maxSelectedTextCharacters" type="number" min="500" max="50000" step="500" /></label>
+      <label>Max visible text characters <input id="maxVisibleTextCharacters" type="number" min="1000" max="50000" step="1000" /></label>
+      <label>Max article/main text characters <input id="maxArticleTextCharacters" type="number" min="1000" max="50000" step="1000" /></label>
+      <label>Max links <input id="maxLinks" type="number" min="0" max="200" step="10" /></label>
+      <label>Max images <input id="maxImages" type="number" min="0" max="200" step="10" /></label>
+      <label>Max tables <input id="maxTables" type="number" min="0" max="60" step="5" /></label>
+    </fieldset>
     <label>
-      Max characters per capture
-      <input id="maxCharacters" type="number" min="1000" max="50000" step="1000" />
+      Redaction hooks, one regex or literal term per line
+      <textarea id="redactionPatterns" rows="7" placeholder="customer-secret-\d+&#10;internal token literal"></textarea>
     </label>
+    <p class="help">Built-in redaction already covers common tokens, API keys, JWTs, email addresses, phone numbers, SSNs, URL secrets, and MRN/patient-id markers. These hooks are for local terms Threadline should remove before capture leaves the extension.</p>
     <button id="save">Save</button>
     <p id="status">Ready.</p>
   </main>
