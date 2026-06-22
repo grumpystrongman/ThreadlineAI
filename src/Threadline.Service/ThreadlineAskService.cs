@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using Threadline.Core;
 using Threadline.Infrastructure;
 using Threadline.Infrastructure.Security;
@@ -15,6 +18,8 @@ public sealed class ThreadlineAskService
     private readonly PromptComposer _promptComposer;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IClock _clock;
+    private readonly ThreadlineServiceOptions _options;
+    private readonly SecretRedactor _redactor;
     private readonly IAuditRepository? _auditRepository;
 
     public ThreadlineAskService(
@@ -24,6 +29,8 @@ public sealed class ThreadlineAskService
         PromptComposer promptComposer,
         IHttpClientFactory httpClientFactory,
         IClock clock,
+        ThreadlineServiceOptions options,
+        SecretRedactor redactor,
         IAuditRepository? auditRepository = null)
     {
         _sessions = sessions;
@@ -32,6 +39,8 @@ public sealed class ThreadlineAskService
         _promptComposer = promptComposer;
         _httpClientFactory = httpClientFactory;
         _clock = clock;
+        _options = options;
+        _redactor = redactor;
         _auditRepository = auditRepository;
     }
 
@@ -68,22 +77,42 @@ public sealed class ThreadlineAskService
             throw new InvalidOperationException($"Provider '{providerConnection.ProviderName}' is missing a default model.");
         }
 
+        if (_options.LocalOnlyMode && !IsLocalProvider(providerConnection))
+        {
+            await AppendAuditAsync(
+                AuditEvent.Create(sessionId, AuditEventType.ProviderCallFailed, _clock.UtcNow, $"Provider call blocked by local-only mode: {providerConnection.ProviderName}", new Dictionary<string, string>
+                {
+                    ["provider"] = providerConnection.ProviderName,
+                    ["model"] = providerConnection.DefaultModel,
+                    ["localOnlyMode"] = "true"
+                }),
+                cancellationToken);
+            throw new InvalidOperationException("Local-only mode is enabled. Remote provider calls are blocked for this session.");
+        }
+
         var apiKey = await ResolveApiKeyAsync(providerConnection, cancellationToken);
         var events = await _sessions.GetRecentEventsAsync(sessionId, request.TakeRecentEvents ?? 20, cancellationToken);
         var summary = await _sessions.GetLatestSummaryAsync(sessionId, cancellationToken);
-        var messages = _promptComposer.Compose(new ThreadlinePromptContext(request.Question.Trim(), request.CurrentWindow, summary, events));
+        var redactedQuestion = _redactor.Redact(request.Question.Trim());
+        var redactedCurrentWindow = string.IsNullOrWhiteSpace(request.CurrentWindow) ? null : _redactor.Redact(request.CurrentWindow);
+        var messages = _promptComposer.Compose(new ThreadlinePromptContext(redactedQuestion, redactedCurrentWindow, summary, events));
         var llmRequest = new LlmRequest(providerConnection.DefaultModel, messages, Temperature: 0.2, MaxOutputTokens: DefaultMaxOutputTokens);
         var provider = new OpenAiCompatibleProvider(
             _httpClientFactory.CreateClient(nameof(ThreadlineAskService)),
             new OpenAiCompatibleProviderOptions(providerConnection.ProviderName, providerConnection.BaseUrl, apiKey, providerConnection.DefaultModel));
 
+        var payloadHash = HashMessages(messages);
         await AppendAuditAsync(
-            AuditEvent.Create(sessionId, AuditEventType.ProviderCallStarted, _clock.UtcNow, $"Provider call started: {providerConnection.ProviderName}", new Dictionary<string, string>
+            AuditEvent.Create(sessionId, AuditEventType.ProviderCallStarted, _clock.UtcNow, $"Provider context prepared and call started: {providerConnection.ProviderName}", new Dictionary<string, string>
             {
                 ["provider"] = providerConnection.ProviderName,
                 ["model"] = providerConnection.DefaultModel,
                 ["messageCount"] = messages.Count.ToString(),
-                ["recentEventCount"] = events.Count.ToString()
+                ["recentEventCount"] = events.Count.ToString(),
+                ["contextPayloadSha256"] = payloadHash,
+                ["promptCharacterCount"] = messages.Sum(message => message.Content.Length).ToString(),
+                ["contextEventIds"] = string.Join(',', events.Select(item => item.Id).Take(50)),
+                ["localOnlyMode"] = _options.LocalOnlyMode.ToString()
             }),
             cancellationToken);
 
@@ -99,7 +128,8 @@ public sealed class ThreadlineAskService
                     ["provider"] = response.ProviderName,
                     ["model"] = response.Model,
                     ["durationMs"] = stopwatch.ElapsedMilliseconds.ToString(),
-                    ["answerLength"] = response.Content.Length.ToString()
+                    ["answerLength"] = response.Content.Length.ToString(),
+                    ["contextPayloadSha256"] = payloadHash
                 }),
                 cancellationToken);
 
@@ -115,7 +145,8 @@ public sealed class ThreadlineAskService
                     ["model"] = providerConnection.DefaultModel,
                     ["durationMs"] = stopwatch.ElapsedMilliseconds.ToString(),
                     ["errorType"] = ex.GetType().Name,
-                    ["errorMessage"] = ex.Message
+                    ["errorMessage"] = _redactor.Redact(ex.Message),
+                    ["contextPayloadSha256"] = payloadHash
                 }),
                 cancellationToken);
 
@@ -137,6 +168,19 @@ public sealed class ThreadlineAskService
 
         return await _secrets.GetValueAsync(providerConnection.CredentialReference, cancellationToken)
             ?? throw new InvalidOperationException($"Provider '{providerConnection.ProviderName}' credential could not be resolved.");
+    }
+
+    private static bool IsLocalProvider(ProviderConnection providerConnection)
+    {
+        if (!Uri.TryCreate(providerConnection.BaseUrl, UriKind.Absolute, out var uri)) return false;
+        if (uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)) return true;
+        return IPAddress.TryParse(uri.Host, out var address) && IPAddress.IsLoopback(address);
+    }
+
+    private static string HashMessages(IReadOnlyList<LlmMessage> messages)
+    {
+        var payload = string.Join('\n', messages.Select(message => $"{message.Role}:{message.Content}"));
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
     }
 
     private Task AppendAuditAsync(AuditEvent auditEvent, CancellationToken cancellationToken) =>
