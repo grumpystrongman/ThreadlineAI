@@ -15,7 +15,7 @@ public static class SensitiveContentRedactor
         ("ssn", new Regex(@"\b\d{3}-\d{2}-\d{4}\b", RegexOptions.Compiled), "[redacted-ssn]"),
         ("phone", new Regex(@"(?<!\d)(?:\+?1[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}(?!\d)", RegexOptions.Compiled), "[redacted-phone]"),
         ("credit-card-like-number", new Regex(@"\b(?:\d[ -]*?){13,19}\b", RegexOptions.Compiled), "[redacted-card-like-number]"),
-        ("api-key", new Regex(@"\b(?:api[_-]?key|secret|token|password|pwd)\s*[:=]\s*['\"]?[^\s'\";,]{8,}", RegexOptions.IgnoreCase | RegexOptions.Compiled), "[redacted-secret]"),
+        ("api-key", new Regex("\\b(?:api[_-]?key|secret|token|password|pwd)\\s*[:=]\\s*['\\\"]?[^\\s'\\\";,]{8,}", RegexOptions.IgnoreCase | RegexOptions.Compiled), "[redacted-secret]"),
         ("bearer-token", new Regex(@"\bBearer\s+[A-Za-z0-9._~+/=-]{12,}", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Bearer [redacted-token]"),
         ("connection-string-password", new Regex(@"\bPassword\s*=\s*[^;\r\n]+", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Password=[redacted]")
     ];
