@@ -283,6 +283,7 @@ function buildAdapterMetadata(tabIdentity?: BrowserTabIdentity): Record<string, 
   };
 
   if (tabIdentity) {
+    metadata.currentTabCapturedAt = tabIdentity.capturedAt;
     if (tabIdentity.tabId !== undefined) metadata.currentTabId = String(tabIdentity.tabId);
     if (tabIdentity.windowId !== undefined) metadata.currentWindowId = String(tabIdentity.windowId);
     if (tabIdentity.title) metadata.currentTabTitle = tabIdentity.title.slice(0, 240);
