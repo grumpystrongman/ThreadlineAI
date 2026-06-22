@@ -17,7 +17,8 @@ const save = document.querySelector<HTMLButtonElement>('#save')!;
 const status = document.querySelector<HTMLParagraphElement>('#status')!;
 
 function numberOrDefault(value: unknown, fallback: number): number {
-  return Number.isFinite(value) ? Number(value) : fallback;
+  const parsed = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 async function load(): Promise<void> {
