@@ -13,7 +13,7 @@ public sealed partial class MainWindow
         await RunUiActionAsync(NewWorkThreadAsync);
 
     private async void ResumeWorkThread_Click(object sender, RoutedEventArgs e) =>
-        await RunUiActionAsync(ResumeWorkThreadAsync);
+        await RunUiActionAsync(() => RunRegisteredUiActionAsync("work.resume"));
 
     private async void RenameWorkThread_Click(object sender, RoutedEventArgs e) =>
         await RunUiActionAsync(RenameWorkThreadAsync);
@@ -265,20 +265,17 @@ public sealed partial class MainWindow
     {
         if (_activeWorkThread is null)
         {
-            WorkThreadStatusText.Text = "Work Thread: none active";
+            WorkThreadStatusText.Text = "Work Thread: none";
             return;
         }
 
         WorkThreadStatusText.Text = $"Work Thread: {_activeWorkThread.Title} ({_activeWorkThread.Status})";
-        if (string.IsNullOrWhiteSpace(WorkThreadTitleBox.Text) || WorkThreadTitleBox.Text.StartsWith("Work Thread", StringComparison.OrdinalIgnoreCase))
-        {
-            WorkThreadTitleBox.Text = _activeWorkThread.Title;
-        }
+        WorkThreadTitleBox.Text = _activeWorkThread.Title;
     }
 
-    private string NormalizeThreadTitle(string? proposedTitle)
+    private string NormalizeThreadTitle(string? proposed)
     {
-        if (!string.IsNullOrWhiteSpace(proposedTitle)) return proposedTitle.Trim();
+        if (!string.IsNullOrWhiteSpace(proposed)) return proposed.Trim();
         return BuildDefaultWorkThreadTitle();
     }
 
@@ -287,30 +284,23 @@ public sealed partial class MainWindow
         var target = _selectedThreadlineTarget ?? _lastFollowTarget;
         if (target is not null)
         {
-            return $"{target.Window.ApplicationName} — {target.Title}";
+            return $"{target.Window.ApplicationName}: {target.Title}";
         }
 
-        if (_lastForegroundWindow is not null)
-        {
-            return $"{_lastForegroundWindow.ApplicationName} — {_lastForegroundWindow.WindowTitle ?? "Untitled"}";
-        }
-
-        return $"Work Thread — {DateTimeOffset.Now:g}";
+        return $"Threadline Work {DateTimeOffset.Now:g}";
     }
 
     private string? BuildCurrentTargetDescription()
     {
         var target = _selectedThreadlineTarget ?? _lastFollowTarget;
-        if (target is not null)
-        {
-            return BuildTargetStatus(target, "Work Thread target");
-        }
-
-        return _lastForegroundWindow?.ToDisplayText();
+        return target is null ? null : BuildTargetStatus(target, "Current");
     }
 
-    private static string FormatStoredRole(string role)
+    private static string FormatStoredRole(string role) => role switch
     {
-        return role.Equals("user", StringComparison.OrdinalIgnoreCase) ? "You" : "Threadline";
-    }
+        "user" => "You",
+        "assistant" => "Threadline",
+        "artifact" => "Threadline Artifact",
+        _ => "Threadline Note"
+    };
 }
