@@ -13,10 +13,12 @@ public enum CaptureMethodKind
     Provider,
     UiAutomation,
     FileResolver,
+    ClipboardSelection,
     Screenshot,
     Ocr,
     ImageExtraction,
-    LayoutAnalysis
+    LayoutAnalysis,
+    TitleProcessFallback
 }
 
 public enum ActiveAppType
@@ -80,4 +82,76 @@ public sealed record CaptureDiagnostics(
 
         return $"Window: {WindowTitle}\nProcess: {ProcessName}\nPID: {ProcessId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Unknown"}\nCapture method used: {CaptureMethodUsed}\nChars extracted: {CharactersExtracted}\nImages found: {ImagesFound}\nSummary size: {SummarySize}\nConfidence: {Confidence}\n\nDetails:\n{details}";
     }
+}
+
+public sealed record ContextCaptureConsent(
+    bool ClipboardSelectionAllowed = false,
+    bool ScreenshotVisionAllowed = false)
+{
+    public static ContextCaptureConsent None { get; } = new();
+}
+
+public enum ContextCaptureKind
+{
+    None,
+    PageText,
+    SelectedText,
+    TitleOnly,
+    Ocr,
+    FileBacked,
+    UiAutomation,
+    ClipboardSelection,
+    ScreenshotVision
+}
+
+public enum ContextProviderAttemptStatus
+{
+    Captured,
+    Skipped,
+    Missed,
+    Blocked,
+    Failed
+}
+
+public sealed record ContextProviderAttempt(
+    string Provider,
+    ContextProviderAttemptStatus Status,
+    string Detail);
+
+public sealed record ContextReceipt(
+    string SourceUsed,
+    ContextConfidence Confidence,
+    ContextCaptureKind CaptureKind,
+    IReadOnlyList<string> Captured,
+    IReadOnlyList<string> NotCaptured,
+    bool MissingRealWorkingContent,
+    string UserMessage,
+    IReadOnlyList<ContextProviderAttempt> ProviderAttempts)
+{
+    public bool IsPageText => CaptureKind == ContextCaptureKind.PageText;
+    public bool IsSelectedText => CaptureKind == ContextCaptureKind.SelectedText;
+    public bool IsTitleOnly => CaptureKind == ContextCaptureKind.TitleOnly;
+    public bool IsOcr => CaptureKind == ContextCaptureKind.Ocr;
+    public bool IsFileBacked => CaptureKind == ContextCaptureKind.FileBacked;
+    public bool IsUiAutomation => CaptureKind == ContextCaptureKind.UiAutomation;
+    public bool IsClipboardSelection => CaptureKind == ContextCaptureKind.ClipboardSelection;
+    public bool IsScreenshotVision => CaptureKind == ContextCaptureKind.ScreenshotVision;
+
+    public string ToDisplayText()
+    {
+        return $"Source used: {SourceUsed}\nConfidence: {Confidence}\nCapture kind: {CaptureKind}\nMissing real working content: {(MissingRealWorkingContent ? "Yes" : "No")}\n\nWhat was captured:\n{FormatList(Captured)}\n\nWhat was not captured:\n{FormatList(NotCaptured)}\n\nReceipt message: {UserMessage}\n\nProvider ladder:\n{FormatAttempts(ProviderAttempts)}";
+    }
+
+    public string ToPromptText()
+    {
+        return $"Context receipt:\n- Source used: {SourceUsed}\n- Confidence: {Confidence}\n- Capture kind: {CaptureKind}\n- Is page text: {IsPageText}\n- Is selected text: {IsSelectedText}\n- Is title-only: {IsTitleOnly}\n- Is OCR: {IsOcr}\n- Is file-backed: {IsFileBacked}\n- Is UI Automation: {IsUiAutomation}\n- Missing real working content: {MissingRealWorkingContent}\n- Receipt message: {UserMessage}\n\nWhat was captured:\n{FormatList(Captured)}\n\nWhat was not captured:\n{FormatList(NotCaptured)}\n\nProvider ladder:\n{FormatAttempts(ProviderAttempts)}";
+    }
+
+    private static string FormatList(IReadOnlyList<string> items) => items.Count == 0
+        ? "- None."
+        : string.Join(Environment.NewLine, items.Select(item => $"- {item}"));
+
+    private static string FormatAttempts(IReadOnlyList<ContextProviderAttempt> attempts) => attempts.Count == 0
+        ? "- Not recorded."
+        : string.Join(Environment.NewLine, attempts.Select(attempt => $"- {attempt.Provider}: {attempt.Status} — {attempt.Detail}"));
 }
