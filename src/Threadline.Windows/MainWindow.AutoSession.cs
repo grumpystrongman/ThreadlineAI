@@ -27,7 +27,7 @@ public sealed partial class MainWindow
         if (_fallbackEdgeTriggerStarted) return;
 
         _fallbackEdgeTriggerStarted = true;
-        _fallbackEdgeTriggerTimer.Interval = TimeSpan.FromMilliseconds(900);
+        _fallbackEdgeTriggerTimer.Interval = TimeSpan.FromMilliseconds(1500);
         _fallbackEdgeTriggerTimer.Tick += (_, _) => SafeEnsureFallbackFloatingTriggerVisible();
         _fallbackEdgeTriggerTimer.Start();
     }
@@ -102,6 +102,6 @@ public sealed partial class MainWindow
             AppendTranscript("Threadline Session", "Loaded your active chat session. You can ask now.");
         }
 
-        SessionText.Text = $"Session: {_session.Status} / {_session.ActiveProvider ?? "None"}";
+        SessionText.Text = $"Session: {_session.Status} / {_session.ActiveProvider ?? \"None\"}";
     }
 }
