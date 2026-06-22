@@ -40,7 +40,7 @@ function unavailableReason(identity?: BrowserTabIdentity): string | undefined {
   if (/^about:/i.test(url)) return 'Browser about/new-tab pages do not expose page DOM to extensions.';
   if (/^devtools:/i.test(url)) return 'DevTools pages do not expose page DOM to extensions.';
   if (/^chrome-extension:\/\//i.test(url)) return 'Extension pages cannot be captured by another extension context.';
-  if (/^chromewebstore\.google\.com/i.test(url)) return 'Chrome Web Store pages block normal extension capture.';
+  if (/^https:\/\/chromewebstore\.google\.com\//i.test(url)) return 'Chrome Web Store pages block normal extension capture.';
   if (!/^https?:\/\//i.test(url)) return 'Only normal http/https pages expose full page context to Threadline.';
   return undefined;
 }
