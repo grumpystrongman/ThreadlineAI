@@ -17,3 +17,5 @@ public sealed record SaveWorkContextEventRequest(
 public sealed record SaveConversationMessageRequest(string Role, string Content, string? ContextReceiptId = null);
 public sealed record SaveContextReceiptRequest(string UsedSourcesJson, string? NotUsedSourcesJson = null, string? Limitations = null);
 public sealed record SaveArtifactRequest(string ArtifactType, string Title, string Content, string? ContextReceiptId = null);
+public sealed record RegenerateArtifactRequest(string? Transcript = null, string? ContextSummary = null);
+public sealed record ArtifactExportResponse(string FileName, string ContentType, string Content, WorkArtifact Artifact);
