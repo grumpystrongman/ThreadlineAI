@@ -20,7 +20,7 @@ public sealed partial class MainWindow
 
             var contextStatus = BuildContextStatus(_lastContextSummary);
             AddTimeline($"Ask using context: {target.Window.ApplicationName} — {target.Title} ({contextStatus})");
-            AppendTranscript("Threadline Context", $"Using context from {target.Window.ApplicationName} — {target.Title}\nStatus: {contextStatus}\nSource: {_lastContextSummary.Source}\nConfidence: {_lastContextSummary.Confidence}");
+            AppendTranscript("Threadline Context", BuildAskContextReceiptMessage(target, _lastContextSummary, contextStatus));
             return BuildFullPromptContext(_lastContextSummary);
         }
 
@@ -48,6 +48,17 @@ public sealed partial class MainWindow
         if (_selectedThreadlineTarget is not null) return _selectedThreadlineTarget;
         if (_lastFollowTarget is not null) return _lastFollowTarget;
         return null;
+    }
+
+    private static string BuildAskContextReceiptMessage(ThreadlineTarget target, SummarizedContext context, string contextStatus)
+    {
+        var receipt = context.Receipt;
+        if (receipt is null)
+        {
+            return $"Using context from {target.Window.ApplicationName} — {target.Title}\nStatus: {contextStatus}\nSource: {context.Source}\nConfidence: {context.Confidence}\nReceipt: not available";
+        }
+
+        return $"Using context from {target.Window.ApplicationName} — {target.Title}\nStatus: {contextStatus}\nSource: {context.Source}\nConfidence: {context.Confidence}\nReceipt: {receipt.CaptureKind} via {receipt.SourceUsed}\nMissing real content: {(receipt.MissingRealWorkingContent ? "Yes" : "No")}\n{receipt.UserMessage}";
     }
 
     private static string BuildFullPromptContext(SummarizedContext context)
