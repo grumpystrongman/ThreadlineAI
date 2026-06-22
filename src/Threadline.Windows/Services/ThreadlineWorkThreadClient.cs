@@ -119,6 +119,38 @@ public sealed class ThreadlineWorkThreadClient
         return await ReadRequiredAsync<List<WorkArtifactDto>>(response, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<WorkArtifactVersionDto>> GetArtifactHistoryAsync(string workThreadId, string artifactId, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.GetAsync($"work-threads/{workThreadId}/artifacts/{artifactId}/history", cancellationToken);
+        return await ReadRequiredAsync<List<WorkArtifactVersionDto>>(response, cancellationToken);
+    }
+
+    public async Task<ArtifactExportDto> ExportArtifactAsync(string workThreadId, string artifactId, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.GetAsync($"work-threads/{workThreadId}/artifacts/{artifactId}/export", cancellationToken);
+        return await ReadRequiredAsync<ArtifactExportDto>(response, cancellationToken);
+    }
+
+    public async Task<ThreadlineActionExecutionResultDto> RegenerateArtifactAsync(string workThreadId, string artifactId, string? transcript = null, string? contextSummary = null, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync(
+            $"work-threads/{workThreadId}/artifacts/{artifactId}/regenerate",
+            new { transcript, contextSummary },
+            _jsonOptions,
+            cancellationToken);
+        return await ReadRequiredAsync<ThreadlineActionExecutionResultDto>(response, cancellationToken);
+    }
+
+    public async Task<ThreadlineActionExecutionResultDto> RunActionAsync(string actionId, string? workThreadId = null, string? transcript = null, string? contextSummary = null, string? artifactId = null, string? title = null, string? content = null, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync(
+            $"actions/{Uri.EscapeDataString(actionId)}/run",
+            new { workThreadId, transcript, contextSummary, artifactId, title, content },
+            _jsonOptions,
+            cancellationToken);
+        return await ReadRequiredAsync<ThreadlineActionExecutionResultDto>(response, cancellationToken);
+    }
+
     private async Task<T> ReadRequiredAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         await EnsureSuccessAsync(response, cancellationToken);
@@ -138,3 +170,6 @@ public sealed record WorkThreadDto(string Id, string Title, string? Description,
 public sealed record ConversationMessageDto(string Id, string WorkThreadId, string Role, string Content, DateTimeOffset CreatedAt, string? ContextReceiptId);
 public sealed record ContextReceiptDto(string Id, string WorkThreadId, string UsedSourcesJson, string? NotUsedSourcesJson, string? Limitations, DateTimeOffset CreatedAt);
 public sealed record WorkArtifactDto(string Id, string WorkThreadId, string ArtifactType, string Title, string Content, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, string? ContextReceiptId);
+public sealed record WorkArtifactVersionDto(string Id, string ArtifactId, string WorkThreadId, int Version, string ArtifactType, string Title, string Content, string Operation, string? ActionId, DateTimeOffset CreatedAt, string? ContextReceiptId);
+public sealed record ThreadlineActionExecutionResultDto(string ActionId, string Status, string Message, string? WorkThreadId, WorkArtifactDto? Artifact, Dictionary<string, string>? Metadata);
+public sealed record ArtifactExportDto(string FileName, string ContentType, string Content, WorkArtifactDto Artifact);
