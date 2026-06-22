@@ -19,9 +19,10 @@ public sealed class ThreadlineLocalClient
     {
         _baseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
         _httpClient = new HttpClient { BaseAddress = _baseAddress };
-        if (!string.IsNullOrWhiteSpace(localAccessToken))
+        var resolvedToken = string.IsNullOrWhiteSpace(localAccessToken) ? TryLoadLocalAccessToken() : localAccessToken;
+        if (!string.IsNullOrWhiteSpace(resolvedToken))
         {
-            _httpClient.DefaultRequestHeaders.Add("X-Threadline-Token", localAccessToken);
+            _httpClient.DefaultRequestHeaders.Add("X-Threadline-Token", resolvedToken);
         }
     }
 
@@ -62,7 +63,7 @@ public sealed class ThreadlineLocalClient
         {
             ["source"] = "Threadline.Windows",
             ["windowHandle"] = snapshot.Handle.ToString(),
-            ["build"] = "18-native-window-context-providers"
+            ["build"] = "20-security-privacy-hardening"
         };
 
         foreach (var pair in nativeContext.ToWindowMetadata())
@@ -212,6 +213,14 @@ public sealed class ThreadlineLocalClient
 
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         throw new InvalidOperationException($"Threadline service returned {(int)response.StatusCode}: {body}");
+    }
+
+    private static string? TryLoadLocalAccessToken()
+    {
+        var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ThreadlineAI", "service-token.txt");
+        if (!File.Exists(path)) return null;
+        var token = File.ReadAllText(path).Trim();
+        return token.Length >= 32 ? token : null;
     }
 }
 
