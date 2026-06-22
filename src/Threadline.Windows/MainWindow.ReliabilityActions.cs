@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.UI.Xaml;
 using Threadline.Windows.Services;
 
 namespace Threadline.Windows;
@@ -6,6 +7,7 @@ namespace Threadline.Windows;
 public sealed partial class MainWindow
 {
     private readonly ThreadlineUiActionRegistry _uiActions = new();
+    private bool _uiActionsRegistered;
 
     private void RegisterUiActions()
     {
@@ -20,8 +22,25 @@ public sealed partial class MainWindow
         _uiActions.Register("transcript.clear", "Clear transcript", ClearTranscriptActionAsync);
     }
 
-    private Task RunRegisteredUiActionAsync(string actionId) =>
-        _uiActions.ExecuteAsync(actionId);
+    private void EnsureUiActionsRegistered()
+    {
+        if (_uiActionsRegistered)
+        {
+            return;
+        }
+
+        RegisterUiActions();
+        _uiActionsRegistered = true;
+    }
+
+    private Task RunRegisteredUiActionAsync(string actionId)
+    {
+        EnsureUiActionsRegistered();
+        return _uiActions.ExecuteAsync(actionId);
+    }
+
+    private async void ProviderTest_Click(object sender, RoutedEventArgs e) =>
+        await RunUiActionAsync(() => RunRegisteredUiActionAsync("provider.test"));
 
     private Task ClearTranscriptActionAsync()
     {
@@ -60,6 +79,7 @@ public sealed partial class MainWindow
                 ? $"Provider test passed: {result.ProviderName}"
                 : $"Provider test needs attention: {result.ProviderName}";
             AddTimeline(result.Success ? "Provider test passed." : "Provider test returned a setup issue.");
+            await RefreshDoctorReadinessAsync();
         }
         catch (Exception ex)
         {
