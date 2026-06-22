@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="ThreadlineAI"
+    Manufacturer="Jeff Barnes"
+    Version="$(var.ProductVersion)"
+    UpgradeCode="3D96E9D1-34D0-4A8E-8B8C-9EE31116D621"
+    Scope="perMachine">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of ThreadlineAI is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="MainFeature" Title="ThreadlineAI" Level="1">
+      <ComponentGroupRef Id="ThreadlineCoreFiles" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="ServiceRegistration" />
+      <ComponentRef Id="AutoStartRegistry" />
+    </Feature>
+
+    <StandardDirectory Id="ProgramFilesFolder">
+      <Directory Id="INSTALLFOLDER" Name="ThreadlineAI">
+        <Directory Id="APPFOLDER" Name="app" />
+        <Directory Id="SERVICEFOLDER" Name="service" />
+        <Directory Id="EXTENSIONFOLDER" Name="browser-extension" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="ThreadlineAI" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="ThreadlineCoreFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.SourceDir)\app\**" Directory="APPFOLDER" />
+      <Files Include="$(var.SourceDir)\service\**" Directory="SERVICEFOLDER" />
+      <Files Include="$(var.SourceDir)\browser-extension\**" Directory="EXTENSIONFOLDER" />
+      <Files Include="$(var.SourceDir)\commercial-manifest.json" />
+    </ComponentGroup>
+
+    <Component Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Guid="C848B768-37C1-4092-A06C-F6E372D2E1D7">
+      <Shortcut Id="ThreadlineAIShortcut"
+                Name="ThreadlineAI"
+                Target="[APPFOLDER]Threadline.Windows.exe"
+                WorkingDirectory="APPFOLDER"
+                Description="Open the ThreadlineAI sidecar" />
+      <Shortcut Id="ThreadlineAIUninstallShortcut"
+                Name="Uninstall ThreadlineAI"
+                Target="[SystemFolder]msiexec.exe"
+                Arguments="/x [ProductCode]" />
+      <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\ThreadlineAI" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Component Id="ServiceRegistration" Directory="SERVICEFOLDER" Guid="6C89154D-6325-4A74-8C0C-2F3C0BC9DFD3">
+      <File Id="ThreadlineServiceExe" Source="$(var.SourceDir)\service\Threadline.Service.exe" KeyPath="yes" />
+      <ServiceInstall Id="ThreadlineServiceInstall"
+                      Type="ownProcess"
+                      Name="ThreadlineAIService"
+                      DisplayName="ThreadlineAI Service"
+                      Description="ThreadlineAI local context broker and provider bridge."
+                      Start="auto"
+                      Account="LocalSystem"
+                      ErrorControl="normal"
+                      Arguments="--urls http://127.0.0.1:5057" />
+      <ServiceControl Id="ThreadlineServiceControl"
+                      Name="ThreadlineAIService"
+                      Start="install"
+                      Stop="both"
+                      Remove="uninstall"
+                      Wait="yes" />
+    </Component>
+
+    <Component Id="AutoStartRegistry" Directory="APPFOLDER" Guid="52CBF13C-5FF4-45F6-A37E-C0B8E673D0D4">
+      <RegistryValue Root="HKCU"
+                     Key="Software\Microsoft\Windows\CurrentVersion\Run"
+                     Name="ThreadlineAI"
+                     Type="string"
+                     Value="&quot;[APPFOLDER]Threadline.Windows.exe&quot;"
+                     KeyPath="yes" />
+    </Component>
+  </Package>
+</Wix>
