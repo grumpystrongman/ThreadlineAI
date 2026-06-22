@@ -33,8 +33,13 @@ public sealed class DpapiProtectedSecretStore : ISecretStore
         var protectedBytes = Protect(Encoding.UTF8.GetBytes(secretValue));
         var envelope = new SecretEnvelope(descriptor.Reference, descriptor.Name, descriptor.ProtectionKind, descriptor.CreatedAt, descriptor.UpdatedAt, metadata, Convert.ToBase64String(protectedBytes));
 
-        await using var stream = File.Create(path);
-        await JsonSerializer.SerializeAsync(stream, envelope, JsonOptions, cancellationToken);
+        var temporaryPath = path + ".tmp";
+        await using (var stream = File.Create(temporaryPath))
+        {
+            await JsonSerializer.SerializeAsync(stream, envelope, JsonOptions, cancellationToken);
+            await stream.FlushAsync(cancellationToken);
+        }
+        File.Move(temporaryPath, path, overwrite: true);
         return descriptor;
     }
 
@@ -73,6 +78,24 @@ public sealed class DpapiProtectedSecretStore : ISecretStore
 
         File.Delete(path);
         return Task.FromResult(true);
+    }
+
+    public Task<int> DeleteAllSecretsAsync(CancellationToken cancellationToken = default)
+    {
+        if (!Directory.Exists(_rootDirectory))
+        {
+            return Task.FromResult(0);
+        }
+
+        var deleted = 0;
+        foreach (var file in Directory.EnumerateFiles(_rootDirectory, "*.json", SearchOption.TopDirectoryOnly))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            File.Delete(file);
+            deleted++;
+        }
+
+        return Task.FromResult(deleted);
     }
 
     private static string ToReference(string normalizedName) => $"secret://local/{normalizedName}";
