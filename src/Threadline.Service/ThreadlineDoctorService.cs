@@ -60,6 +60,7 @@ public sealed class ThreadlineDoctorService
         var adapters = await _adapters.ListAsync(cancellationToken);
         var browserAdapters = adapters.Where(a => a.Kind == AdapterKind.BrowserExtension).ToArray();
         var auditEvents = await _audit.GetRecentAuditEventsAsync(null, 50, cancellationToken);
+        var lastProviderTest = auditEvents.LastOrDefault(IsProviderTestAudit);
         var lastProviderError = auditEvents.LastOrDefault(e => e.EventType == AuditEventType.ProviderCallFailed);
         var recentEvents = activeSession is null
             ? Array.Empty<ContextEvent>()
@@ -67,7 +68,7 @@ public sealed class ThreadlineDoctorService
         var currentEvent = recentEvents.LastOrDefault();
 
         checks.Add(CheckProviderConfigured(providers, readyProviders));
-        checks.Add(CheckProviderTest(lastProviderError));
+        checks.Add(CheckProviderTest(lastProviderTest));
         checks.Add(CheckActiveSession(activeSession));
         checks.Add(CheckActiveWorkThread(activeWorkThread));
         checks.Add(CheckBrowserExtension(browserAdapters));
@@ -130,28 +131,42 @@ public sealed class ThreadlineDoctorService
             "Open Settings, choose a provider, save the provider, then start or resume a session with that provider.");
     }
 
-    private static ThreadlineDoctorCheck CheckProviderTest(AuditEvent? lastProviderError)
+    private static ThreadlineDoctorCheck CheckProviderTest(AuditEvent? lastProviderTest)
     {
-        if (lastProviderError is null)
+        if (lastProviderTest is null)
         {
             return ThreadlineDoctorCheck.Unknown(
                 "provider.test",
                 "Provider test",
-                "No provider failure has been recorded recently. Run Provider test for an explicit pass/fail result.",
+                "Provider settings have not been tested in this service run.",
                 "Use POST /providers/{providerName}/test or the Windows Tools panel Provider test action.");
         }
 
-        return ThreadlineDoctorCheck.Warning(
+        var provider = GetMetadataValue(lastProviderTest, "provider") ?? "provider";
+        var detail = GetMetadataValue(lastProviderTest, "detail") ?? lastProviderTest.Message;
+        var status = GetMetadataValue(lastProviderTest, "status") ?? lastProviderTest.EventType.ToString();
+        var metadata = lastProviderTest.Metadata;
+
+        if (lastProviderTest.EventType == AuditEventType.ProviderCallCompleted)
+        {
+            return ThreadlineDoctorCheck.Pass(
+                "provider.test",
+                "Provider test",
+                $"Last provider test passed for {provider}: {detail}",
+                metadata);
+        }
+
+        return ThreadlineDoctorCheck.Fail(
             "provider.test",
             "Provider test",
-            $"Last provider failure: {lastProviderError.Message}",
-            "Run Provider test after correcting provider settings.",
-            lastProviderError.Metadata);
+            $"Last provider test failed for {provider}: {detail} Status: {status}.",
+            "Correct provider settings and run Provider test again.",
+            metadata);
     }
 
     private static ThreadlineDoctorCheck CheckActiveSession(ThreadlineSession? activeSession) =>
         activeSession is null
-            ? ThreadlineDoctorCheck.Warning("session.active", "Active session", "No active Threadline session exists.", "Start a session or click Use Session in the sidecar.")
+            ? ThreadlineDoctorCheck.Warning("session.active", "Active session", "No active Threadline session exists.", "Start a session or click Use Session in the sidecar. The Windows shell can bootstrap one when none exists.")
             : ThreadlineDoctorCheck.Pass("session.active", "Active session", $"Active session: {activeSession.Name} ({activeSession.Id}).", new Dictionary<string, string>
             {
                 ["sessionId"] = activeSession.Id,
@@ -243,8 +258,8 @@ public sealed class ThreadlineDoctorService
         ThreadlineDoctorCheck.Unknown(
             "sidecar.geometry-state",
             "Sidecar geometry state",
-            "Geometry is owned by the Windows sidecar process and is not persisted in the local service yet.",
-            "The Windows sidecar should save/restore geometry locally and keep geometry failures non-fatal.");
+            "Geometry is owned by the Windows sidecar process and guarded by non-fatal placement fallbacks.",
+            "If geometry becomes unstable, reset local context or restart the Windows sidecar; placement failures should not crash the app.");
 
     private IEnumerable<ThreadlineCapability> BuildCapabilities(
         IReadOnlyList<ProviderConnection> providers,
@@ -325,6 +340,12 @@ public sealed class ThreadlineDoctorService
 
         return ThreadlineReadinessState.Ready;
     }
+
+    private static bool IsProviderTestAudit(AuditEvent auditEvent) =>
+        string.Equals(GetMetadataValue(auditEvent, "source"), "ThreadlineProviderTest", StringComparison.OrdinalIgnoreCase);
+
+    private static string? GetMetadataValue(AuditEvent auditEvent, string key) =>
+        auditEvent.Metadata is not null && auditEvent.Metadata.TryGetValue(key, out var value) ? value : null;
 
     private static bool LooksLikeBrowser(ContextEvent currentEvent)
     {
