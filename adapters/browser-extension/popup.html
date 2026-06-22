@@ -9,7 +9,21 @@
   <main>
     <h1>ThreadlineAI</h1>
     <p id="status">Ready.</p>
+    <p id="currentTab">Current tab: checking...</p>
+    <p id="heartbeat">Extension heartbeat: checking...</p>
+    <p id="guidance" class="guidance"></p>
+    <section aria-label="Setup flow">
+      <h2>Setup</h2>
+      <ol>
+        <li>Start the Threadline local service.</li>
+        <li>Click Test connection.</li>
+        <li>Click Setup / register extension.</li>
+        <li>Open a normal http/https page and click Send page or Send selection.</li>
+      </ol>
+    </section>
     <button id="testConnection">Test connection</button>
+    <button id="setup">Setup / register extension</button>
+    <button id="heartbeatNow">Send heartbeat now</button>
     <button id="sendPage">Send page</button>
     <button id="sendSelection">Send selection</button>
     <a id="openOptions" href="options.html" target="_blank">Options</a>
