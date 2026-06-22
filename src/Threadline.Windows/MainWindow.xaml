@@ -266,7 +266,7 @@
 
         <!-- Privacy: compact readable status with labels visible. -->
         <Border Grid.Row="4" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="14" Padding="9,7">
-          <Grid RowDefinitions="Auto,Auto" RowSpacing="5">
+          <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="5">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
               <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                 <TextBlock Text="Privacy &amp; Trust" FontSize="12" FontWeight="SemiBold" Foreground="#111827" />
@@ -274,11 +274,13 @@
               </StackPanel>
               <TextBlock Grid.Column="1" x:Name="TrustControlStatusText" Text="Governed" FontSize="10" Foreground="#6B7280" TextTrimming="CharacterEllipsis" />
             </Grid>
-            <Grid Grid.Row="1" ColumnDefinitions="*,*,*" ColumnSpacing="6">
+            <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*" ColumnSpacing="6">
               <CheckBox x:Name="AllowProviderContextToggle" Content="Provider" IsChecked="True" FontSize="10" Foreground="#374151" MinWidth="0" />
               <CheckBox x:Name="SaveWorkThreadMemoryToggle" Grid.Column="1" Content="Memory" IsChecked="True" FontSize="10" Foreground="#374151" MinWidth="0" />
               <CheckBox x:Name="ShowContextReceiptsToggle" Grid.Column="2" Content="Receipts" IsChecked="True" FontSize="10" Foreground="#374151" MinWidth="0" />
+              <CheckBox x:Name="ScreenshotVisionConsentToggle" Grid.Column="3" Content="Vision once" IsChecked="False" FontSize="10" Foreground="#7C2D12" MinWidth="0" />
             </Grid>
+            <TextBlock Grid.Row="2" x:Name="ScreenshotVisionPolicyText" Text="Vision: off. Screenshot/OCR needs visible one-time approval." TextWrapping="WrapWholeWords" MaxLines="2" FontSize="10" Foreground="#6B7280" />
           </Grid>
         </Border>
 
@@ -394,6 +396,12 @@
                     <Button Grid.Column="2" Content="Follow/Lock" Click="ToggleFollowLock_Click" Style="{StaticResource SidecarButtonStyle}" />
                   </Grid>
                   <ListView x:Name="OpenWindowsList" Height="180" SelectionMode="Single" FontSize="11" HorizontalContentAlignment="Stretch" />
+                  <TextBlock Text="Screenshot/OCR app policy" FontWeight="SemiBold" FontSize="11" Foreground="#111827" />
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                    <Button Content="Allow Vision App" Click="AllowScreenshotVisionForSelectedApp_Click" Style="{StaticResource SidecarButtonStyle}" />
+                    <Button Grid.Column="1" Content="Deny Vision App" Click="DenyScreenshotVisionForSelectedApp_Click" Style="{StaticResource WarmSidecarButtonStyle}" />
+                  </Grid>
+                  <Button Content="Ask Each Time" Click="ResetScreenshotVisionForSelectedApp_Click" Style="{StaticResource SidecarButtonStyle}" />
                   <Border x:Name="DiagnosticsPanel" BorderThickness="1" BorderBrush="#E5EDF8" CornerRadius="8" Padding="6" Visibility="Collapsed">
                     <TextBlock x:Name="DiagnosticsText" Text="No diagnostics yet." TextWrapping="WrapWholeWords" FontSize="10" Foreground="#6B7280" />
                   </Border>
