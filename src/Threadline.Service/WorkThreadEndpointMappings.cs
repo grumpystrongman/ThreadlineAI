@@ -81,16 +81,16 @@ public static class WorkThreadEndpointMappings
             if (thread is null) return Results.NotFound();
 
             var probe = ContextEvent.Create(
-                workThreadId,
-                ContextSource.Manual,
-                request.SourceType,
-                request.ContentSummary ?? request.SourceName,
-                clock.UtcNow,
-                request.AppName,
+                sessionId: workThreadId,
+                source: ContextSource.Manual,
+                contextType: request.SourceType,
+                content: request.ContentSummary ?? request.SourceName,
+                timestamp: clock.UtcNow,
+                applicationName: request.AppName,
                 processName: null,
-                request.WindowTitle,
-                request.Url,
-                SensitivityLevel.Normal,
+                windowTitle: request.WindowTitle,
+                uri: request.Url,
+                sensitivity: SensitivityLevel.Normal,
                 userApproved: true);
             var decision = capturePolicy.Evaluate(probe);
             if (!decision.IsAllowed || decision.RequiresExplicitApproval)
