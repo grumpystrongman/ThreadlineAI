@@ -39,13 +39,18 @@ var sqliteOptions = SqliteOptions.LocalAppData(string.IsNullOrWhiteSpace(configu
 builder.Services.AddSingleton(sqliteOptions);
 builder.Services.AddSingleton<SqliteThreadlineStore>();
 builder.Services.AddSingleton<SqliteWorkThreadStore>();
+builder.Services.AddSingleton<SqliteArtifactHistoryStore>();
+builder.Services.AddSingleton<SqliteWorkContinuityMaintenanceStore>();
 builder.Services.AddSingleton<SqlitePrivacyAndMaintenanceStore>();
 builder.Services.AddSingleton<ISessionRepository>(sp => sp.GetRequiredService<SqliteThreadlineStore>());
 builder.Services.AddSingleton<IProviderConnectionRepository>(sp => sp.GetRequiredService<SqliteThreadlineStore>());
 builder.Services.AddSingleton<IAuditRepository>(sp => sp.GetRequiredService<SqliteThreadlineStore>());
 builder.Services.AddSingleton<IWorkThreadRepository>(sp => sp.GetRequiredService<SqliteWorkThreadStore>());
+builder.Services.AddSingleton<IArtifactHistoryRepository>(sp => sp.GetRequiredService<SqliteArtifactHistoryStore>());
 builder.Services.AddSingleton<IThreadlineStoreInitializer>(sp => sp.GetRequiredService<SqliteThreadlineStore>());
 builder.Services.AddSingleton<IThreadlineStoreInitializer>(sp => sp.GetRequiredService<SqliteWorkThreadStore>());
+builder.Services.AddSingleton<IThreadlineStoreInitializer>(sp => sp.GetRequiredService<SqliteArtifactHistoryStore>());
+builder.Services.AddSingleton<IThreadlineStoreInitializer>(sp => sp.GetRequiredService<SqliteWorkContinuityMaintenanceStore>());
 builder.Services.AddSingleton<IThreadlineStoreInitializer>(sp => sp.GetRequiredService<SqlitePrivacyAndMaintenanceStore>());
 builder.Services.AddSingleton<IAdapterRegistry, InMemoryAdapterRegistry>();
 builder.Services.AddSingleton<IWindowAttachmentRepository, InMemoryWindowAttachmentRepository>();
@@ -67,6 +72,7 @@ builder.Services.AddSingleton<WindowAttachmentService>();
 builder.Services.AddSingleton<PromptComposer>();
 builder.Services.AddSingleton<ThreadlineAskService>();
 builder.Services.AddSingleton<ThreadlineProviderProbeService>();
+builder.Services.AddSingleton<ThreadlineActionExecutionService>();
 builder.Services.AddSingleton<ThreadlineDoctorService>();
 builder.Services.AddSingleton<ThreadlineCommercialLifecycleService>();
 
