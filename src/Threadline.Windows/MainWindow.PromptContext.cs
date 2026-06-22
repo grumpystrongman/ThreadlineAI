@@ -15,7 +15,9 @@ public sealed partial class MainWindow
             _lastFollowTarget = target;
             PlaceSidecarForTarget(target, "Ask context target attached.");
             _attachment = await _client.AttachWindowAsync(_session!.Id, target.Window);
-            _lastContextSummary = await _contentResolver.ResolveAsync(_session!.Id, target);
+            var consent = BuildContextCaptureConsent(target);
+            _lastContextSummary = await _contentResolver.ResolveAsync(_session!.Id, target, consent);
+            ResetScreenshotVisionOneTimeApproval(_lastContextSummary);
             UpdateCurrentContextPanel(_lastContextSummary);
 
             var contextStatus = BuildContextStatus(_lastContextSummary);
