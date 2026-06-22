@@ -4,6 +4,9 @@ namespace Threadline.Service;
 
 public sealed class ThreadlineDoctorService
 {
+    private const string ExpectedBrowserExtensionVersion = "17.0.0";
+    private static readonly TimeSpan BrowserHeartbeatFreshnessWindow = TimeSpan.FromMinutes(10);
+
     private readonly ThreadlineServiceOptions _options;
     private readonly ProviderConnectionService _providers;
     private readonly ISessionRepository _sessions;
@@ -71,7 +74,8 @@ public sealed class ThreadlineDoctorService
         checks.Add(CheckProviderTest(lastProviderTest));
         checks.Add(CheckActiveSession(activeSession));
         checks.Add(CheckActiveWorkThread(activeWorkThread));
-        checks.Add(CheckBrowserExtension(browserAdapters));
+        checks.Add(CheckBrowserExtension(browserAdapters, _clock.UtcNow));
+        checks.Add(CheckBrowserExtensionCompatibility(browserAdapters));
         checks.Add(CheckCurrentContextSource(currentEvent));
         checks.Add(CheckLastProviderError(lastProviderError));
         checks.Add(CheckSidecarGeometryState());
@@ -182,7 +186,7 @@ public sealed class ThreadlineDoctorService
                 ["status"] = activeWorkThread.Status.ToString()
             });
 
-    private static ThreadlineDoctorCheck CheckBrowserExtension(IReadOnlyList<AdapterRegistration> browserAdapters)
+    private static ThreadlineDoctorCheck CheckBrowserExtension(IReadOnlyList<AdapterRegistration> browserAdapters, DateTimeOffset now)
     {
         if (browserAdapters.Count == 0)
         {
@@ -190,19 +194,72 @@ public sealed class ThreadlineDoctorService
                 "browser-extension.reachable",
                 "Browser extension reachable",
                 "No browser-extension adapter is registered with the local service.",
-                "Install or reload the Chrome/Edge extension, then use its Threadline capture action so page-level context can reach the service.");
+                "Install or reload the Chrome/Edge extension, then open its popup and click Setup / register extension so page-level context can reach the service.");
         }
 
-        var latest = browserAdapters.OrderByDescending(a => a.LastSeenAt ?? a.RegisteredAt).First();
+        var latest = GetLatestBrowserAdapter(browserAdapters)!;
+        var lastSeen = latest.LastSeenAt ?? latest.RegisteredAt;
+        var age = now - lastSeen;
+        var metadata = BuildBrowserAdapterMetadata(latest, now);
+
+        if (age > BrowserHeartbeatFreshnessWindow)
+        {
+            return ThreadlineDoctorCheck.Warning(
+                "browser-extension.reachable",
+                "Browser extension reachable",
+                $"Browser extension is registered but its heartbeat is stale. Last seen {lastSeen:O}.",
+                "Open Chrome/Edge, reload the ThreadlineAI extension, then click Send heartbeat now in the extension popup.",
+                metadata);
+        }
+
         return ThreadlineDoctorCheck.Pass(
             "browser-extension.reachable",
             "Browser extension reachable",
-            $"Browser extension registered: {latest.DisplayName}.",
-            new Dictionary<string, string>
-            {
-                ["adapterId"] = latest.Id,
-                ["lastSeenAt"] = (latest.LastSeenAt ?? latest.RegisteredAt).ToString("O")
-            });
+            $"Browser extension heartbeat received from {latest.DisplayName}; last seen {lastSeen:O}.",
+            metadata);
+    }
+
+    private static ThreadlineDoctorCheck CheckBrowserExtensionCompatibility(IReadOnlyList<AdapterRegistration> browserAdapters)
+    {
+        if (browserAdapters.Count == 0)
+        {
+            return ThreadlineDoctorCheck.Unknown(
+                "browser-extension.compatibility",
+                "Browser extension compatibility",
+                "No browser-extension adapter has registered a version yet.",
+                "Install the Build 17 extension and register it from the popup.");
+        }
+
+        var latest = GetLatestBrowserAdapter(browserAdapters)!;
+        var version = GetAdapterVersion(latest);
+        var metadata = BuildBrowserAdapterMetadata(latest, DateTimeOffset.UtcNow);
+        metadata["expectedVersion"] = ExpectedBrowserExtensionVersion;
+
+        if (string.IsNullOrWhiteSpace(version))
+        {
+            return ThreadlineDoctorCheck.Warning(
+                "browser-extension.compatibility",
+                "Browser extension compatibility",
+                "The browser extension registered without a version.",
+                $"Reload the Build 17 extension package and register again. Expected version {ExpectedBrowserExtensionVersion}.",
+                metadata);
+        }
+
+        if (!string.Equals(version, ExpectedBrowserExtensionVersion, StringComparison.OrdinalIgnoreCase))
+        {
+            return ThreadlineDoctorCheck.Warning(
+                "browser-extension.compatibility",
+                "Browser extension compatibility",
+                $"Browser extension version {version} does not match service expectation {ExpectedBrowserExtensionVersion}.",
+                "Rebuild/reload adapters/browser-extension and click Setup / register extension again.",
+                metadata);
+        }
+
+        return ThreadlineDoctorCheck.Pass(
+            "browser-extension.compatibility",
+            "Browser extension compatibility",
+            $"Browser extension version {version} is compatible with Build 17.",
+            metadata);
     }
 
     private static ThreadlineDoctorCheck CheckCurrentContextSource(ContextEvent? currentEvent)
@@ -225,6 +282,14 @@ public sealed class ThreadlineDoctorService
 
         if (currentEvent.Source == ContextSource.Browser)
         {
+            if (currentEvent.Metadata is not null)
+            {
+                foreach (var item in currentEvent.Metadata)
+                {
+                    metadata[item.Key] = item.Value;
+                }
+            }
+
             return ThreadlineDoctorCheck.Pass(
                 "context.current-source",
                 "Current context source",
@@ -237,8 +302,8 @@ public sealed class ThreadlineDoctorService
             return ThreadlineDoctorCheck.Warning(
                 "context.current-source",
                 "Current context source",
-                "Current context appears to be browser title/window metadata only, not extension page text.",
-                "Use the browser extension to capture page title, URL, selection, and page text when the answer needs deeper browser context.",
+                "Current context appears to be Chrome/Edge title-only window metadata, not full extension page text.",
+                "Use the browser extension Send page or Send selection action when the answer needs page title, URL, selected text, visible text, article/main text, and DOM extraction metadata.",
                 metadata);
         }
 
@@ -315,10 +380,25 @@ public sealed class ThreadlineDoctorService
             activeWorkThread is null ? "Work Thread memory is available but no active Work Thread is selected." : $"Active Work Thread: {activeWorkThread.Title}.",
             new Dictionary<string, string> { ["activeWorkThread"] = (activeWorkThread is not null).ToString() }).ToCapability();
 
+        var latestBrowserAdapter = GetLatestBrowserAdapter(browserAdapters);
+        var browserStatus = latestBrowserAdapter is null
+            ? ThreadlineCapabilityStatus.NeedsSetup
+            : IsHeartbeatFresh(latestBrowserAdapter, _clock.UtcNow) && IsBrowserExtensionCompatible(latestBrowserAdapter)
+                ? ThreadlineCapabilityStatus.Ready
+                : ThreadlineCapabilityStatus.Degraded;
+
+        var browserDescription = latestBrowserAdapter is null
+            ? "Browser extension is not registered with the local service yet."
+            : browserStatus == ThreadlineCapabilityStatus.Ready
+                ? "Browser extension heartbeat and Build 17 version are compatible."
+                : "Browser extension is registered but needs a fresh heartbeat or compatible Build 17 version.";
+
         yield return new BrowserExtensionCapability(
-            browserAdapters.Count > 0 ? ThreadlineCapabilityStatus.Ready : ThreadlineCapabilityStatus.NeedsSetup,
-            browserAdapters.Count > 0 ? "Browser extension adapter is registered." : "Browser extension is not registered with the local service yet.",
-            new Dictionary<string, string> { ["adapterCount"] = browserAdapters.Count.ToString() }).ToCapability();
+            browserStatus,
+            browserDescription,
+            latestBrowserAdapter is null
+                ? new Dictionary<string, string> { ["adapterCount"] = browserAdapters.Count.ToString(), ["expectedVersion"] = ExpectedBrowserExtensionVersion }
+                : BuildBrowserAdapterMetadata(latestBrowserAdapter, _clock.UtcNow)).ToCapability();
     }
 
     private static ThreadlineReadinessState DetermineReadiness(IReadOnlyList<ThreadlineDoctorCheck> checks)
@@ -346,6 +426,49 @@ public sealed class ThreadlineDoctorService
 
     private static string? GetMetadataValue(AuditEvent auditEvent, string key) =>
         auditEvent.Metadata is not null && auditEvent.Metadata.TryGetValue(key, out var value) ? value : null;
+
+    private static AdapterRegistration? GetLatestBrowserAdapter(IReadOnlyList<AdapterRegistration> browserAdapters) =>
+        browserAdapters.OrderByDescending(a => a.LastSeenAt ?? a.RegisteredAt).FirstOrDefault();
+
+    private static bool IsBrowserExtensionCompatible(AdapterRegistration adapter) =>
+        string.Equals(GetAdapterVersion(adapter), ExpectedBrowserExtensionVersion, StringComparison.OrdinalIgnoreCase);
+
+    private static string? GetAdapterVersion(AdapterRegistration adapter)
+    {
+        if (!string.IsNullOrWhiteSpace(adapter.Version)) return adapter.Version;
+        if (adapter.Metadata is not null && adapter.Metadata.TryGetValue("extensionVersion", out var version) && !string.IsNullOrWhiteSpace(version)) return version;
+        if (adapter.Metadata is not null && adapter.Metadata.TryGetValue("heartbeatVersion", out var heartbeatVersion) && !string.IsNullOrWhiteSpace(heartbeatVersion)) return heartbeatVersion;
+        return null;
+    }
+
+    private static bool IsHeartbeatFresh(AdapterRegistration adapter, DateTimeOffset now) =>
+        now - (adapter.LastSeenAt ?? adapter.RegisteredAt) <= BrowserHeartbeatFreshnessWindow;
+
+    private static Dictionary<string, string> BuildBrowserAdapterMetadata(AdapterRegistration adapter, DateTimeOffset now)
+    {
+        var lastSeenAt = adapter.LastSeenAt ?? adapter.RegisteredAt;
+        var metadata = new Dictionary<string, string>
+        {
+            ["adapterId"] = adapter.Id,
+            ["adapterCountedKind"] = adapter.Kind.ToString(),
+            ["displayName"] = adapter.DisplayName,
+            ["registeredAt"] = adapter.RegisteredAt.ToString("O"),
+            ["lastSeenAt"] = lastSeenAt.ToString("O"),
+            ["heartbeatAgeSeconds"] = Math.Max(0, (int)(now - lastSeenAt).TotalSeconds).ToString(),
+            ["version"] = GetAdapterVersion(adapter) ?? "unknown",
+            ["expectedVersion"] = ExpectedBrowserExtensionVersion
+        };
+
+        if (adapter.Metadata is not null)
+        {
+            foreach (var item in adapter.Metadata)
+            {
+                metadata[item.Key] = item.Value;
+            }
+        }
+
+        return metadata;
+    }
 
     private static bool LooksLikeBrowser(ContextEvent currentEvent)
     {
