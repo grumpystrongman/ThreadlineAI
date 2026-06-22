@@ -18,6 +18,25 @@ public sealed class ScreenshotContextResolver
         };
         details.AddRange(priorAttempts.Select(attempt => "Prior attempt: " + attempt));
 
+        var receipt = new ContextReceipt(
+            "screenshot/OCR/vision fallback",
+            ContextConfidence.Low,
+            ContextCaptureKind.TitleOnly,
+            [
+                $"Window title: {target.Window.WindowTitle ?? target.Title}",
+                $"Process: {target.Window.ProcessName ?? processIntelligence.ProcessName}",
+                "No OCR text was extracted."
+            ],
+            [
+                "Screenshot pixels were not captured by this resolver result.",
+                "OCR text was not captured.",
+                "Image extraction and layout analysis were not captured.",
+                "Page/body content was not captured."
+            ],
+            true,
+            "I only have the window title. I do not have the page/body content.",
+            priorAttempts.Select(attempt => new ContextProviderAttempt("Prior capture attempt", ContextProviderAttemptStatus.Missed, attempt)).ToList());
+
         return new SummarizedContext(
             target.Title,
             "screenshot-resolver",
@@ -26,6 +45,8 @@ public sealed class ScreenshotContextResolver
             ["Screenshot capture is the fallback path only. OCR, image extraction, and layout analysis still need the vision/OCR engine integration."],
             target.Window.ToDisplayText(),
             ContextConfidence.Low,
-            processIntelligence);
+            processIntelligence,
+            null,
+            receipt);
     }
 }
