@@ -10,6 +10,17 @@ if (-not [string]::IsNullOrWhiteSpace($LocalAccess)) {
   $headers['X-Threadline-Token'] = $LocalAccess
 }
 
+function Assert-Smoke {
+  param(
+    [bool] $Condition,
+    [string] $Message
+  )
+
+  if (-not $Condition) {
+    throw "Smoke assertion failed: $Message"
+  }
+}
+
 Write-Host "Checking Threadline service at $BaseUrl..."
 $health = Invoke-RestMethod -Method Get -Uri "$BaseUrl/health"
 $health | Format-List
@@ -87,10 +98,11 @@ $credentialResponse = Invoke-RestMethod -Method Post -Uri "$BaseUrl/providers/Sm
 $credentialResponse.provider | Format-List
 $credentialResponse.credential | Format-List
 
-Write-Host 'Reading provider credential descriptor without exposing value...'
-$encodedReference = [System.Uri]::EscapeDataString($credentialResponse.credential.reference)
-$descriptor = Invoke-RestMethod -Method Get -Uri "$BaseUrl/secrets/$encodedReference" -Headers $headers
-$descriptor | Format-List
+Write-Host 'Verifying provider credential descriptor without exposing value...'
+Assert-Smoke ($null -ne $credentialResponse.credential) 'Credential response should include a safe descriptor.'
+Assert-Smoke (-not [string]::IsNullOrWhiteSpace($credentialResponse.credential.reference)) 'Credential descriptor should include a reference.'
+Assert-Smoke ($credentialResponse.credential.reference -eq $credentialResponse.provider.credentialReference) 'Provider credential reference should match credential descriptor reference.'
+Assert-Smoke (-not ($credentialResponse | ConvertTo-Json -Depth 10).Contains('smoke-test-provider-secret-12345')) 'Credential response must not expose the secret value.'
 
 Write-Host 'Registering adapter...'
 $adapterBody = @{
