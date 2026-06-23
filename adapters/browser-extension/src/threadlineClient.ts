@@ -63,6 +63,7 @@ export const adapterStorageKey = 'threadlineBrowserAdapterId';
 
 const oneMinuteMs = 60_000;
 const adapterPermissions = 35; // ReadSessions | WriteContext | RegisterAdapters
+const localAccessDeniedMarker = 'Threadline local API access denied';
 
 export const defaultSettings: ThreadlineSettings = {
   baseUrl: 'http://localhost:5057',
@@ -133,6 +134,10 @@ export async function callThreadline<T>(path: string, init?: RequestInit): Promi
 
   if (!response.ok) {
     const text = await response.text();
+    if (response.status === 401 && text.includes(localAccessDeniedMarker)) {
+      throw new Error(buildLocalAccessDeniedMessage(Boolean(settings.localAccessToken)));
+    }
+
     throw new Error(`Threadline service returned ${response.status}: ${text}`);
   }
 
@@ -196,7 +201,7 @@ export async function sendExtensionHeartbeat(tabIdentity?: BrowserTabIdentity): 
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes('returned 404')) {
       const registration = await registerBrowserExtension(tabIdentity);
-      return { ok: true, adapterId: registration.id, registered: true, registration };
+      return { ok: true, adapterId: registration.id, registered: true };
     }
 
     return { ok: false, adapterId, error: message };
@@ -258,6 +263,14 @@ export function redactText(value: string, customPatterns: string[] = []): Redact
 export function limitText(value: string, maxCharacters: number): string {
   if (value.length <= maxCharacters) return value;
   return `${value.slice(0, Math.max(0, maxCharacters - 36))}\n...[trimmed by Threadline extension]`;
+}
+
+function buildLocalAccessDeniedMessage(hasSavedToken: boolean): string {
+  const tokenState = hasSavedToken
+    ? 'The saved Threadline Local Access Token was rejected. It may be stale after clearing local data, reinstalling the service, or regenerating the token.'
+    : 'The browser extension does not have a Threadline Local Access Token saved.';
+
+  return `${tokenState} Open the ThreadlineAI extension Options, paste the current token from %LOCALAPPDATA%\\ThreadlineAI\\service-token.txt, save, then retry.`;
 }
 
 function readNumber(value: unknown, fallback: number, min: number, max: number): number {
