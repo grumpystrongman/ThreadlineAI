@@ -213,21 +213,25 @@ public sealed class AmbientCaptureCoordinator : IDisposable
 
     private void SafeStopCapture()
     {
+        var microphoneCapture = _microphoneCapture;
+        var systemCapture = _systemCapture;
+
+        _microphoneCapture = null;
+        _systemCapture = null;
+
+        try { microphoneCapture?.StopRecording(); } catch { }
+        try { systemCapture?.StopRecording(); } catch { }
+
         lock (_gate)
         {
-            try { _microphoneCapture?.StopRecording(); } catch { }
-            try { _systemCapture?.StopRecording(); } catch { }
-
-            _microphoneCapture?.Dispose();
-            _systemCapture?.Dispose();
             _microphoneWriter?.Dispose();
             _systemWriter?.Dispose();
-
-            _microphoneCapture = null;
-            _systemCapture = null;
             _microphoneWriter = null;
             _systemWriter = null;
         }
+
+        microphoneCapture?.Dispose();
+        systemCapture?.Dispose();
     }
 
     private MMDevice? TryGetDefaultAudioEndpoint(DataFlow flow, Role role)
