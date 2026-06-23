@@ -1,9 +1,12 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Threadline.Core;
 using Threadline.Service;
 
@@ -92,7 +95,7 @@ public sealed class LocalServiceApiContractTests : IClassFixture<LocalServiceApi
         private const string TestApiToken = "threadline-contract-test-token";
         private readonly string _root = Path.Combine(Path.GetTempPath(), "threadline-build23-api", Guid.NewGuid().ToString("N"));
 
-        public System.Net.Http.HttpClient CreateAuthorizedClient()
+        public HttpClient CreateAuthorizedClient()
         {
             var client = CreateClient();
             client.DefaultRequestHeaders.Add("X-Threadline-Token", TestApiToken);
@@ -114,6 +117,20 @@ public sealed class LocalServiceApiContractTests : IClassFixture<LocalServiceApi
                     ["Threadline:BuildChannel"] = "build-23-test"
                 });
             });
+
+            builder.ConfigureTestServices(services =>
+            {
+                services.RemoveAll<ThreadlineServiceOptions>();
+                services.AddSingleton(new ThreadlineServiceOptions(
+                    RequireApiToken: true,
+                    ApiToken: TestApiToken,
+                    ApiTokenPath: Path.Combine(_root, "service-token.txt"),
+                    MaxContextCharacters: 200_000,
+                    MaxSessionNameCharacters: 120,
+                    RetentionDays: 30,
+                    LocalOnlyMode: false,
+                    CorsAllowedOrigins: new HashSet<string>(StringComparer.OrdinalIgnoreCase)));
+            });
         }
 
         public new void Dispose()
@@ -130,4 +147,3 @@ public sealed class LocalServiceApiContractTests : IClassFixture<LocalServiceApi
         }
     }
 }
-
