@@ -24,7 +24,7 @@ public sealed partial class MainWindow
     {
         try
         {
-            AttachSidecarButton.Content = _attachSidecarToTarget ? "Screen Dock" : "Attach";
+            AttachSidecarButton.Content = _attachSidecarToTarget ? "Screen Dock" : "Resize";
         }
         catch
         {
