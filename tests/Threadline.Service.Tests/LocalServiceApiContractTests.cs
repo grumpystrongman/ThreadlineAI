@@ -110,7 +110,6 @@ public sealed class LocalServiceApiContractTests : IClassFixture<LocalServiceApi
                     ["Threadline:ApiToken"] = TestApiToken,
                     ["Threadline:DatabasePath"] = Path.Combine(_root, "threadline.db"),
                     ["Threadline:LocalDataRoot"] = _root,
-                    ["Threadline:ApiTokenPath"] = Path.Combine(_root, "service-token.txt"),
                     ["Threadline:SecretStorePath"] = Path.Combine(_root, "secrets"),
                     ["Threadline:BuildChannel"] = "build-23-test"
                 });
