@@ -49,7 +49,7 @@ public sealed partial class MainWindow
 
     private void OpenDiagnosticsTargetPickerPanel()
     {
-        ShowShellDrawer("Diagnostics / Target Picker", DiagnosticsTargetPickerPanel);
+        ShowShellDrawer("Context & Tools", DiagnosticsTargetPickerPanel);
         EnsureAmbientCaptureToolsPanel();
     }
 

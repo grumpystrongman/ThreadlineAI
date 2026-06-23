@@ -17,6 +17,8 @@ public sealed partial class MainWindow
         SafeEnsureReadableCheckBoxLabels();
         StartFallbackFloatingTriggerTimer();
         StartBrowserExtensionGuidanceTimer();
+
+        await RunUiActionAsync(EnsureLocalServiceStartedAsync);
         await ShowFirstRunSetupWizardIfNeededAsync();
 
         if (_sidecarSessionBootstrapStarted) return;
