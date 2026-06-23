@@ -14,9 +14,10 @@
       <input id="baseUrl" type="url" placeholder="http://localhost:5057" />
     </label>
     <label>
-      Local access token, optional
-      <input id="localAccessToken" type="password" />
+      Local access token
+      <input id="localAccessToken" type="password" autocomplete="off" />
     </label>
+    <p class="help">Required when local API token auth is enabled. Get the current token from %LOCALAPPDATA%\ThreadlineAI\service-token.txt and save it here. Re-save this field after clearing Threadline local data or regenerating the service token.</p>
     <fieldset>
       <legend>DOM extraction limits</legend>
       <label>Max total characters per capture <input id="maxCharacters" type="number" min="1000" max="50000" step="1000" /></label>
