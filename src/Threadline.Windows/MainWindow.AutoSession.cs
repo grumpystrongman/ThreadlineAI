@@ -14,7 +14,7 @@ public sealed partial class MainWindow
 
     private async void RootShell_Loaded(object sender, RoutedEventArgs e)
     {
-        EnsureReadableCheckBoxLabels();
+        SafeEnsureReadableCheckBoxLabels();
         StartFallbackFloatingTriggerTimer();
         StartBrowserExtensionGuidanceTimer();
         await ShowFirstRunSetupWizardIfNeededAsync();
@@ -22,6 +22,18 @@ public sealed partial class MainWindow
         if (_sidecarSessionBootstrapStarted) return;
         _sidecarSessionBootstrapStarted = true;
         await RunUiActionAsync(EnsureSidecarSessionReadyAsync);
+    }
+
+    private void SafeEnsureReadableCheckBoxLabels()
+    {
+        try
+        {
+            EnsureReadableCheckBoxLabels();
+        }
+        catch (Exception ex)
+        {
+            AddTimeline($"Checkbox label polish skipped: {ex.Message}");
+        }
     }
 
     private void StartFallbackFloatingTriggerTimer()
