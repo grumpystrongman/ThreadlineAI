@@ -50,6 +50,7 @@ public sealed partial class MainWindow
     private void OpenDiagnosticsTargetPickerPanel()
     {
         ShowShellDrawer("Diagnostics / Target Picker", DiagnosticsTargetPickerPanel);
+        EnsureAmbientCaptureToolsPanel();
     }
 
     private void ShowShellDrawer(string title, FrameworkElement activePanel)
