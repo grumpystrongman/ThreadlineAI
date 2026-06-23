@@ -14,6 +14,7 @@ public sealed partial class MainWindow
 
     private async void RootShell_Loaded(object sender, RoutedEventArgs e)
     {
+        EnsureReadableCheckBoxLabels();
         StartFallbackFloatingTriggerTimer();
         StartBrowserExtensionGuidanceTimer();
         await ShowFirstRunSetupWizardIfNeededAsync();
