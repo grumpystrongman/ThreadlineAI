@@ -115,7 +115,8 @@ $adapter = Invoke-RestMethod -Method Post -Uri "$BaseUrl/adapters" -Headers $hea
 $adapter | Format-List
 
 Write-Host 'Sending adapter heartbeat...'
-$heartbeat = Invoke-RestMethod -Method Post -Uri "$BaseUrl/adapters/$($adapter.id)/heartbeat" -Headers $headers
+$heartbeatBody = @{ metadata = @{ source = 'smoke-test' } } | ConvertTo-Json -Depth 4
+$heartbeat = Invoke-RestMethod -Method Post -Uri "$BaseUrl/adapters/$($adapter.id)/heartbeat" -Headers $headers -ContentType 'application/json' -Body $heartbeatBody
 $heartbeat | Format-List
 
 Write-Host 'Reading recent audit events...'
