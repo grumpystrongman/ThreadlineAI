@@ -163,6 +163,10 @@ public sealed partial class MainWindow
     private Task StartAmbientCaptureAsync()
     {
         EnsureAmbientCaptureToolsPanel();
+        _ambientCaptureLastError = null;
+        _ambientCaptureIsProcessing = false;
+        RefreshAmbientCaptureIndicator();
+
         var options = new AmbientCaptureOptions(
             CaptureMicrophone: _ambientCaptureMicrophoneToggle?.IsChecked == true,
             CaptureSystemAudio: _ambientCaptureSystemAudioToggle?.IsChecked == true,
@@ -170,25 +174,56 @@ public sealed partial class MainWindow
             TranslateTranscript: _ambientCaptureTranslateToggle?.IsChecked == true,
             TargetLanguage: string.IsNullOrWhiteSpace(_ambientCaptureTargetLanguageBox?.Text) ? "en" : _ambientCaptureTargetLanguageBox!.Text.Trim());
 
-        var session = _ambientCapture.Start(options);
-        AppendTranscript("Ambient Capture", $"Recording started.\n\n{session.DeviceSnapshot.ToDisplayText()}\n\nFolder:\n{session.OutputFolder}");
-        AddTimeline("Ambient capture started with microphone/system loopback settings.");
-        RefreshAmbientCaptureUi();
-        return Task.CompletedTask;
+        try
+        {
+            var session = _ambientCapture.Start(options);
+            AppendTranscript("Ambient Capture", $"Recording started.\n\n{session.DeviceSnapshot.ToDisplayText()}\n\nFolder:\n{session.OutputFolder}");
+            AddTimeline("Ambient capture started with microphone/system loopback settings.");
+            RefreshAmbientCaptureUi();
+            return Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            _ambientCaptureLastError = ex.Message;
+            RefreshAmbientCaptureUi();
+            RefreshAmbientCaptureIndicator();
+            throw;
+        }
     }
 
     private Task StopAmbientCaptureAsync()
     {
-        var session = _ambientCapture.Stop();
-        AppendTranscript("Ambient Capture", $"Recording stopped. Audio, manifest, transcript placeholder, and handoff were saved.\n\nFolder:\n{session.OutputFolder}");
-        AddTimeline("Ambient capture stopped and handoff files were generated.");
-        RefreshAmbientCaptureUi();
-        return Task.CompletedTask;
+        _ambientCaptureLastError = null;
+        _ambientCaptureIsProcessing = true;
+        RefreshAmbientCaptureIndicator();
+
+        try
+        {
+            var session = _ambientCapture.Stop();
+            AppendTranscript("Ambient Capture", $"Recording stopped. Audio, manifest, transcript placeholder, and handoff were saved.\n\nFolder:\n{session.OutputFolder}");
+            AddTimeline("Ambient capture stopped and handoff files were generated.");
+            return Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            _ambientCaptureLastError = ex.Message;
+            throw;
+        }
+        finally
+        {
+            _ambientCaptureIsProcessing = false;
+            RefreshAmbientCaptureUi();
+            RefreshAmbientCaptureIndicator();
+        }
     }
 
     private void RefreshAmbientCaptureUi()
     {
-        if (_ambientCaptureStatusText is null || _ambientCaptureDeviceText is null) return;
+        if (_ambientCaptureStatusText is null || _ambientCaptureDeviceText is null)
+        {
+            RefreshAmbientCaptureIndicator();
+            return;
+        }
 
         var snapshot = _ambientCapture.DetectDevices();
         _ambientCaptureStatusText.Text = _ambientCapture.IsRecording
@@ -202,6 +237,8 @@ public sealed partial class MainWindow
         if (_ambientCaptureStopButton is not null) _ambientCaptureStopButton.IsEnabled = _ambientCapture.IsRecording;
         if (_ambientCaptureOpenFolderButton is not null) _ambientCaptureOpenFolderButton.IsEnabled = _ambientCapture.CurrentSession is not null || _ambientCapture.LastCompletedSession is not null;
         if (_ambientCaptureCopyHandoffButton is not null) _ambientCaptureCopyHandoffButton.IsEnabled = _ambientCapture.LastCompletedSession is not null;
+
+        RefreshAmbientCaptureIndicator();
     }
 
     private void OpenAmbientCaptureFolder()
