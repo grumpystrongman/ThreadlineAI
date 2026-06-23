@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using Threadline.Windows.Services;
 
 namespace Threadline.Windows;
 
@@ -39,6 +40,10 @@ public partial class App : Application
         try
         {
             LogMessage("Application launch started.");
+
+            var serviceStartup = ThreadlineServiceLauncher.EnsureStartedAsync().GetAwaiter().GetResult();
+            LogMessage(serviceStartup.Message);
+
             _window = new MainWindow();
             LogMessage("Main window constructed.");
             _window.Activate();
