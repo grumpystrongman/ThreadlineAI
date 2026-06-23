@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
@@ -18,7 +18,7 @@ public sealed class LocalServiceApiContractTests : IClassFixture<LocalServiceApi
     [Fact]
     public async Task HealthDoctorCapabilitiesAndActionsExposeStableContracts()
     {
-        using var client = _factory.CreateClient();
+        using var client = _factory.CreateAuthorizedClient();
 
         var health = await client.GetAsync("/health");
         var doctor = await client.GetAsync("/doctor");
@@ -47,7 +47,7 @@ public sealed class LocalServiceApiContractTests : IClassFixture<LocalServiceApi
     [Fact]
     public async Task SessionBootstrapPreviewAndPromptContractsWorkTogether()
     {
-        using var client = _factory.CreateClient();
+        using var client = _factory.CreateAuthorizedClient();
 
         var create = await client.PostAsJsonAsync("/sessions", new StartSessionRequest("Build 23 contract session", "OpenAI"));
         Assert.Equal(HttpStatusCode.Created, create.StatusCode);
@@ -89,7 +89,15 @@ public sealed class LocalServiceApiContractTests : IClassFixture<LocalServiceApi
 
     public sealed class ThreadlineApiFactory : WebApplicationFactory<Program>, IDisposable
     {
+        private const string TestApiToken = "threadline-contract-test-token";
         private readonly string _root = Path.Combine(Path.GetTempPath(), "threadline-build23-api", Guid.NewGuid().ToString("N"));
+
+        public System.Net.Http.HttpClient CreateAuthorizedClient()
+        {
+            var client = CreateClient();
+            client.DefaultRequestHeaders.Add("X-Threadline-Token", TestApiToken);
+            return client;
+        }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -98,7 +106,8 @@ public sealed class LocalServiceApiContractTests : IClassFixture<LocalServiceApi
             {
                 config.AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["Threadline:RequireApiToken"] = "false",
+                    ["Threadline:RequireApiToken"] = "true",
+                    ["Threadline:ApiToken"] = TestApiToken,
                     ["Threadline:DatabasePath"] = Path.Combine(_root, "threadline.db"),
                     ["Threadline:LocalDataRoot"] = _root,
                     ["Threadline:ApiTokenPath"] = Path.Combine(_root, "service-token.txt"),
@@ -122,3 +131,4 @@ public sealed class LocalServiceApiContractTests : IClassFixture<LocalServiceApi
         }
     }
 }
+
