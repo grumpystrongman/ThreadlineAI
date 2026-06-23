@@ -16,10 +16,7 @@ public sealed class ThreadlineWorkThreadClient
     public ThreadlineWorkThreadClient(string baseUrl = "http://localhost:5057", string? localAccessToken = null)
     {
         _httpClient = new HttpClient { BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/") };
-        if (!string.IsNullOrWhiteSpace(localAccessToken))
-        {
-            _httpClient.DefaultRequestHeaders.Add("X-Threadline-Token", localAccessToken);
-        }
+        ThreadlineLocalApiAccess.ApplyTo(_httpClient, localAccessToken);
     }
 
     public async Task<WorkThreadDto?> GetActiveWorkThreadAsync(CancellationToken cancellationToken = default)
