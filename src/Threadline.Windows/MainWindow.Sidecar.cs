@@ -11,6 +11,12 @@ namespace Threadline.Windows;
 
 public sealed partial class MainWindow
 {
+    private enum SidecarDockingBehavior
+    {
+        ResizeCurrentWindowToMakeRoom,
+        ScreenDock
+    }
+
     private const int ShowWindowNormal = 1;
     private const int ShowWindowHide = 0;
     private const int ShowWindowRestore = 9;
@@ -40,12 +46,14 @@ public sealed partial class MainWindow
     private DateTimeOffset _lastFloatingTriggerEligibleAt = DateTimeOffset.MinValue;
     private string? _attachedSidecarTargetId;
     private bool _attachSidecarToTarget = true;
+    private SidecarDockingBehavior _sidecarDockingBehavior = SidecarDockingBehavior.ResizeCurrentWindowToMakeRoom;
     private bool _sidecarCollapsedToHandle = true;
     private bool _sidecarWindowHiddenForTrigger = true;
 
     private void ConfigureSidecarWindow()
     {
         SetSidecarVisualState();
+        UpdateAttachSidecarButtonLabel();
         StartFloatingEdgeTrigger();
         PlaceSidecarForTarget(GetBestSidecarTarget(), "Initial sidecar placement.");
 
@@ -88,15 +96,18 @@ public sealed partial class MainWindow
     private void ToggleAttachSidecarMode_Click(object sender, RoutedEventArgs e)
     {
         _attachSidecarToTarget = AttachSidecarToggle.IsChecked == true;
+        _sidecarDockingBehavior = _attachSidecarToTarget
+            ? SidecarDockingBehavior.ResizeCurrentWindowToMakeRoom
+            : SidecarDockingBehavior.ScreenDock;
 
         if (_attachSidecarToTarget)
         {
-            PlaceSidecarForTarget(GetBestSidecarTarget(), "Attach sidecar mode enabled.");
-            AddTimeline("Sidecar attach mode enabled.");
+            PlaceSidecarForTarget(GetBestSidecarTarget(), "Resize-to-make-room sidecar mode enabled.");
+            AddTimeline("Resize-to-make-room sidecar mode enabled.");
         }
         else
         {
-            DockSidecarToScreen("Sidecar: Screen dock mode. Attach is off.");
+            DockSidecarToScreen("Sidecar: Screen dock mode. Resize-to-make-room is off.");
             AddTimeline("Sidecar screen dock mode enabled.");
         }
     }
@@ -380,7 +391,7 @@ public sealed partial class MainWindow
         {
             DockSidecarToScreen(_sidecarWindowHiddenForTrigger
                 ? "Sidecar: Floating trigger armed in screen dock mode."
-                : "Sidecar: Screen dock mode. Attach is off.");
+                : "Sidecar: Screen dock mode. Resize-to-make-room is off.");
             return;
         }
 
@@ -388,7 +399,7 @@ public sealed partial class MainWindow
         {
             DockSidecarToScreen(_sidecarWindowHiddenForTrigger
                 ? "Sidecar: Floating trigger armed; waiting for a target window edge hover."
-                : "Sidecar: Attach mode on; waiting for a target window.");
+                : "Sidecar: Resize-to-make-room mode on; waiting for a target window.");
             return;
         }
 
@@ -397,7 +408,7 @@ public sealed partial class MainWindow
             return;
         }
 
-        DockSidecarToScreen($"Sidecar: Could not attach to {target.Window.ApplicationName}; using screen dock fallback.");
+        DockSidecarToScreen($"Sidecar: Could not resize {target.Window.ApplicationName}; using screen dock fallback.");
     }
 
     private bool TryAttachSidecarToTarget(ActiveWindowSnapshot targetWindow, string targetTitle, string reason)
@@ -422,7 +433,7 @@ public sealed partial class MainWindow
             var maxWidth = Math.Max(1, workArea.Width - (SidecarScreenMargin * 2));
             var sidecarWidth = ClampToArea(SidecarDefaultWidth, SidecarMinimumWidth, maxWidth);
 
-            if (!_sidecarWindowHiddenForTrigger)
+            if (!_sidecarWindowHiddenForTrigger && _sidecarDockingBehavior == SidecarDockingBehavior.ResizeCurrentWindowToMakeRoom)
             {
                 targetRect = EnsureSideBySideTargetSpace(targetWindow.Handle, targetRect, workArea, sidecarWidth);
             }
@@ -446,7 +457,7 @@ public sealed partial class MainWindow
             appWindow.Move(new PointInt32(x, y));
 
             var side = x == rightX ? "right" : x == leftX ? "left" : "screen edge";
-            UpdateSidecarAttachmentStatus($"Sidecar: Attached chat on {side} of {targetWindow.ApplicationName} — {targetTitle}. {reason}");
+            UpdateSidecarAttachmentStatus($"Sidecar: Resize-to-make-room on {side} of {targetWindow.ApplicationName} — {targetTitle}. {reason}");
             return true;
         }
         catch
@@ -488,14 +499,12 @@ public sealed partial class MainWindow
         var maxTargetHeight = Math.Max(1, workArea.Height - (SidecarScreenMargin * 2));
         var targetWidth = ClampToArea(targetRect.Width, Math.Min(TargetMinimumWidth, availableTargetWidth), availableTargetWidth);
         var targetHeight = ClampToArea(targetRect.Height, 1, maxTargetHeight);
-        var targetLeft = workRight - sidecarWidth - SidecarAttachGap - targetWidth;
+        var targetLeft = workLeft;
         var targetTop = ClampToArea(targetRect.Top, workTop, workBottom - targetHeight);
-
-        targetLeft = ClampToArea(targetLeft, workLeft, Math.Max(workLeft, workRight - sidecarWidth - SidecarAttachGap - targetWidth));
 
         // Maximized windows ignore normal move/resize calls. Restore first so Threadline can create a Copilot-style side-by-side layout.
         _ = ShowWindow(targetHandle, ShowWindowRestore);
-        _ = SetWindowPos(
+        var moved = SetWindowPos(
             targetHandle,
             nint.Zero,
             targetLeft,
@@ -504,7 +513,7 @@ public sealed partial class MainWindow
             targetHeight,
             SetWindowPosNoZOrder | SetWindowPosNoActivate);
 
-        return GetWindowRect(targetHandle, out var updatedRect) ? updatedRect : new NativeRect
+        return moved && GetWindowRect(targetHandle, out var updatedRect) ? updatedRect : new NativeRect
         {
             Left = targetLeft,
             Top = targetTop,
