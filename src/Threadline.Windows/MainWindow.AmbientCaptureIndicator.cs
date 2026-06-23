@@ -47,7 +47,7 @@ public sealed partial class MainWindow
         {
             Width = 32,
             Height = 32,
-            RenderTransformOrigin = new Windows.Foundation.Point(0.5, 0.5),
+            RenderTransformOrigin = new global::Windows.Foundation.Point(0.5, 0.5),
             RenderTransform = _ambientCaptureIndicatorScale
         };
         indicatorRoot.Children.Add(_ambientCaptureIndicatorGlow);
@@ -167,8 +167,8 @@ public sealed partial class MainWindow
             _ambientCaptureIndicatorButton.Visibility = Visibility.Visible;
             _ambientCaptureIndicatorGlow.Fill = new SolidColorBrush(Colors.Red);
             _ambientCaptureIndicatorDot.Fill = new SolidColorBrush(Colors.Red);
-            ToolTipService.SetToolTip(_ambientCaptureIndicatorButton, "Ambient Capture is recording. Click to open the tool.");
-            AutomationProperties.SetName(_ambientCaptureIndicatorButton, "Ambient Capture is recording");
+            ToolTipService.SetToolTip(_ambientCaptureIndicatorButton, "Ambient Capture is active. Click to open the tool.");
+            AutomationProperties.SetName(_ambientCaptureIndicatorButton, "Ambient Capture is active");
             _ambientCapturePulseStoryboard?.Begin();
             return;
         }
@@ -179,6 +179,6 @@ public sealed partial class MainWindow
     private void AmbientCaptureIndicator_Click(object sender, RoutedEventArgs e)
     {
         OpenDiagnosticsTargetPickerPanel();
-        AddTimeline("Opened Ambient Capture from the recording indicator.");
+        AddTimeline("Opened Ambient Capture from the status indicator.");
     }
 }
