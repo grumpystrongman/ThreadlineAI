@@ -43,6 +43,29 @@ function Invoke-ThreadlineJson {
     return Invoke-RestMethod -Method $Method -Uri $uri -Headers $headers -ContentType 'application/json' -Body $json
 }
 
+function Get-ThreadlinePowerShellExecutable {
+    $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
+    if ($null -ne $pwsh) {
+        return $pwsh.Source
+    }
+
+    $windowsPowerShell = Get-Command powershell -ErrorAction SilentlyContinue
+    if ($null -ne $windowsPowerShell) {
+        return $windowsPowerShell.Source
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($PSHOME)) {
+        foreach ($candidateName in @('pwsh.exe', 'powershell.exe')) {
+            $candidate = Join-Path $PSHOME $candidateName
+            if (Test-Path $candidate) {
+                return $candidate
+            }
+        }
+    }
+
+    throw 'No PowerShell executable was found. Install PowerShell 7 or ensure Windows PowerShell is available on PATH.'
+}
+
 function Get-ThreadlineActiveSession {
     [CmdletBinding()]
     param()
@@ -171,13 +194,23 @@ function Invoke-ThreadlineCommandCapture {
     }
 
     $started = Get-Date
-    $output = & pwsh -NoLogo -NoProfile -Command $Command 2>&1 | Out-String
-    $exitCode = if ($null -ne $LASTEXITCODE) { $LASTEXITCODE } else { 0 }
+    $shellExecutable = Get-ThreadlinePowerShellExecutable
+    try {
+        $output = & $shellExecutable -NoLogo -NoProfile -Command $Command 2>&1 | Out-String
+        $exitCode = if ($null -ne $LASTEXITCODE) { $LASTEXITCODE } else { 0 }
+    }
+    catch {
+        $output = $_ | Out-String
+        $exitCode = 1
+    }
     $finished = Get-Date
 
     $content = @"
 Command:
 $Command
+
+Shell:
+$shellExecutable
 
 ExitCode:
 $exitCode
