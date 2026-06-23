@@ -8,6 +8,12 @@ public static class ProviderAuditEndpointMappings
     {
         var api = app.MapGroup(string.Empty).RequireThreadlineLocalAccess();
 
+        api.MapGet("/audit/recent", async (string? sessionId, int? take, IAuditRepository audit, CancellationToken ct) =>
+        {
+            var events = await audit.GetRecentAuditEventsAsync(string.IsNullOrWhiteSpace(sessionId) ? null : sessionId, take ?? 50, ct);
+            return Results.Ok(events);
+        });
+
         api.MapGet("/audit/provider-context", async (string? sessionId, int? take, IAuditRepository audit, CancellationToken ct) =>
         {
             var events = await audit.GetRecentAuditEventsAsync(string.IsNullOrWhiteSpace(sessionId) ? null : sessionId, take ?? 100, ct);
