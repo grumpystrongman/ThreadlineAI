@@ -68,32 +68,42 @@
           VerticalAlignment="Stretch">
 
       <Grid RowDefinitions="Auto,Auto,*,Auto,Auto"
-            RowSpacing="7"
+            RowSpacing="8"
             Padding="9"
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch">
 
-        <!-- Header: compact, readable, and always actionable. -->
-        <Border Grid.Row="0" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="16" Padding="10,8">
-          <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="7">
+        <!-- Header: quiet by default; advanced controls live in the drawer. -->
+        <Border Grid.Row="0" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="18" Padding="10,8">
+          <Grid RowDefinitions="Auto,Auto" RowSpacing="6">
             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-              <Border Width="28" Height="28" CornerRadius="14" Background="#EEF5FF" BorderBrush="#C8DBFF" BorderThickness="1" VerticalAlignment="Center">
+              <Border Width="30" Height="30" CornerRadius="15" Background="#EEF5FF" BorderBrush="#C8DBFF" BorderThickness="1" VerticalAlignment="Center">
                 <TextBlock Text="◉" FontSize="16" Foreground="#2563EB" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Border>
-              <StackPanel Grid.Column="1" Spacing="0" VerticalAlignment="Center">
+
+              <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
                 <TextBlock Text="ThreadlineAI" FontSize="17" FontWeight="SemiBold" Foreground="#111827" />
                 <TextBlock x:Name="SidecarAttachmentText"
-                           Text="Sidecar: attached to active work."
+                           Text="Following your active work."
                            TextWrapping="WrapWholeWords"
                            MaxLines="1"
                            FontSize="10"
                            Foreground="#6B7280" />
               </StackPanel>
-              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" HorizontalAlignment="Right">
+
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button Content="New"
+                        Click="NewChat_Click"
+                        MinWidth="44"
+                        Style="{StaticResource SidecarButtonStyle}" />
+                <Button Content="Details"
+                        Click="ToggleDiagnosticsTargetPickerPanel_Click"
+                        MinWidth="58"
+                        Style="{StaticResource SidecarButtonStyle}" />
                 <Button x:Name="AttachSidecarButton"
-                        Content="Dock"
+                        Content="Resize"
                         Click="ToggleAttachSidecar_Click"
-                        MinWidth="54"
+                        MinWidth="58"
                         Style="{StaticResource SidecarButtonStyle}" />
                 <Button Content="×"
                         Click="CollapseSidecarToHandle_Click"
@@ -107,22 +117,23 @@
             <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
               <TextBlock x:Name="WorkThreadStatusText"
                          Text="Work Thread: ready"
-                         FontSize="13"
+                         FontSize="12"
                          FontWeight="SemiBold"
                          Foreground="#111827"
                          TextWrapping="WrapWholeWords"
                          TextTrimming="CharacterEllipsis"
                          MaxLines="1"
                          VerticalAlignment="Center" />
-              <Button Grid.Column="1" Content="New Thread" Click="NewWorkThread_Click" Style="{StaticResource SidecarButtonStyle}" MinWidth="82" />
-              <Button Grid.Column="2" Content="Resume" Click="ResumeWorkThread_Click" Style="{StaticResource SidecarButtonStyle}" MinWidth="66" />
-            </Grid>
-
-            <Grid Grid.Row="2" ColumnDefinitions="*,*,*,*" ColumnSpacing="6">
-              <Button Content="New Chat" Click="NewChat_Click" Style="{StaticResource SidecarButtonStyle}" />
-              <Button Grid.Column="1" Content="Sessions" Click="ToggleSessionManagerPanel_Click" Style="{StaticResource SidecarButtonStyle}" />
-              <Button Grid.Column="2" Content="Settings" Click="ToggleProviderSettingsPanel_Click" Style="{StaticResource SidecarButtonStyle}" />
-              <Button Grid.Column="3" Content="Tools" Click="ToggleDiagnosticsTargetPickerPanel_Click" Style="{StaticResource SidecarButtonStyle}" />
+              <Button Grid.Column="1"
+                      Content="Sessions"
+                      Click="ToggleSessionManagerPanel_Click"
+                      Style="{StaticResource SidecarButtonStyle}"
+                      MinWidth="68" />
+              <Button Grid.Column="2"
+                      Content="Settings"
+                      Click="ToggleProviderSettingsPanel_Click"
+                      Style="{StaticResource SidecarButtonStyle}"
+                      MinWidth="68" />
             </Grid>
 
             <TextBox x:Name="WorkThreadTitleBox"
@@ -169,53 +180,63 @@
           </Grid>
         </Border>
 
-        <!-- Work surface: compact context row + transcript. -->
-        <Grid Grid.Row="2" RowDefinitions="Auto,*" RowSpacing="7" MinHeight="160">
-          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-            <Border x:Name="CurrentContextPanel" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="14" Padding="9,7">
-              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                <Border x:Name="ContextStatusPill" Width="24" Height="24" CornerRadius="12" Background="#EEF5FF">
-                  <TextBlock x:Name="ContextStatusText" Text="◉" Foreground="#2563EB" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <StackPanel Grid.Column="1" Spacing="1">
-                  <TextBlock Text="Connected context" FontSize="11" FontWeight="SemiBold" Foreground="#111827" />
-                  <TextBlock x:Name="CurrentContextText"
-                             Text="No source selected yet."
-                             TextWrapping="WrapWholeWords"
-                             MaxLines="2"
-                             FontSize="10"
-                             Foreground="#6B7280" />
-                </StackPanel>
-              </Grid>
-            </Border>
-            <Border Grid.Column="1" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="14" Padding="9,7" MinWidth="126">
-              <StackPanel Spacing="1">
-                <TextBlock Text="Receipt" FontSize="11" FontWeight="SemiBold" Foreground="#111827" />
-                <TextBlock x:Name="ReceiptSourceText" Text="No receipt" FontSize="10" Foreground="#6B7280" TextWrapping="WrapWholeWords" MaxLines="2" />
-                <TextBlock x:Name="ReceiptTrustText" Text="No context" FontSize="10" Foreground="#16A34A" TextWrapping="WrapWholeWords" MaxLines="1" />
-              </StackPanel>
-            </Border>
-          </Grid>
+        <!-- Chat body: familiar LLM surface with only a small context signal. -->
+        <Grid Grid.Row="2" RowDefinitions="Auto,*" RowSpacing="8" MinHeight="220">
+          <Border x:Name="CurrentContextPanel" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="18" Padding="9,7">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+              <Border x:Name="ContextStatusPill" Width="24" Height="24" CornerRadius="12" Background="#EEF5FF">
+                <TextBlock x:Name="ContextStatusText" Text="◉" Foreground="#2563EB" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
 
-          <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="16" Padding="0" MinHeight="150">
+              <StackPanel Grid.Column="1" Spacing="1">
+                <TextBlock Text="Sharing current context" FontSize="11" FontWeight="SemiBold" Foreground="#111827" />
+                <TextBlock x:Name="CurrentContextText"
+                           Text="No source selected yet."
+                           TextWrapping="WrapWholeWords"
+                           MaxLines="2"
+                           FontSize="10"
+                           Foreground="#6B7280" />
+              </StackPanel>
+
+              <StackPanel Grid.Column="2" Spacing="1" MinWidth="90" HorizontalAlignment="Right">
+                <TextBlock x:Name="ReceiptTrustText"
+                           Text="No context"
+                           FontSize="10"
+                           FontWeight="SemiBold"
+                           Foreground="#16A34A"
+                           TextAlignment="Right"
+                           TextWrapping="WrapWholeWords"
+                           MaxLines="1" />
+                <TextBlock x:Name="ReceiptSourceText"
+                           Text="No receipt"
+                           FontSize="10"
+                           Foreground="#6B7280"
+                           TextAlignment="Right"
+                           TextWrapping="WrapWholeWords"
+                           MaxLines="1" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <Border Grid.Row="1" Background="#FCFDFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="20" Padding="0" MinHeight="190">
             <ScrollViewer x:Name="TranscriptScrollViewer"
                           VerticalScrollBarVisibility="Auto"
                           VerticalScrollMode="Enabled"
                           HorizontalScrollBarVisibility="Disabled"
                           HorizontalScrollMode="Disabled"
                           ZoomMode="Disabled"
-                          Padding="10,8,10,10">
+                          Padding="10,10,10,10">
               <ItemsControl x:Name="TranscriptList">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
                     <Border Background="#FFFFFF"
                             BorderBrush="#E5EDF8"
                             BorderThickness="1"
-                            CornerRadius="12"
-                            Padding="10"
-                            Margin="0,4,0,4"
+                            CornerRadius="16"
+                            Padding="12"
+                            Margin="0,5,0,5"
                             HorizontalAlignment="Stretch">
-                      <StackPanel Spacing="5">
+                      <StackPanel Spacing="7">
                         <Grid ColumnDefinitions="*,Auto">
                           <TextBlock Text="{Binding Speaker}" FontSize="12" FontWeight="SemiBold" Foreground="#111827" />
                           <TextBlock Grid.Column="1" Text="{Binding TimestampDisplay}" FontSize="10" Foreground="#6B7280" />
@@ -224,7 +245,8 @@
                                    TextWrapping="WrapWholeWords"
                                    IsTextSelectionEnabled="True"
                                    Foreground="#111827"
-                                   FontSize="12" />
+                                   FontSize="13"
+                                   LineHeight="18" />
                       </StackPanel>
                     </Border>
                   </DataTemplate>
@@ -234,85 +256,73 @@
           </Border>
         </Grid>
 
-        <!-- Composer: no horizontal scrolling; all core actions are visible. -->
-        <Border Grid.Row="3" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="16" Padding="8">
-          <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
+        <!-- Composer: clean chat-first entry point; features are reachable through + and Details. -->
+        <Border Grid.Row="3" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="20" Padding="8">
+          <Grid RowDefinitions="Auto,Auto" RowSpacing="6">
             <TextBox x:Name="QuestionBox"
                      PlaceholderText="Ask ThreadlineAI..."
                      AcceptsReturn="True"
-                     Height="56"
-                     MaxHeight="60"
+                     Height="64"
+                     MaxHeight="88"
                      TextWrapping="Wrap"
                      BorderThickness="0"
-                     Background="Transparent" />
+                     Background="Transparent"
+                     FontSize="13" />
 
-            <Grid Grid.Row="1" ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
-              <Button Content="Summary" Click="SummaryArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
-              <Button Grid.Column="1" Content="Handoff" Click="HandoffArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
-              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
-                <Button Content="Copy Art" Click="CopyArtifactAction_Click" MinWidth="62" Style="{StaticResource SidecarButtonStyle}" />
-                <Button Content="Export" Click="ExportArtifactAction_Click" MinWidth="58" Style="{StaticResource SidecarButtonStyle}" />
-                <Button Content="Ask" Click="TrustedAsk_Click" MinWidth="62" Style="{StaticResource PrimarySidecarButtonStyle}" />
-              </StackPanel>
+            <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="6">
+              <Button Content="+"
+                      Click="ToggleDiagnosticsTargetPickerPanel_Click"
+                      MinWidth="34"
+                      Style="{StaticResource SidecarButtonStyle}" />
+              <Button Grid.Column="1"
+                      Content="Tools"
+                      Click="ToggleDiagnosticsTargetPickerPanel_Click"
+                      MinWidth="54"
+                      Style="{StaticResource SidecarButtonStyle}" />
+              <TextBlock Grid.Column="2"
+                         x:Name="TrustControlStatusText"
+                         Text="Governed"
+                         FontSize="10"
+                         Foreground="#6B7280"
+                         TextTrimming="CharacterEllipsis"
+                         VerticalAlignment="Center" />
+              <Button Grid.Column="3"
+                      Content="Ask"
+                      Click="TrustedAsk_Click"
+                      MinWidth="64"
+                      Style="{StaticResource PrimarySidecarButtonStyle}" />
             </Grid>
-
-            <Grid Grid.Row="2" ColumnDefinitions="*,*,*,*" ColumnSpacing="6">
-              <Button Content="Decide" Click="DecisionsArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
-              <Button Grid.Column="1" Content="Risks" Click="RisksArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
-              <Button Grid.Column="2" Content="Next" Click="NextActionsArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
-              <Button Grid.Column="3" Content="Regen" Click="RegenerateArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
-            </Grid>
-          </Grid>
-        </Border>
-
-        <!-- Privacy: compact readable status with labels visible. -->
-        <Border Grid.Row="4" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="14" Padding="9,7">
-          <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="5">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                <TextBlock Text="Privacy &amp; Trust" FontSize="12" FontWeight="SemiBold" Foreground="#111827" />
-                <TextBlock Text="● Protected" FontSize="10" FontWeight="SemiBold" Foreground="#16A34A" />
-              </StackPanel>
-              <TextBlock Grid.Column="1" x:Name="TrustControlStatusText" Text="Governed" FontSize="10" Foreground="#6B7280" TextTrimming="CharacterEllipsis" />
-            </Grid>
-            <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*" ColumnSpacing="6">
-              <CheckBox x:Name="AllowProviderContextToggle" Content="Provider" IsChecked="True" FontSize="10" Foreground="#374151" MinWidth="0" />
-              <CheckBox x:Name="SaveWorkThreadMemoryToggle" Grid.Column="1" Content="Memory" IsChecked="True" FontSize="10" Foreground="#374151" MinWidth="0" />
-              <CheckBox x:Name="ShowContextReceiptsToggle" Grid.Column="2" Content="Receipts" IsChecked="True" FontSize="10" Foreground="#374151" MinWidth="0" />
-              <CheckBox x:Name="ScreenshotVisionConsentToggle" Grid.Column="3" Content="Vision once" IsChecked="False" FontSize="10" Foreground="#7C2D12" MinWidth="0" />
-            </Grid>
-            <TextBlock Grid.Row="2" x:Name="ScreenshotVisionPolicyText" Text="Vision: off. Screenshot/OCR needs visible one-time approval." TextWrapping="WrapWholeWords" MaxLines="2" FontSize="10" Foreground="#6B7280" />
           </Grid>
         </Border>
 
         <ListView x:Name="TimelineList" Grid.Row="4" Height="1" Visibility="Collapsed" />
       </Grid>
 
-      <!-- Drawer: top-aligned and intentionally smaller than the whole sidecar. -->
+      <!-- Drawer: advanced capabilities stay available without crowding the conversation. -->
       <Border x:Name="ShellOverlayPanel"
-              Width="360"
-              MaxWidth="390"
-              MaxHeight="620"
+              Width="372"
+              MaxWidth="410"
+              MaxHeight="720"
               Margin="10"
               HorizontalAlignment="Right"
-              VerticalAlignment="Top"
+              VerticalAlignment="Stretch"
               Background="#FFFFFF"
               BorderBrush="#DCE6F5"
               BorderThickness="1"
-              CornerRadius="16"
+              CornerRadius="18"
               Padding="10"
               Visibility="Collapsed">
         <Grid RowDefinitions="Auto,*" RowSpacing="8">
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
             <StackPanel>
               <TextBlock x:Name="ShellOverlayTitleText" Text="Panel" FontSize="16" FontWeight="SemiBold" Foreground="#111827" />
-              <TextBlock Text="Sidecar drawer" FontSize="10" Foreground="#6B7280" />
+              <TextBlock Text="Context, tools, settings, and diagnostics" FontSize="10" Foreground="#6B7280" />
             </StackPanel>
             <Button Grid.Column="1" Content="Close" Click="CloseShellOverlayPanel_Click" Style="{StaticResource SidecarButtonStyle}" />
           </Grid>
 
           <Grid Grid.Row="1">
-            <Border x:Name="WorkThreadSessionManagerPanel" BorderThickness="1" BorderBrush="#E5EDF8" CornerRadius="12" Padding="10" Visibility="Collapsed">
+            <Border x:Name="WorkThreadSessionManagerPanel" BorderThickness="1" BorderBrush="#E5EDF8" CornerRadius="14" Padding="10" Visibility="Collapsed">
               <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                   <StackPanel>
@@ -324,7 +334,7 @@
                     <Button Content="Resume" Click="ResumeSelectedWorkThread_Click" Style="{StaticResource SidecarButtonStyle}" />
                   </StackPanel>
                 </Grid>
-                <ListView x:Name="WorkThreadList" Grid.Row="1" Height="180" SelectionMode="Single" SelectionChanged="WorkThreadList_SelectionChanged" FontSize="11" HorizontalContentAlignment="Stretch" />
+                <ListView x:Name="WorkThreadList" Grid.Row="1" Height="220" SelectionMode="Single" SelectionChanged="WorkThreadList_SelectionChanged" FontSize="11" HorizontalContentAlignment="Stretch" />
                 <TextBox x:Name="SessionManagerTitleBox" Grid.Row="2" PlaceholderText="Rename selected or active Work Thread..." FontSize="11" TextWrapping="NoWrap" />
                 <StackPanel Grid.Row="3" Spacing="6">
                   <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
@@ -342,8 +352,8 @@
               </Grid>
             </Border>
 
-            <Border x:Name="ProviderSettingsPanel" BorderThickness="1" BorderBrush="#E5EDF8" CornerRadius="12" Padding="10" Visibility="Collapsed">
-              <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="540">
+            <Border x:Name="ProviderSettingsPanel" BorderThickness="1" BorderBrush="#E5EDF8" CornerRadius="14" Padding="10" Visibility="Collapsed">
+              <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="650">
                 <StackPanel Spacing="8">
                   <TextBlock Text="ChatGPT / Provider setup" FontSize="15" FontWeight="SemiBold" Foreground="#111827" />
                   <TextBlock x:Name="ProviderSettingsStatusText" Text="Choose OpenAI, paste your key, then Save Provider." TextWrapping="WrapWholeWords" FontSize="11" Foreground="#6B7280" />
@@ -377,35 +387,87 @@
               </ScrollViewer>
             </Border>
 
-            <Border x:Name="DiagnosticsTargetPickerPanel" BorderThickness="1" BorderBrush="#E5EDF8" CornerRadius="12" Padding="10" Visibility="Collapsed">
-              <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="540">
-                <StackPanel Spacing="8">
-                  <TextBlock Text="Tools" FontSize="15" FontWeight="SemiBold" Foreground="#111827" />
-                  <TextBlock Text="Service and target controls" FontSize="11" Foreground="#6B7280" />
-                  <TextBlock x:Name="ServiceStatusText" Text="Service: unknown" TextWrapping="WrapWholeWords" FontSize="11" Foreground="#6B7280" />
-                  <TextBlock x:Name="SessionText" Text="No active Threadline session." TextWrapping="WrapWholeWords" FontSize="11" Foreground="#6B7280" />
-                  <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="6" RowSpacing="6">
-                    <Button Content="New Chat" Click="NewChat_Click" Style="{StaticResource SidecarButtonStyle}" />
-                    <Button Grid.Column="1" Content="Use Session" Click="UseActiveSession_Click" Style="{StaticResource SidecarButtonStyle}" />
-                    <Button Grid.Row="1" Content="Start Session" Click="StartSession_Click" Style="{StaticResource SidecarButtonStyle}" />
-                    <Button Grid.Row="1" Grid.Column="1" Content="Check Service" Click="CheckService_Click" Style="{StaticResource SidecarButtonStyle}" />
-                  </Grid>
-                  <TextBlock Text="Target picker" FontWeight="SemiBold" FontSize="11" Foreground="#111827" />
-                  <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
-                    <Button Content="Refresh" Click="RefreshOpenWindows_Click" Style="{StaticResource SidecarButtonStyle}" />
-                    <Button Grid.Column="1" Content="Use" Click="UseSelectedTarget_Click" Style="{StaticResource SidecarButtonStyle}" />
-                    <Button Grid.Column="2" Content="Follow/Lock" Click="ToggleFollowLock_Click" Style="{StaticResource SidecarButtonStyle}" />
-                  </Grid>
-                  <ListView x:Name="OpenWindowsList" Height="180" SelectionMode="Single" FontSize="11" HorizontalContentAlignment="Stretch" />
-                  <TextBlock Text="Screenshot/OCR app policy" FontWeight="SemiBold" FontSize="11" Foreground="#111827" />
-                  <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
-                    <Button Content="Allow Vision App" Click="AllowScreenshotVisionForSelectedApp_Click" Style="{StaticResource SidecarButtonStyle}" />
-                    <Button Grid.Column="1" Content="Deny Vision App" Click="DenyScreenshotVisionForSelectedApp_Click" Style="{StaticResource WarmSidecarButtonStyle}" />
-                  </Grid>
-                  <Button Content="Ask Each Time" Click="ResetScreenshotVisionForSelectedApp_Click" Style="{StaticResource SidecarButtonStyle}" />
+            <Border x:Name="DiagnosticsTargetPickerPanel" BorderThickness="1" BorderBrush="#E5EDF8" CornerRadius="14" Padding="10" Visibility="Collapsed">
+              <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="650">
+                <StackPanel Spacing="10">
+                  <TextBlock Text="Context &amp; tools" FontSize="15" FontWeight="SemiBold" Foreground="#111827" />
+                  <TextBlock Text="Everything powerful is still here; the main sidecar stays focused on conversation." FontSize="11" Foreground="#6B7280" TextWrapping="WrapWholeWords" />
+
+                  <Border BorderBrush="#E5EDF8" BorderThickness="1" CornerRadius="12" Padding="8">
+                    <StackPanel Spacing="6">
+                      <TextBlock Text="Service and session" FontWeight="SemiBold" FontSize="11" Foreground="#111827" />
+                      <TextBlock x:Name="ServiceStatusText" Text="Service: starting..." TextWrapping="WrapWholeWords" FontSize="11" Foreground="#6B7280" />
+                      <TextBlock x:Name="SessionText" Text="No active Threadline session." TextWrapping="WrapWholeWords" FontSize="11" Foreground="#6B7280" />
+                      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="6" RowSpacing="6">
+                        <Button Content="New Chat" Click="NewChat_Click" Style="{StaticResource SidecarButtonStyle}" />
+                        <Button Grid.Column="1" Content="Use Session" Click="UseActiveSession_Click" Style="{StaticResource SidecarButtonStyle}" />
+                        <Button Grid.Row="1" Content="Start Session" Click="StartSession_Click" Style="{StaticResource SidecarButtonStyle}" />
+                        <Button Grid.Row="1" Grid.Column="1" Content="Check Service" Click="CheckService_Click" Style="{StaticResource SidecarButtonStyle}" />
+                      </Grid>
+                    </StackPanel>
+                  </Border>
+
+                  <Border BorderBrush="#E5EDF8" BorderThickness="1" CornerRadius="12" Padding="8">
+                    <StackPanel Spacing="6">
+                      <TextBlock Text="Target picker" FontWeight="SemiBold" FontSize="11" Foreground="#111827" />
+                      <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
+                        <Button Content="Refresh" Click="RefreshOpenWindows_Click" Style="{StaticResource SidecarButtonStyle}" />
+                        <Button Grid.Column="1" Content="Use" Click="UseSelectedTarget_Click" Style="{StaticResource SidecarButtonStyle}" />
+                        <Button Grid.Column="2" Content="Follow/Lock" Click="ToggleFollowLock_Click" Style="{StaticResource SidecarButtonStyle}" />
+                      </Grid>
+                      <ListView x:Name="OpenWindowsList" Height="180" SelectionMode="Single" FontSize="11" HorizontalContentAlignment="Stretch" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border BorderBrush="#E5EDF8" BorderThickness="1" CornerRadius="12" Padding="8">
+                    <StackPanel Spacing="6">
+                      <TextBlock Text="Artifact actions" FontWeight="SemiBold" FontSize="11" Foreground="#111827" />
+                      <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="6" RowSpacing="6">
+                        <Button Content="Summary" Click="SummaryArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
+                        <Button Grid.Column="1" Content="Handoff" Click="HandoffArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
+                        <Button Grid.Column="2" Content="Decide" Click="DecisionsArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
+                        <Button Grid.Row="1" Content="Risks" Click="RisksArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
+                        <Button Grid.Row="1" Grid.Column="1" Content="Next" Click="NextActionsArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
+                        <Button Grid.Row="1" Grid.Column="2" Content="Regen" Click="RegenerateArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
+                        <Button Grid.Row="2" Content="Copy Art" Click="CopyArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
+                        <Button Grid.Row="2" Grid.Column="1" Content="Export" Click="ExportArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
+                      </Grid>
+                    </StackPanel>
+                  </Border>
+
+                  <Border BorderBrush="#E5EDF8" BorderThickness="1" CornerRadius="12" Padding="8">
+                    <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="5">
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                          <TextBlock Text="Privacy &amp; Trust" FontSize="12" FontWeight="SemiBold" Foreground="#111827" />
+                          <TextBlock Text="● Protected" FontSize="10" FontWeight="SemiBold" Foreground="#16A34A" />
+                        </StackPanel>
+                      </Grid>
+                      <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*" ColumnSpacing="6">
+                        <CheckBox x:Name="AllowProviderContextToggle" Content="Provider" IsChecked="True" FontSize="10" Foreground="#374151" MinWidth="0" />
+                        <CheckBox x:Name="SaveWorkThreadMemoryToggle" Grid.Column="1" Content="Memory" IsChecked="True" FontSize="10" Foreground="#374151" MinWidth="0" />
+                        <CheckBox x:Name="ShowContextReceiptsToggle" Grid.Column="2" Content="Receipts" IsChecked="True" FontSize="10" Foreground="#374151" MinWidth="0" />
+                        <CheckBox x:Name="ScreenshotVisionConsentToggle" Grid.Column="3" Content="Vision once" IsChecked="False" FontSize="10" Foreground="#7C2D12" MinWidth="0" />
+                      </Grid>
+                      <TextBlock Grid.Row="2" x:Name="ScreenshotVisionPolicyText" Text="Vision: off. Screenshot/OCR needs visible one-time approval." TextWrapping="WrapWholeWords" MaxLines="2" FontSize="10" Foreground="#6B7280" />
+                    </Grid>
+                  </Border>
+
+                  <Border BorderBrush="#E5EDF8" BorderThickness="1" CornerRadius="12" Padding="8">
+                    <StackPanel Spacing="6">
+                      <TextBlock Text="Screenshot/OCR app policy" FontWeight="SemiBold" FontSize="11" Foreground="#111827" />
+                      <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                        <Button Content="Allow Vision App" Click="AllowScreenshotVisionForSelectedApp_Click" Style="{StaticResource SidecarButtonStyle}" />
+                        <Button Grid.Column="1" Content="Deny Vision App" Click="DenyScreenshotVisionForSelectedApp_Click" Style="{StaticResource WarmSidecarButtonStyle}" />
+                      </Grid>
+                      <Button Content="Ask Each Time" Click="ResetScreenshotVisionForSelectedApp_Click" Style="{StaticResource SidecarButtonStyle}" />
+                    </StackPanel>
+                  </Border>
+
                   <Border x:Name="DiagnosticsPanel" BorderThickness="1" BorderBrush="#E5EDF8" CornerRadius="8" Padding="6" Visibility="Collapsed">
                     <TextBlock x:Name="DiagnosticsText" Text="No diagnostics yet." TextWrapping="WrapWholeWords" FontSize="10" Foreground="#6B7280" />
                   </Border>
+
                   <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
                     <Button Content="Diagnostics" Click="ToggleDiagnostics_Click" Style="{StaticResource SidecarButtonStyle}" />
                     <Button Content="Clear Context" Click="ClearSharedContext_Click" Style="{StaticResource SidecarButtonStyle}" />
