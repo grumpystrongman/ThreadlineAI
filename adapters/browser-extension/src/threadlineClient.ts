@@ -201,7 +201,7 @@ export async function sendExtensionHeartbeat(tabIdentity?: BrowserTabIdentity): 
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes('returned 404')) {
       const registration = await registerBrowserExtension(tabIdentity);
-      return { ok: true, adapterId: registration.id, registered: true };
+      return { ok: true, adapterId: registration.id, registered: true, registration };
     }
 
     return { ok: false, adapterId, error: message };
