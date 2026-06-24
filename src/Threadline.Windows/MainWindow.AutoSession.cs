@@ -16,13 +16,10 @@ public sealed partial class MainWindow
     private static readonly nint HwndTopmost = unchecked((nint)(-1));
 
     private bool _sidecarSessionBootstrapStarted;
-    private bool _fallbackEdgeTriggerStarted;
-    private readonly DispatcherTimer _fallbackEdgeTriggerTimer = new();
 
     private async void RootShell_Loaded(object sender, RoutedEventArgs e)
     {
         SafeEnsureReadableCheckBoxLabels();
-        StartFallbackFloatingTriggerTimer();
         SafeEnsureFallbackFloatingTriggerVisible();
         StartBrowserExtensionGuidanceTimer();
 
@@ -46,16 +43,6 @@ public sealed partial class MainWindow
         }
     }
 
-    private void StartFallbackFloatingTriggerTimer()
-    {
-        if (_fallbackEdgeTriggerStarted) return;
-
-        _fallbackEdgeTriggerStarted = true;
-        _fallbackEdgeTriggerTimer.Interval = TimeSpan.FromMilliseconds(250);
-        _fallbackEdgeTriggerTimer.Tick += (_, _) => SafeEnsureFallbackFloatingTriggerVisible();
-        _fallbackEdgeTriggerTimer.Start();
-    }
-
     private void SafeEnsureFallbackFloatingTriggerVisible()
     {
         try
@@ -64,25 +51,19 @@ public sealed partial class MainWindow
         }
         catch
         {
-            // The floating trigger is a recovery path. It should never break the sidecar UI.
+            // The collapsed edge handle is a recovery path. It should never break the sidecar UI.
         }
     }
 
     private void EnsureFallbackFloatingTriggerVisible()
     {
-        if (!_sidecarWindowHiddenForTrigger || !_sidecarCollapsedToHandle)
+        if (!_sidecarCollapsedToHandle)
         {
             return;
         }
 
-        // In attach-to-target mode, the native open-window edge hover is the primary affordance.
-        // Do not show the screen-edge fallback or hide the native trigger here; doing so suppresses
-        // the AI hover beside real application windows every 250ms.
-        if (_attachSidecarToTarget)
-        {
-            return;
-        }
-
+        _sidecarWindowHiddenForTrigger = false;
+        SetSidecarVisualState();
         ShowCollapsedSidecarHandleAtScreenEdge();
     }
 
@@ -116,8 +97,7 @@ public sealed partial class MainWindow
         }
         catch
         {
-            // If the collapsed handle cannot be placed, leave the app running and let the next
-            // timer tick try again.
+            // If the collapsed handle cannot be placed during startup, the app should keep running.
         }
     }
 
