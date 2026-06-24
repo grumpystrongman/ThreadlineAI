@@ -75,7 +75,14 @@ public sealed partial class MainWindow
             return;
         }
 
-        _edgeTriggerWindow?.HideTrigger();
+        // In attach-to-target mode, the native open-window edge hover is the primary affordance.
+        // Do not show the screen-edge fallback or hide the native trigger here; doing so suppresses
+        // the AI hover beside real application windows every 250ms.
+        if (_attachSidecarToTarget)
+        {
+            return;
+        }
+
         ShowCollapsedSidecarHandleAtScreenEdge();
     }
 
