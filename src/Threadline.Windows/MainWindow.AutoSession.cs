@@ -23,6 +23,7 @@ public sealed partial class MainWindow
     {
         SafeEnsureReadableCheckBoxLabels();
         StartFallbackFloatingTriggerTimer();
+        SafeEnsureFallbackFloatingTriggerVisible();
         StartBrowserExtensionGuidanceTimer();
 
         await RunUiActionAsync(EnsureLocalServiceStartedAsync);
@@ -74,9 +75,6 @@ public sealed partial class MainWindow
             return;
         }
 
-        // The native popup trigger has been unreliable on some WinUI/monitor paths. Use the
-        // real sidecar window as the fallback handle so it participates in normal WinUI layout,
-        // pointer input, and z-order behavior.
         _edgeTriggerWindow?.HideTrigger();
         ShowCollapsedSidecarHandleAtScreenEdge();
     }
