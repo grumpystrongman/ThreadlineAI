@@ -7,13 +7,12 @@ public sealed partial class MainWindow
     public void EnsureCollapsedEdgeHandleStartedAfterActivation()
     {
         StartFallbackFloatingTriggerTimer();
-        SafeShowCollapsedEdgeHandleAfterActivation();
+        OpenSidecarAtStartup();
 
-        // ConfigureSidecarWindow still has legacy hide behavior during startup. Queue multiple
-        // WinUI-handle reveal passes after activation so the collapsed handle wins without relying
-        // on a separate native popup window.
-        QueueCollapsedEdgeHandleReveal();
-        QueueCollapsedEdgeHandleReveal();
+        // Keep a couple of low-priority placement passes after activation so the sidecar wins over
+        // startup layout timing without depending on the collapsed hover trigger.
+        QueueStartupSidecarReveal();
+        QueueStartupSidecarReveal();
     }
 
     private void StartFallbackFloatingTriggerTimer()
@@ -24,14 +23,14 @@ public sealed partial class MainWindow
         }
     }
 
-    private void QueueCollapsedEdgeHandleReveal()
+    private void QueueStartupSidecarReveal()
     {
         try
         {
             _ = DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
             {
-                SafeShowCollapsedEdgeHandleAfterActivation();
-                _ = DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, SafeShowCollapsedEdgeHandleAfterActivation);
+                OpenSidecarAtStartup();
+                _ = DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, OpenSidecarAtStartup);
             });
         }
         catch
@@ -40,20 +39,22 @@ public sealed partial class MainWindow
         }
     }
 
-    private void SafeShowCollapsedEdgeHandleAfterActivation()
+    private void OpenSidecarAtStartup()
     {
         try
         {
-            if (!_sidecarWindowHiddenForTrigger || !_sidecarCollapsedToHandle)
-            {
-                return;
-            }
+            _sidecarCollapsedToHandle = false;
+            _sidecarWindowHiddenForTrigger = false;
+            _floatingTriggerTarget = null;
+            _edgeTriggerWindow?.HideTrigger();
 
-            ShowCollapsedSidecarHandleAtScreenEdge();
+            ShowMainSidecarWindow();
+            SetSidecarVisualState();
+            PlaceSidecarForTarget(GetBestSidecarTarget(), "Sidecar opened at startup.");
         }
         catch
         {
-            // This is a startup recovery path. Leave the app running if the handle cannot be placed.
+            // Startup should not fail just because the sidecar could not be placed immediately.
         }
     }
 }
