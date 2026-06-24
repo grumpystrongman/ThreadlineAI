@@ -1,9 +1,17 @@
+using Microsoft.UI;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Windowing;
+using Windows.Graphics;
+using WinRT.Interop;
 
 namespace Threadline.Windows;
 
 public sealed partial class MainWindow
 {
+    private const int StartupSidecarWidth = 430;
+    private const int StartupSidecarHeight = 760;
+    private const int StartupSidecarMargin = 24;
+
     public void EnsureCollapsedEdgeHandleStartedAfterActivation()
     {
         StartFallbackFloatingTriggerTimer();
@@ -48,13 +56,36 @@ public sealed partial class MainWindow
             _floatingTriggerTarget = null;
             _edgeTriggerWindow?.HideTrigger();
 
+            EdgeHandlePanel.Visibility = Visibility.Collapsed;
+            ChatShellPanel.Visibility = Visibility.Visible;
             ShowMainSidecarWindow();
-            SetSidecarVisualState();
-            PlaceSidecarForTarget(GetBestSidecarTarget(), "Sidecar opened at startup.");
+            ForceVisibleStartupWindow();
+            AddTimeline("Sidecar opened at startup.");
         }
         catch
         {
             // Startup should not fail just because the sidecar could not be placed immediately.
         }
+    }
+
+    private void ForceVisibleStartupWindow()
+    {
+        var hwnd = WindowNative.GetWindowHandle(this);
+        _ = ShowWindow(hwnd, ShowWindowRestore);
+        Activate();
+
+        var id = Win32Interop.GetWindowIdFromWindow(hwnd);
+        var appWindow = AppWindow.GetFromWindowId(id);
+        EnsureSidecarWindowUserResizable(appWindow);
+
+        var area = DisplayArea.GetFromWindowId(id, DisplayAreaFallback.Nearest).WorkArea;
+        var width = Math.Min(StartupSidecarWidth, Math.Max(360, area.Width - (StartupSidecarMargin * 2)));
+        var height = Math.Min(StartupSidecarHeight, Math.Max(620, area.Height - (StartupSidecarMargin * 2)));
+        var x = area.X + area.Width - width - StartupSidecarMargin;
+        var y = area.Y + StartupSidecarMargin;
+
+        appWindow.Resize(new SizeInt32(width, height));
+        appWindow.Move(new PointInt32(x, y));
+        _ = SetWindowPos(hwnd, HwndTopmost, x, y, width, height, SetWindowPosNoActivate | SetWindowPosShowWindow);
     }
 }
