@@ -44,10 +44,13 @@ public partial class App : Application
             var serviceStartup = ThreadlineServiceLauncher.EnsureStartedAsync().GetAwaiter().GetResult();
             LogMessage(serviceStartup.Message);
 
-            _window = new MainWindow();
+            var mainWindow = new MainWindow();
+            _window = mainWindow;
             LogMessage("Main window constructed.");
             _window.Activate();
             LogMessage("Main window activated.");
+            mainWindow.EnsureCollapsedEdgeHandleStartedAfterActivation();
+            LogMessage("Collapsed edge handle startup requested after activation.");
         }
         catch (Exception ex)
         {
