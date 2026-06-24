@@ -1,5 +1,5 @@
-using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text;
 using Windows.Graphics;
 
 namespace Threadline.Windows;
@@ -410,9 +410,9 @@ public sealed class EdgeTriggerWindow
 
     private static string GetWindowClassName(nint handle)
     {
-        Span<char> buffer = stackalloc char[256];
-        var length = GetClassName(handle, buffer, buffer.Length);
-        return length <= 0 ? string.Empty : new string(buffer[..length]);
+        var buffer = new StringBuilder(256);
+        var length = GetClassName(handle, buffer, buffer.Capacity);
+        return length <= 0 ? string.Empty : buffer.ToString();
     }
 
     private static uint Rgb(byte red, byte green, byte blue) => (uint)(red | (green << 8) | (blue << 16));
@@ -543,7 +543,7 @@ public sealed class EdgeTriggerWindow
     private static extern uint GetWindowThreadProcessId(nint hWnd, out int lpdwProcessId);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int GetClassName(nint hWnd, Span<char> lpClassName, int nMaxCount);
+    private static extern int GetClassName(nint hWnd, StringBuilder lpClassName, int nMaxCount);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern nint GetModuleHandle(string? lpModuleName);
