@@ -16,6 +16,14 @@ public sealed partial class MainWindow
         QueueCollapsedEdgeHandleReveal();
     }
 
+    private void StartFallbackFloatingTriggerTimer()
+    {
+        if (!_edgeHoverTimer.IsEnabled)
+        {
+            StartFloatingEdgeTrigger();
+        }
+    }
+
     private void QueueCollapsedEdgeHandleReveal()
     {
         try
