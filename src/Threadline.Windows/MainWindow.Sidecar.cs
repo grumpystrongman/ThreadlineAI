@@ -28,27 +28,23 @@ public sealed partial class MainWindow
     private const int SidecarAttachGap = 8;
     private const int FloatingTriggerWidth = 64;
     private const int FloatingTriggerHeight = 144;
-    private const int FloatingTriggerHoverZone = 180;
+    private const int FloatingTriggerHoverZone = 12;
     private const int FloatingTriggerInsetFromEdge = 24;
-    private const int FloatingTriggerReachPadding = 220;
-    private const int FloatingTriggerHideGraceMilliseconds = 1800;
+    private const int FloatingTriggerReachPadding = 96;
     private const int SidecarScreenMargin = 12;
     private const int SidecarScreenTopOffset = 40;
     private const uint SetWindowPosNoZOrder = 0x0004;
     private const uint SetWindowPosNoActivate = 0x0010;
     private const uint MonitorDefaultToNearest = 0x00000002;
-    private const uint GetAncestorRoot = 2;
-    private const uint GetAncestorRootOwner = 3;
 
     private readonly DispatcherTimer _edgeHoverTimer = new();
     private EdgeTriggerWindow? _edgeTriggerWindow;
     private ThreadlineTarget? _floatingTriggerTarget;
-    private DateTimeOffset _lastFloatingTriggerEligibleAt = DateTimeOffset.MinValue;
     private string? _attachedSidecarTargetId;
     private bool _attachSidecarToTarget = true;
     private SidecarDockingBehavior _sidecarDockingBehavior = SidecarDockingBehavior.ResizeCurrentWindowToMakeRoom;
     private bool _sidecarCollapsedToHandle = true;
-    private bool _sidecarWindowHiddenForTrigger = true;
+    private bool _sidecarWindowHiddenForTrigger;
 
     private void ConfigureSidecarWindow()
     {
@@ -61,7 +57,11 @@ public sealed partial class MainWindow
         {
             RootShell.Loaded += (_, _) =>
             {
-                if (_sidecarWindowHiddenForTrigger)
+                if (_sidecarCollapsedToHandle)
+                {
+                    _ = RootShell.DispatcherQueue.TryEnqueue(ShowCollapsedSidecarHandleAtScreenEdge);
+                }
+                else if (_sidecarWindowHiddenForTrigger)
                 {
                     _ = RootShell.DispatcherQueue.TryEnqueue(HideMainSidecarWindow);
                 }
@@ -69,10 +69,18 @@ public sealed partial class MainWindow
         }
         catch
         {
-            // If delayed hiding cannot be registered, fall back to an immediate hide attempt.
+            // If delayed placement cannot be registered, fall back to the immediate attempt below.
         }
 
-        HideMainSidecarWindow();
+        if (_sidecarCollapsedToHandle)
+        {
+            _sidecarWindowHiddenForTrigger = false;
+            ShowCollapsedSidecarHandleAtScreenEdge();
+        }
+        else if (_sidecarWindowHiddenForTrigger)
+        {
+            HideMainSidecarWindow();
+        }
     }
 
     private void StartFloatingEdgeTrigger()
@@ -125,11 +133,12 @@ public sealed partial class MainWindow
     private void HideSidecarBehindFloatingTrigger()
     {
         _sidecarCollapsedToHandle = true;
-        _sidecarWindowHiddenForTrigger = true;
+        _sidecarWindowHiddenForTrigger = false;
+        _floatingTriggerTarget = null;
+        _edgeTriggerWindow?.HideTrigger();
         SetSidecarVisualState();
-        PlaceSidecarForTarget(GetBestSidecarTarget(), "Hidden behind floating edge trigger.");
-        HideMainSidecarWindow();
-        AddTimeline("Sidecar hidden. Hover near the target window edge to reveal the floating trigger.");
+        ShowCollapsedSidecarHandleAtScreenEdge();
+        AddTimeline("Sidecar collapsed to the visible edge handle. Hover near an app window edge or click the handle to reopen.");
     }
 
     private void RestoreSidecarFromFloatingTrigger()
@@ -200,65 +209,35 @@ public sealed partial class MainWindow
     {
         var trigger = EnsureEdgeTriggerWindow();
 
-        if (!_attachSidecarToTarget)
+        if (!_attachSidecarToTarget || !_sidecarCollapsedToHandle)
         {
+            _floatingTriggerTarget = null;
             trigger.HideTrigger();
             return;
         }
 
         if (!GetCursorPos(out var cursor))
         {
-            HideFloatingTriggerIfGraceExpired(trigger);
+            _floatingTriggerTarget = null;
+            trigger.HideTrigger();
             return;
         }
 
         if (trigger.IsVisible && trigger.IsCursorWithinReach(cursor.X, cursor.Y, 12) && IsLeftMouseButtonDown())
         {
-            _lastFloatingTriggerEligibleAt = DateTimeOffset.Now;
             RestoreSidecarFromFloatingTrigger();
             return;
         }
 
         if (trigger.IsPointerInside || trigger.IsCursorWithinReach(cursor.X, cursor.Y, FloatingTriggerReachPadding))
         {
-            _lastFloatingTriggerEligibleAt = DateTimeOffset.Now;
             return;
         }
 
-        var candidateWindow = GetPreferredWindowForCursor(cursor);
-        ThreadlineTarget? target = null;
-
-        if (candidateWindow is not null && candidateWindow.Handle != nint.Zero && IsWindow(candidateWindow.Handle))
+        if (!TryGetWindowNearCursorEdge(cursor, out var targetWindow, out var targetRect, out var anchorRight))
         {
-            target = ResolveTargetForWindow(candidateWindow);
-        }
-        else if (_sidecarWindowHiddenForTrigger)
-        {
-            target = GetBestSidecarTarget();
-        }
-
-        if (target is null)
-        {
-            HideFloatingTriggerIfGraceExpired(trigger);
-            return;
-        }
-
-        var targetWindow = target.Window;
-        if (targetWindow.Handle == nint.Zero || !IsWindow(targetWindow.Handle))
-        {
-            HideFloatingTriggerIfGraceExpired(trigger);
-            return;
-        }
-
-        if (!GetWindowRect(targetWindow.Handle, out var targetRect))
-        {
-            HideFloatingTriggerIfGraceExpired(trigger);
-            return;
-        }
-
-        if (!IsCursorNearTargetEdge(cursor, targetRect, out var anchorRight))
-        {
-            HideFloatingTriggerIfGraceExpired(trigger);
+            _floatingTriggerTarget = null;
+            trigger.HideTrigger();
             return;
         }
 
@@ -274,69 +253,42 @@ public sealed partial class MainWindow
         x = ClampToArea(x, workArea.X + SidecarScreenMargin, workArea.X + workArea.Width - FloatingTriggerWidth - SidecarScreenMargin);
         y = ClampToArea(y, workArea.Y + SidecarScreenMargin, workArea.Y + workArea.Height - FloatingTriggerHeight - SidecarScreenMargin);
 
-        _floatingTriggerTarget = target;
-        _lastFloatingTriggerEligibleAt = DateTimeOffset.Now;
+        _floatingTriggerTarget = CreateWindowTarget(targetWindow);
         trigger.ShowAt(new PointInt32(x, y), size);
     }
 
-    private void HideFloatingTriggerIfGraceExpired(EdgeTriggerWindow trigger)
+    private bool TryGetWindowNearCursorEdge(NativePoint cursor, out ActiveWindowSnapshot targetWindow, out NativeRect targetRect, out bool anchorRight)
     {
-        if (!trigger.IsVisible)
+        ActiveWindowSnapshot? bestWindow = null;
+        var bestRect = default(NativeRect);
+        var bestAnchorRight = false;
+        var bestDistance = int.MaxValue;
+
+        EnumWindows((handle, _) =>
         {
-            return;
-        }
+            if (handle == nint.Zero || !IsWindow(handle) || !IsWindowVisible(handle)) return true;
 
-        var elapsed = DateTimeOffset.Now - _lastFloatingTriggerEligibleAt;
-        if (elapsed.TotalMilliseconds <= FloatingTriggerHideGraceMilliseconds)
-        {
-            return;
-        }
+            var snapshot = GetUsableWindowSnapshot(handle);
+            if (snapshot is null) return true;
+            if (!GetWindowRect(snapshot.Handle, out var rect)) return true;
+            if (!IsCursorNearTargetEdge(cursor, rect, out var candidateAnchorRight)) return true;
 
-        trigger.HideTrigger();
-    }
+            var distance = Math.Min(Math.Abs(cursor.X - rect.Left), Math.Abs(cursor.X - rect.Right));
+            if (distance < bestDistance)
+            {
+                bestWindow = snapshot;
+                bestRect = rect;
+                bestAnchorRight = candidateAnchorRight;
+                bestDistance = distance;
+            }
 
-    private ActiveWindowSnapshot? GetPreferredWindowForCursor(NativePoint cursor)
-    {
-        var cursorWindow = GetCursorNonThreadlineWindow(cursor);
-        if (cursorWindow is not null && !IsShellOrDesktopWindow(cursorWindow))
-        {
-            return cursorWindow;
-        }
+            return true;
+        }, nint.Zero);
 
-        var activeWindow = GetCurrentNonThreadlineWindow();
-        if (activeWindow is not null && activeWindow.Handle != nint.Zero && IsWindow(activeWindow.Handle))
-        {
-            return activeWindow;
-        }
-
-        return null;
-    }
-
-    private ActiveWindowSnapshot? GetCurrentNonThreadlineWindow()
-    {
-        var activeWindow = _activeWindowMonitor.GetActiveWindowSnapshot();
-        if (activeWindow is null || IsThreadlineWindow(activeWindow) || IsShellOrDesktopWindow(activeWindow)) return null;
-        return activeWindow;
-    }
-
-    private ActiveWindowSnapshot? GetCursorNonThreadlineWindow(NativePoint cursor)
-    {
-        try
-        {
-            var handle = WindowFromPoint(cursor);
-            if (handle == nint.Zero) return null;
-
-            var rootOwnerHandle = GetAncestor(handle, GetAncestorRootOwner);
-            var rootHandle = GetAncestor(handle, GetAncestorRoot);
-
-            return GetUsableWindowSnapshot(rootOwnerHandle)
-                ?? GetUsableWindowSnapshot(rootHandle)
-                ?? GetUsableWindowSnapshot(handle);
-        }
-        catch
-        {
-            return null;
-        }
+        targetWindow = bestWindow!;
+        targetRect = bestRect;
+        anchorRight = bestAnchorRight;
+        return bestWindow is not null;
     }
 
     private ActiveWindowSnapshot? GetUsableWindowSnapshot(nint handle)
@@ -368,8 +320,16 @@ public sealed partial class MainWindow
     {
         try
         {
-            EdgeHandlePanel.Visibility = Visibility.Collapsed;
-            ChatShellPanel.Visibility = Visibility.Visible;
+            if (_sidecarCollapsedToHandle)
+            {
+                EdgeHandlePanel.Visibility = Visibility.Visible;
+                ChatShellPanel.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                EdgeHandlePanel.Visibility = Visibility.Collapsed;
+                ChatShellPanel.Visibility = Visibility.Visible;
+            }
         }
         catch
         {
@@ -593,6 +553,18 @@ public sealed partial class MainWindow
         }
     }
 
+    private static ThreadlineTarget CreateWindowTarget(ActiveWindowSnapshot window) =>
+        new(
+            $"window:{window.Handle}",
+            ThreadlineTargetKind.Window,
+            window,
+            window.WindowTitle ?? window.ApplicationName,
+            "native-ui",
+            true,
+            true,
+            "medium",
+            "Generic app window target. Threadline may use native UI fallback unless a better provider is available.");
+
     private static bool IsShellOrDesktopWindow(ActiveWindowSnapshot window)
     {
         var process = window.ProcessName ?? string.Empty;
@@ -613,6 +585,8 @@ public sealed partial class MainWindow
 
         return Math.Clamp(value, minimum, maximum);
     }
+
+    private delegate bool EnumWindowsProc(nint hwnd, nint lParam);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativeRect
@@ -643,19 +617,19 @@ public sealed partial class MainWindow
     }
 
     [DllImport("user32.dll")]
+    private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, nint lParam);
+
+    [DllImport("user32.dll")]
     private static extern bool GetWindowRect(nint hWnd, out NativeRect lpRect);
 
     [DllImport("user32.dll")]
     private static extern bool IsWindow(nint hWnd);
 
     [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(nint hWnd);
+
+    [DllImport("user32.dll")]
     private static extern bool GetCursorPos(out NativePoint lpPoint);
-
-    [DllImport("user32.dll")]
-    private static extern nint WindowFromPoint(NativePoint point);
-
-    [DllImport("user32.dll")]
-    private static extern nint GetAncestor(nint hWnd, uint gaFlags);
 
     [DllImport("user32.dll")]
     private static extern nint MonitorFromWindow(nint hwnd, uint dwFlags);
