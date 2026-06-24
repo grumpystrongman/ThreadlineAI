@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Windows.Graphics;
 
@@ -14,6 +15,7 @@ public sealed class EdgeTriggerWindow
     private const int SwHide = 0;
     private const int SwShowNoActivate = 4;
     private const uint SwpNoActivate = 0x0010;
+    private const uint SwpNoOwnerZOrder = 0x0200;
     private const uint SwpShowWindow = 0x0040;
     private static readonly nint HwndTopmost = unchecked((nint)(-1));
 
@@ -33,24 +35,25 @@ public sealed class EdgeTriggerWindow
     private const uint DrawTextVCenter = 0x00000004;
     private const uint DrawTextSingleLine = 0x00000020;
     private const int SemiBoldFontWeight = 600;
-    private const uint MonitorDefaultToNearest = 0x00000002;
-
-    private const int ScreenEdgeFallbackWidth = 64;
-    private const int ScreenEdgeFallbackHeight = 144;
-    private const int ScreenEdgeFallbackHoverZone = 180;
-    private const int ScreenEdgeFallbackOuterTolerance = 16;
-    private const int ScreenEdgeFallbackMargin = 12;
+    private const uint GetAncestorRoot = 2;
+    private const uint GetAncestorRootOwner = 3;
+    private const int EdgeHoverZone = 180;
+    private const int EdgeOuterTolerance = 18;
+    private const int TriggerWidth = 64;
+    private const int TriggerHeight = 144;
+    private const int TriggerInsetFromEdge = 24;
 
     private readonly WndProc _wndProc;
     private readonly string _windowClassName = "ThreadlineNativeEdgeIcon_" + Guid.NewGuid().ToString("N");
-    private readonly System.Threading.Timer _screenEdgeFallbackTimer;
+    private readonly System.Threading.Timer _windowEdgeHoverTimer;
+    private readonly int _currentProcessId = Environment.ProcessId;
 
     private nint _hwnd;
     private bool _isRegistered;
     private bool _isVisible;
     private bool _isPointerInside;
     private bool _isTrackingMouseLeave;
-    private bool _showingScreenEdgeFallback;
+    private bool _showingDirectWindowHover;
     private PointInt32 _lastLocation;
     private SizeInt32 _lastSize;
 
@@ -59,10 +62,10 @@ public sealed class EdgeTriggerWindow
         _wndProc = HandleWindowMessage;
         EnsureWindow();
 
-        // Keep the edge handle alive even before MainWindow has resolved a followed/locked target.
-        // The MainWindow hover loop still owns target-attached placement through ShowAt(...), but this
-        // fallback guarantees a visible AI affordance at the physical monitor edge after startup.
-        _screenEdgeFallbackTimer = new System.Threading.Timer(_ => SafeUpdateScreenEdgeFallback(), null, 100, 100);
+        // This timer is intentionally self-contained. The MainWindow hover path can fail when a HWND
+        // has not been converted into a ThreadlineTarget yet, but the affordance still needs to appear
+        // beside ordinary open windows as soon as the app/service is running.
+        _windowEdgeHoverTimer = new System.Threading.Timer(_ => SafeUpdateDirectWindowHover(), null, 100, 75);
     }
 
     public event EventHandler? TriggerRequested;
@@ -83,7 +86,7 @@ public sealed class EdgeTriggerWindow
 
     public void ShowAt(PointInt32 location, SizeInt32 size)
     {
-        _showingScreenEdgeFallback = false;
+        _showingDirectWindowHover = false;
         ShowAtCore(location, size);
     }
 
@@ -95,63 +98,126 @@ public sealed class EdgeTriggerWindow
         _isVisible = false;
         _isPointerInside = false;
         _isTrackingMouseLeave = false;
-        _showingScreenEdgeFallback = false;
+        _showingDirectWindowHover = false;
     }
 
-    private void SafeUpdateScreenEdgeFallback()
+    private void SafeUpdateDirectWindowHover()
     {
         try
         {
-            UpdateScreenEdgeFallback();
+            UpdateDirectWindowHover();
         }
         catch
         {
-            // Never let fallback hover behavior destabilize the sidecar shell.
+            // Never let hover discovery destabilize Threadline.
         }
     }
 
-    private void UpdateScreenEdgeFallback()
+    private void UpdateDirectWindowHover()
     {
-        if (_hwnd == nint.Zero || !GetCursorPos(out var cursor) || !TryGetCursorWorkArea(cursor, out var workArea))
+        if (_hwnd == nint.Zero || !GetCursorPos(out var cursor))
         {
-            HideFallbackIfDetached();
+            HideDirectHoverIfDetached();
             return;
         }
 
-        var workLeft = workArea.Left;
-        var workRight = workArea.Right;
-        var nearRightEdge = cursor.X >= workRight - ScreenEdgeFallbackHoverZone &&
-                            cursor.X <= workRight + ScreenEdgeFallbackOuterTolerance;
-        var nearLeftEdge = cursor.X >= workLeft - ScreenEdgeFallbackOuterTolerance &&
-                           cursor.X <= workLeft + ScreenEdgeFallbackHoverZone;
-
-        if (!nearRightEdge && !nearLeftEdge)
-        {
-            HideFallbackIfDetached();
-            return;
-        }
-
-        // If MainWindow has already placed the trigger against a target edge, do not fight it.
-        if (_isVisible && !_showingScreenEdgeFallback)
+        if (_isPointerInside || IsCursorWithinReach(cursor.X, cursor.Y, 24))
         {
             return;
         }
 
-        var x = nearRightEdge
-            ? workRight - ScreenEdgeFallbackWidth - ScreenEdgeFallbackMargin
-            : workLeft + ScreenEdgeFallbackMargin;
+        var targetHandle = GetTopLevelWindowForCursor(cursor);
+        if (targetHandle == nint.Zero || !TryGetEligibleWindowRect(targetHandle, out var targetRect))
+        {
+            HideDirectHoverIfDetached();
+            return;
+        }
+
+        if (!IsCursorNearWindowEdge(cursor, targetRect, out var anchorRight))
+        {
+            HideDirectHoverIfDetached();
+            return;
+        }
+
+        var x = anchorRight
+            ? targetRect.Right - TriggerWidth - TriggerInsetFromEdge
+            : targetRect.Left + TriggerInsetFromEdge;
         var y = Clamp(
-            cursor.Y - (ScreenEdgeFallbackHeight / 2),
-            workArea.Top + ScreenEdgeFallbackMargin,
-            workArea.Bottom - ScreenEdgeFallbackHeight - ScreenEdgeFallbackMargin);
+            cursor.Y - (TriggerHeight / 2),
+            targetRect.Top + 8,
+            targetRect.Bottom - TriggerHeight - 8);
 
-        _showingScreenEdgeFallback = true;
-        ShowAtCore(new PointInt32(x, y), new SizeInt32(ScreenEdgeFallbackWidth, ScreenEdgeFallbackHeight));
+        _showingDirectWindowHover = true;
+        ShowAtCore(new PointInt32(x, y), new SizeInt32(TriggerWidth, TriggerHeight));
     }
 
-    private void HideFallbackIfDetached()
+    private nint GetTopLevelWindowForCursor(NativePoint cursor)
     {
-        if (!_showingScreenEdgeFallback || _isPointerInside)
+        var handle = WindowFromPoint(cursor);
+        if (handle == nint.Zero || handle == _hwnd)
+        {
+            return nint.Zero;
+        }
+
+        var rootOwner = GetAncestor(handle, GetAncestorRootOwner);
+        if (IsEligibleTopLevelWindow(rootOwner))
+        {
+            return rootOwner;
+        }
+
+        var root = GetAncestor(handle, GetAncestorRoot);
+        if (IsEligibleTopLevelWindow(root))
+        {
+            return root;
+        }
+
+        return IsEligibleTopLevelWindow(handle) ? handle : nint.Zero;
+    }
+
+    private bool TryGetEligibleWindowRect(nint handle, out NativeRect rect)
+    {
+        rect = default;
+        return IsEligibleTopLevelWindow(handle) && GetWindowRect(handle, out rect) && rect.Width >= 120 && rect.Height >= 120;
+    }
+
+    private bool IsEligibleTopLevelWindow(nint handle)
+    {
+        if (handle == nint.Zero || handle == _hwnd || !IsWindow(handle) || !IsWindowVisible(handle))
+        {
+            return false;
+        }
+
+        _ = GetWindowThreadProcessId(handle, out var processId);
+        if (processId == _currentProcessId)
+        {
+            return false;
+        }
+
+        var className = GetWindowClassName(handle);
+        if (string.Equals(className, "Progman", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(className, "WorkerW", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(className, "Shell_TrayWnd", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(className, "Windows.UI.Core.CoreWindow", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool IsCursorNearWindowEdge(NativePoint cursor, NativeRect rect, out bool anchorRight)
+    {
+        var withinVerticalBand = cursor.Y >= rect.Top - 12 && cursor.Y <= rect.Bottom + 12;
+        var nearRight = cursor.X >= rect.Right - EdgeHoverZone && cursor.X <= rect.Right + EdgeOuterTolerance;
+        var nearLeft = cursor.X >= rect.Left - EdgeOuterTolerance && cursor.X <= rect.Left + EdgeHoverZone;
+
+        anchorRight = nearRight || !nearLeft;
+        return withinVerticalBand && (nearRight || nearLeft);
+    }
+
+    private void HideDirectHoverIfDetached()
+    {
+        if (!_showingDirectWindowHover || _isPointerInside)
         {
             return;
         }
@@ -168,30 +234,10 @@ public sealed class EdgeTriggerWindow
         _lastLocation = location;
         _lastSize = safeSize;
 
-        _ = SetWindowPos(_hwnd, HwndTopmost, location.X, location.Y, safeSize.Width, safeSize.Height, SwpNoActivate | SwpShowWindow);
+        _ = SetWindowPos(_hwnd, HwndTopmost, location.X, location.Y, safeSize.Width, safeSize.Height, SwpNoActivate | SwpNoOwnerZOrder | SwpShowWindow);
         _ = ShowWindow(_hwnd, SwShowNoActivate);
         _isVisible = true;
         _ = InvalidateRect(_hwnd, nint.Zero, true);
-    }
-
-    private static bool TryGetCursorWorkArea(NativePoint cursor, out NativeRect workArea)
-    {
-        workArea = default;
-
-        var monitor = MonitorFromPoint(cursor, MonitorDefaultToNearest);
-        if (monitor == nint.Zero)
-        {
-            return false;
-        }
-
-        var monitorInfo = new NativeMonitorInfo { cbSize = Marshal.SizeOf<NativeMonitorInfo>() };
-        if (!GetMonitorInfo(monitor, ref monitorInfo))
-        {
-            return false;
-        }
-
-        workArea = monitorInfo.rcWork;
-        return true;
     }
 
     private void EnsureWindow()
@@ -272,7 +318,7 @@ public sealed class EdgeTriggerWindow
             case WmLButtonDown:
             case WmLButtonUp:
                 SetPointerInside(true);
-                _showingScreenEdgeFallback = false;
+                _showingDirectWindowHover = false;
                 TriggerRequested?.Invoke(this, EventArgs.Empty);
                 return nint.Zero;
             default:
@@ -362,6 +408,13 @@ public sealed class EdgeTriggerWindow
         }
     }
 
+    private static string GetWindowClassName(nint handle)
+    {
+        Span<char> buffer = stackalloc char[256];
+        var length = GetClassName(handle, buffer, buffer.Length);
+        return length <= 0 ? string.Empty : new string(buffer[..length]);
+    }
+
     private static uint Rgb(byte red, byte green, byte blue) => (uint)(red | (green << 8) | (blue << 16));
 
     private static int Clamp(int value, int minimum, int maximum)
@@ -400,6 +453,9 @@ public sealed class EdgeTriggerWindow
         public int Top;
         public int Right;
         public int Bottom;
+
+        public int Width => Math.Max(0, Right - Left);
+        public int Height => Math.Max(0, Bottom - Top);
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -407,15 +463,6 @@ public sealed class EdgeTriggerWindow
     {
         public int X;
         public int Y;
-    }
-
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    private struct NativeMonitorInfo
-    {
-        public int cbSize;
-        public NativeRect rcMonitor;
-        public NativeRect rcWork;
-        public uint dwFlags;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -478,10 +525,25 @@ public sealed class EdgeTriggerWindow
     private static extern bool GetCursorPos(out NativePoint lpPoint);
 
     [DllImport("user32.dll")]
-    private static extern nint MonitorFromPoint(NativePoint pt, uint dwFlags);
+    private static extern nint WindowFromPoint(NativePoint point);
+
+    [DllImport("user32.dll")]
+    private static extern nint GetAncestor(nint hWnd, uint gaFlags);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindow(nint hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(nint hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(nint hWnd, out NativeRect lpRect);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(nint hWnd, out int lpdwProcessId);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern bool GetMonitorInfo(nint hMonitor, ref NativeMonitorInfo lpmi);
+    private static extern int GetClassName(nint hWnd, Span<char> lpClassName, int nMaxCount);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern nint GetModuleHandle(string? lpModuleName);
