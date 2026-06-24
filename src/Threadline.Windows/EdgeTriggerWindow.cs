@@ -34,14 +34,14 @@ public sealed class EdgeTriggerWindow
     private const uint DrawTextSingleLine = 0x00000020;
     private const int SemiBoldFontWeight = 600;
     private const uint MonitorDefaultToNearest = 0x00000002;
+
     private const int ScreenEdgeFallbackWidth = 64;
     private const int ScreenEdgeFallbackHeight = 144;
-    private const int ScreenEdgeFallbackHoverZone = 96;
-    private const int ScreenEdgeFallbackOuterTolerance = 12;
+    private const int ScreenEdgeFallbackHoverZone = 180;
+    private const int ScreenEdgeFallbackOuterTolerance = 16;
     private const int ScreenEdgeFallbackMargin = 12;
 
     private readonly WndProc _wndProc;
-    private readonly EnumWindowsProc _enumWindowsProc;
     private readonly string _windowClassName = "ThreadlineNativeEdgeIcon_" + Guid.NewGuid().ToString("N");
     private readonly System.Threading.Timer _screenEdgeFallbackTimer;
 
@@ -50,21 +50,19 @@ public sealed class EdgeTriggerWindow
     private bool _isVisible;
     private bool _isPointerInside;
     private bool _isTrackingMouseLeave;
-    private bool _fallbackShowing;
+    private bool _showingScreenEdgeFallback;
     private PointInt32 _lastLocation;
     private SizeInt32 _lastSize;
 
     public EdgeTriggerWindow()
     {
         _wndProc = HandleWindowMessage;
-        _enumWindowsProc = InspectProcessWindow;
-
-        // Create the native HWND on the UI thread while the sidecar starts up. The existing
-        // sidecar hover loop can still place this window next to a resolved target, but this
-        // also lets the fallback timer reliably surface the same AI handle at the monitor edge
-        // when no target has been resolved yet.
         EnsureWindow();
-        _screenEdgeFallbackTimer = new System.Threading.Timer(_ => SafeUpdateScreenEdgeFallback(), null, 125, 125);
+
+        // Keep the edge handle alive even before MainWindow has resolved a followed/locked target.
+        // The MainWindow hover loop still owns target-attached placement through ShowAt(...), but this
+        // fallback guarantees a visible AI affordance at the physical monitor edge after startup.
+        _screenEdgeFallbackTimer = new System.Threading.Timer(_ => SafeUpdateScreenEdgeFallback(), null, 100, 100);
     }
 
     public event EventHandler? TriggerRequested;
@@ -85,7 +83,7 @@ public sealed class EdgeTriggerWindow
 
     public void ShowAt(PointInt32 location, SizeInt32 size)
     {
-        _fallbackShowing = false;
+        _showingScreenEdgeFallback = false;
         ShowAtCore(location, size);
     }
 
@@ -97,22 +95,7 @@ public sealed class EdgeTriggerWindow
         _isVisible = false;
         _isPointerInside = false;
         _isTrackingMouseLeave = false;
-        _fallbackShowing = false;
-    }
-
-    private void ShowAtCore(PointInt32 location, SizeInt32 size)
-    {
-        EnsureWindow();
-        if (_hwnd == nint.Zero) return;
-
-        var safeSize = new SizeInt32(Math.Max(48, size.Width), Math.Max(48, size.Height));
-        _lastLocation = location;
-        _lastSize = safeSize;
-
-        _ = SetWindowPos(_hwnd, HwndTopmost, location.X, location.Y, safeSize.Width, safeSize.Height, SwpNoActivate | SwpShowWindow);
-        _ = ShowWindow(_hwnd, SwShowNoActivate);
-        _isVisible = true;
-        _ = InvalidateRect(_hwnd, nint.Zero, true);
+        _showingScreenEdgeFallback = false;
     }
 
     private void SafeUpdateScreenEdgeFallback()
@@ -123,36 +106,13 @@ public sealed class EdgeTriggerWindow
         }
         catch
         {
-            // This fallback must never destabilize the normal sidecar hover loop.
+            // Never let fallback hover behavior destabilize the sidecar shell.
         }
     }
 
     private void UpdateScreenEdgeFallback()
     {
-        if (_hwnd == nint.Zero)
-        {
-            return;
-        }
-
-        // When the Threadline sidecar is visible, do not show the fallback handle. The normal
-        // MainWindow hover logic remains responsible for target-attached placement.
-        if (HasVisibleThreadlineWindow())
-        {
-            if (_fallbackShowing)
-            {
-                HideTrigger();
-            }
-
-            return;
-        }
-
-        if (!GetCursorPos(out var cursor))
-        {
-            HideFallbackIfDetached();
-            return;
-        }
-
-        if (!TryGetCursorWorkArea(cursor, out var workArea))
+        if (_hwnd == nint.Zero || !GetCursorPos(out var cursor) || !TryGetCursorWorkArea(cursor, out var workArea))
         {
             HideFallbackIfDetached();
             return;
@@ -171,7 +131,8 @@ public sealed class EdgeTriggerWindow
             return;
         }
 
-        if (_isVisible && !_fallbackShowing)
+        // If MainWindow has already placed the trigger against a target edge, do not fight it.
+        if (_isVisible && !_showingScreenEdgeFallback)
         {
             return;
         }
@@ -184,13 +145,13 @@ public sealed class EdgeTriggerWindow
             workArea.Top + ScreenEdgeFallbackMargin,
             workArea.Bottom - ScreenEdgeFallbackHeight - ScreenEdgeFallbackMargin);
 
-        _fallbackShowing = true;
+        _showingScreenEdgeFallback = true;
         ShowAtCore(new PointInt32(x, y), new SizeInt32(ScreenEdgeFallbackWidth, ScreenEdgeFallbackHeight));
     }
 
     private void HideFallbackIfDetached()
     {
-        if (!_fallbackShowing || _isPointerInside)
+        if (!_showingScreenEdgeFallback || _isPointerInside)
         {
             return;
         }
@@ -198,33 +159,19 @@ public sealed class EdgeTriggerWindow
         HideTrigger();
     }
 
-    private bool HasVisibleThreadlineWindow()
+    private void ShowAtCore(PointInt32 location, SizeInt32 size)
     {
-        var state = new ProcessWindowScanState
-        {
-            ProcessId = (uint)Environment.ProcessId,
-            ExcludedHandle = _hwnd
-        };
+        EnsureWindow();
+        if (_hwnd == nint.Zero) return;
 
-        _ = EnumWindows(_enumWindowsProc, ref state);
-        return state.HasVisibleWindow;
-    }
+        var safeSize = new SizeInt32(Math.Max(48, size.Width), Math.Max(48, size.Height));
+        _lastLocation = location;
+        _lastSize = safeSize;
 
-    private bool InspectProcessWindow(nint hwnd, ref ProcessWindowScanState state)
-    {
-        if (hwnd == nint.Zero || hwnd == state.ExcludedHandle || !IsWindowVisible(hwnd))
-        {
-            return true;
-        }
-
-        _ = GetWindowThreadProcessId(hwnd, out var processId);
-        if (processId == state.ProcessId)
-        {
-            state.HasVisibleWindow = true;
-            return false;
-        }
-
-        return true;
+        _ = SetWindowPos(_hwnd, HwndTopmost, location.X, location.Y, safeSize.Width, safeSize.Height, SwpNoActivate | SwpShowWindow);
+        _ = ShowWindow(_hwnd, SwShowNoActivate);
+        _isVisible = true;
+        _ = InvalidateRect(_hwnd, nint.Zero, true);
     }
 
     private static bool TryGetCursorWorkArea(NativePoint cursor, out NativeRect workArea)
@@ -271,7 +218,7 @@ public sealed class EdgeTriggerWindow
         if (_hwnd == nint.Zero) return;
 
         // Treat pure black as transparent. The paint routine fills the host window with black,
-        // then draws only the visible AI icon. This avoids the black WinUI rectangle entirely.
+        // then draws only the visible AI icon.
         _ = SetLayeredWindowAttributes(_hwnd, Rgb(0, 0, 0), 255, LwaColorKey);
         _ = ShowWindow(_hwnd, SwHide);
     }
@@ -325,7 +272,7 @@ public sealed class EdgeTriggerWindow
             case WmLButtonDown:
             case WmLButtonUp:
                 SetPointerInside(true);
-                _fallbackShowing = false;
+                _showingScreenEdgeFallback = false;
                 TriggerRequested?.Invoke(this, EventArgs.Empty);
                 return nint.Zero;
             default:
@@ -428,7 +375,6 @@ public sealed class EdgeTriggerWindow
     }
 
     private delegate nint WndProc(nint hwnd, uint message, nuint wParam, nint lParam);
-    private delegate bool EnumWindowsProc(nint hwnd, ref ProcessWindowScanState state);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct WindowClassEx
@@ -492,13 +438,6 @@ public sealed class EdgeTriggerWindow
         public uint dwHoverTime;
     }
 
-    private struct ProcessWindowScanState
-    {
-        public uint ProcessId;
-        public nint ExcludedHandle;
-        public bool HasVisibleWindow;
-    }
-
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern ushort RegisterClassEx(ref WindowClassEx lpwcx);
 
@@ -543,15 +482,6 @@ public sealed class EdgeTriggerWindow
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern bool GetMonitorInfo(nint hMonitor, ref NativeMonitorInfo lpmi);
-
-    [DllImport("user32.dll")]
-    private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, ref ProcessWindowScanState state);
-
-    [DllImport("user32.dll")]
-    private static extern bool IsWindowVisible(nint hWnd);
-
-    [DllImport("user32.dll")]
-    private static extern uint GetWindowThreadProcessId(nint hWnd, out uint lpdwProcessId);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern nint GetModuleHandle(string? lpModuleName);
