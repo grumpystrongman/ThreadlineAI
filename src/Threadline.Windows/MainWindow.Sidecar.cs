@@ -28,7 +28,7 @@ public sealed partial class MainWindow
     private const int SidecarAttachGap = 8;
     private const int FloatingTriggerWidth = 64;
     private const int FloatingTriggerHeight = 144;
-    private const int FloatingTriggerHoverZone = 12;
+    private const int FloatingTriggerHoverZone = 24;
     private const int FloatingTriggerInsetFromEdge = 24;
     private const int FloatingTriggerReachPadding = 96;
     private const int SidecarScreenMargin = 12;
