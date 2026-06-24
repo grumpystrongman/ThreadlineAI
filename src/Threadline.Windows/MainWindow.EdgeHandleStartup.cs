@@ -7,13 +7,11 @@ public sealed partial class MainWindow
     public void EnsureCollapsedEdgeHandleStartedAfterActivation()
     {
         StartFallbackFloatingTriggerTimer();
-        StartDeterministicEdgeAffordanceWatchdog();
         SafeEnsureFallbackFloatingTriggerVisible();
-        SafeEnsureDeterministicEdgeAffordance();
 
-        // ConfigureSidecarWindow registers an older Loaded handler that can still queue a hide.
-        // Queue multiple reveal passes after activation so the collapsed WinUI handle wins the
-        // startup race deterministically instead of depending on hover/native popup behavior.
+        // ConfigureSidecarWindow still has legacy hide behavior during startup. Queue multiple
+        // WinUI-handle reveal passes after activation so the collapsed handle wins without relying
+        // on a separate native popup window.
         QueueCollapsedEdgeHandleReveal();
         QueueCollapsedEdgeHandleReveal();
     }
@@ -25,12 +23,7 @@ public sealed partial class MainWindow
             _ = DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
             {
                 SafeEnsureFallbackFloatingTriggerVisible();
-                SafeEnsureDeterministicEdgeAffordance();
-                _ = DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
-                {
-                    SafeEnsureFallbackFloatingTriggerVisible();
-                    SafeEnsureDeterministicEdgeAffordance();
-                });
+                _ = DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, SafeEnsureFallbackFloatingTriggerVisible);
             });
         }
         catch
