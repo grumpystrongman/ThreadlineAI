@@ -7,7 +7,7 @@ public sealed partial class MainWindow
     public void EnsureCollapsedEdgeHandleStartedAfterActivation()
     {
         StartFallbackFloatingTriggerTimer();
-        SafeEnsureFallbackFloatingTriggerVisible();
+        SafeShowCollapsedEdgeHandleAfterActivation();
 
         // ConfigureSidecarWindow still has legacy hide behavior during startup. Queue multiple
         // WinUI-handle reveal passes after activation so the collapsed handle wins without relying
@@ -22,13 +22,30 @@ public sealed partial class MainWindow
         {
             _ = DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
             {
-                SafeEnsureFallbackFloatingTriggerVisible();
-                _ = DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, SafeEnsureFallbackFloatingTriggerVisible);
+                SafeShowCollapsedEdgeHandleAfterActivation();
+                _ = DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, SafeShowCollapsedEdgeHandleAfterActivation);
             });
         }
         catch
         {
             // This is a startup recovery path. Leave the app running if queueing is unavailable.
+        }
+    }
+
+    private void SafeShowCollapsedEdgeHandleAfterActivation()
+    {
+        try
+        {
+            if (!_sidecarWindowHiddenForTrigger || !_sidecarCollapsedToHandle)
+            {
+                return;
+            }
+
+            ShowCollapsedSidecarHandleAtScreenEdge();
+        }
+        catch
+        {
+            // This is a startup recovery path. Leave the app running if the handle cannot be placed.
         }
     }
 }
