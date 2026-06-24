@@ -1,6 +1,7 @@
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using System.Runtime.InteropServices;
 using Windows.Graphics;
 using WinRT.Interop;
 
@@ -8,6 +9,12 @@ namespace Threadline.Windows;
 
 public sealed partial class MainWindow
 {
+    private const int CollapsedEdgeHandleWidth = 56;
+    private const int CollapsedEdgeHandleHeight = 180;
+    private const int CollapsedEdgeHandleMargin = 12;
+    private const uint SetWindowPosShowWindow = 0x0040;
+    private static readonly nint HwndTopmost = unchecked((nint)(-1));
+
     private bool _sidecarSessionBootstrapStarted;
     private bool _fallbackEdgeTriggerStarted;
     private readonly DispatcherTimer _fallbackEdgeTriggerTimer = new();
@@ -43,7 +50,7 @@ public sealed partial class MainWindow
         if (_fallbackEdgeTriggerStarted) return;
 
         _fallbackEdgeTriggerStarted = true;
-        _fallbackEdgeTriggerTimer.Interval = TimeSpan.FromMilliseconds(1500);
+        _fallbackEdgeTriggerTimer.Interval = TimeSpan.FromMilliseconds(250);
         _fallbackEdgeTriggerTimer.Tick += (_, _) => SafeEnsureFallbackFloatingTriggerVisible();
         _fallbackEdgeTriggerTimer.Start();
     }
@@ -62,39 +69,51 @@ public sealed partial class MainWindow
 
     private void EnsureFallbackFloatingTriggerVisible()
     {
-        var trigger = EnsureEdgeTriggerWindow();
-
-        if (!_sidecarWindowHiddenForTrigger || !_attachSidecarToTarget)
+        if (!_sidecarWindowHiddenForTrigger || !_sidecarCollapsedToHandle)
         {
-            trigger.HideTrigger();
             return;
         }
 
-        // Important: if the fallback trigger is already visible, keep it stable.
-        // Repeated ShowAt calls cause the visual blink Jeff saw when hovering near the AI button.
-        if (trigger.IsVisible)
+        // The native popup trigger has been unreliable on some WinUI/monitor paths. Use the
+        // real sidecar window as the fallback handle so it participates in normal WinUI layout,
+        // pointer input, and z-order behavior.
+        _edgeTriggerWindow?.HideTrigger();
+        ShowCollapsedSidecarHandleAtScreenEdge();
+    }
+
+    private void ShowCollapsedSidecarHandleAtScreenEdge()
+    {
+        try
         {
-            _lastFloatingTriggerEligibleAt = DateTimeOffset.Now;
-            return;
+            EdgeHandlePanel.Visibility = Visibility.Visible;
+            ChatShellPanel.Visibility = Visibility.Collapsed;
+
+            var hwnd = WindowNative.GetWindowHandle(this);
+            _ = ShowWindow(hwnd, ShowWindowRestore);
+
+            var id = Win32Interop.GetWindowIdFromWindow(hwnd);
+            var appWindow = AppWindow.GetFromWindowId(id);
+            var area = DisplayArea.GetFromWindowId(id, DisplayAreaFallback.Nearest).WorkArea;
+
+            var width = Math.Min(CollapsedEdgeHandleWidth, Math.Max(44, area.Width - (CollapsedEdgeHandleMargin * 2)));
+            var height = Math.Min(CollapsedEdgeHandleHeight, Math.Max(80, area.Height - (CollapsedEdgeHandleMargin * 2)));
+            var x = area.X + area.Width - width - CollapsedEdgeHandleMargin;
+            var y = area.Y + ((area.Height - height) / 2);
+
+            if (GetCursorPos(out var cursor))
+            {
+                y = ClampToArea(cursor.Y - (height / 2), area.Y + CollapsedEdgeHandleMargin, area.Y + area.Height - height - CollapsedEdgeHandleMargin);
+            }
+
+            appWindow.Resize(new SizeInt32(width, height));
+            appWindow.Move(new PointInt32(x, y));
+            _ = SetWindowPos(hwnd, HwndTopmost, x, y, width, height, SetWindowPosNoActivate | SetWindowPosShowWindow);
         }
-
-        var hasCursor = GetCursorPos(out var cursor);
-        var hwnd = WindowNative.GetWindowHandle(this);
-        var id = Win32Interop.GetWindowIdFromWindow(hwnd);
-        var area = DisplayArea.GetFromWindowId(id, DisplayAreaFallback.Nearest).WorkArea;
-
-        const int triggerWidth = 64;
-        const int triggerHeight = 144;
-        const int margin = 12;
-
-        var x = area.X + area.Width - triggerWidth - margin;
-        var y = hasCursor
-            ? ClampToArea(cursor.Y - (triggerHeight / 2), area.Y + margin, area.Y + area.Height - triggerHeight - margin)
-            : area.Y + ((area.Height - triggerHeight) / 2);
-
-        _floatingTriggerTarget ??= GetBestSidecarTarget();
-        _lastFloatingTriggerEligibleAt = DateTimeOffset.Now;
-        trigger.ShowAt(new PointInt32(x, y), new SizeInt32(triggerWidth, triggerHeight));
+        catch
+        {
+            // If the collapsed handle cannot be placed, leave the app running and let the next
+            // timer tick try again.
+        }
     }
 
     private async Task EnsureSidecarSessionReadyAsync()
