@@ -25,9 +25,9 @@ public sealed partial class MainWindow
         {
             UpdateBrowserExtensionGuidance();
         }
-        catch
+        catch (Exception ex)
         {
-            // Browser guidance is advisory. It should never interrupt the sidecar workflow.
+            System.Diagnostics.Debug.WriteLine($"[Threadline] Browser extension guidance skipped: {ex.GetType().Name}: {ex.Message}");
         }
     }
 

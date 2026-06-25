@@ -124,6 +124,22 @@ public static class ThreadlineEndpointMappings
             {
                 return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
             }
+            catch (HttpRequestException ex)
+            {
+                return Results.Problem(
+                    $"Provider communication failed: {ex.Message}",
+                    statusCode: StatusCodes.Status502BadGateway);
+            }
+            catch (TaskCanceledException) when (ct.IsCancellationRequested)
+            {
+                return Results.StatusCode(499);
+            }
+            catch (Exception ex)
+            {
+                return Results.Problem(
+                    $"An unexpected error occurred ({ex.GetType().Name}): {ex.Message}",
+                    statusCode: StatusCodes.Status500InternalServerError);
+            }
         });
 
         api.MapPost("/sessions/{sessionId}/windows/attach", async (string sessionId, AttachWindowRequest request, WindowAttachmentService windows, IClock clock, CancellationToken ct) =>

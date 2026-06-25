@@ -31,9 +31,9 @@ public sealed partial class MainWindow
             WorkThreadStatusText.Text = "Work Thread: ready — click Resume or New Thread";
             AddTimeline("Work Thread auto-load deferred until user action.");
         }
-        catch
+        catch (Exception ex)
         {
-            // Startup status should never be able to crash the sidecar.
+            System.Diagnostics.Debug.WriteLine($"[Threadline] Work Thread init skipped: {ex.GetType().Name}: {ex.Message}");
         }
 
         return Task.CompletedTask;

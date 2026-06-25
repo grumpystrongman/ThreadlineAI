@@ -49,9 +49,9 @@ public sealed partial class MainWindow
         {
             EnsureFallbackFloatingTriggerVisible();
         }
-        catch
+        catch (Exception ex)
         {
-            // The collapsed edge handle is a recovery path. It should never break the sidecar UI.
+            System.Diagnostics.Debug.WriteLine($"[Threadline] Fallback floating trigger skipped: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -95,9 +95,9 @@ public sealed partial class MainWindow
             appWindow.Move(new PointInt32(x, y));
             _ = SetWindowPos(hwnd, HwndTopmost, x, y, width, height, SetWindowPosNoActivate | SetWindowPosShowWindow);
         }
-        catch
+        catch (Exception ex)
         {
-            // If the collapsed handle cannot be placed during startup, the app should keep running.
+            System.Diagnostics.Debug.WriteLine($"[Threadline] Collapsed handle placement failed: {ex.GetType().Name}: {ex.Message}");
         }
     }
 

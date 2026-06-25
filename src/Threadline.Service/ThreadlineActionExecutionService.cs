@@ -65,7 +65,15 @@ public sealed class ThreadlineActionExecutionService
         }
         catch (Exception ex)
         {
-            return ThreadlineActionExecutionResult.Failed(action.Id, $"Action '{action.DisplayName}' failed: {ex.Message}", request.WorkThreadId);
+            return ThreadlineActionExecutionResult.Failed(
+                action.Id,
+                $"Action '{action.DisplayName}' failed ({ex.GetType().Name}): {ex.Message}",
+                request.WorkThreadId,
+                new Dictionary<string, string>
+                {
+                    ["exceptionType"] = ex.GetType().FullName ?? ex.GetType().Name,
+                    ["stackTrace"] = ex.StackTrace ?? string.Empty
+                });
         }
     }
 

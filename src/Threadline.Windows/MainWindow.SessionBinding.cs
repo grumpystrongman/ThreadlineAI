@@ -136,9 +136,9 @@ public sealed partial class MainWindow
                 ? Visibility.Collapsed
                 : Visibility.Visible;
         }
-        catch
+        catch (Exception ex)
         {
-            // Session binding status may be updated during startup before XAML names are ready.
+            System.Diagnostics.Debug.WriteLine($"[Threadline] Session binding status update skipped: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
