@@ -44,7 +44,7 @@ public sealed class AppCaptureRouter
                 "VS Code / IDE context",
                 "Use IDE title/workspace/active-file signals plus native readable UI when available.",
                 true,
-                "VS Code capture should not claim full editor access unless accessibility exposes text. Build 18 mainly provides active file/workspace/title and readable UI fallback.");
+                "VS Code capture should not claim full editor access unless accessibility exposes text. Mainly provides active file/workspace/title and readable UI fallback.");
         }
 
         if (IsTerminal(process, title))

@@ -294,7 +294,8 @@ public sealed partial class MainWindow : Window
         var payload = QuestionBox.Text?.Trim();
         if (string.IsNullOrWhiteSpace(payload))
         {
-            payload = "Threadline generated text placeholder.";
+            AddTimeline("No text provided for insert action.");
+            return;
         }
 
         _lastAction = await _client.ProposeInsertActionAsync(_session!.Id, payload, userApproved: true);
