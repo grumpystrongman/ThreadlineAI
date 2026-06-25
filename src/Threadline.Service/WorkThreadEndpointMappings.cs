@@ -18,7 +18,7 @@ public static class WorkThreadEndpointMappings
         });
 
         api.MapGet("/work-threads", async (int? take, IWorkThreadRepository repository, CancellationToken ct) =>
-            Results.Ok(await repository.ListWorkThreadsAsync(take ?? 25, ct)));
+            Results.Ok(await repository.ListWorkThreadsAsync(RequestValidator.ClampTake(take, 25), ct)));
 
         api.MapPost("/work-threads", async (StartWorkThreadRequest request, IWorkThreadRepository repository, IClock clock, CancellationToken ct) =>
         {
@@ -73,7 +73,7 @@ public static class WorkThreadEndpointMappings
         });
 
         api.MapGet("/work-threads/{workThreadId}/context-events", async (string workThreadId, int? take, IWorkThreadRepository repository, CancellationToken ct) =>
-            Results.Ok(await repository.GetRecentWorkContextEventsAsync(workThreadId, take ?? 20, ct)));
+            Results.Ok(await repository.GetRecentWorkContextEventsAsync(workThreadId, RequestValidator.ClampTake(take, 20), ct)));
 
         api.MapPost("/work-threads/{workThreadId}/context-events", async (string workThreadId, SaveWorkContextEventRequest request, IWorkThreadRepository repository, CapturePolicy capturePolicy, SecretRedactor redactor, IAuditRepository audit, IClock clock, CancellationToken ct) =>
         {
@@ -122,7 +122,7 @@ public static class WorkThreadEndpointMappings
         });
 
         api.MapGet("/work-threads/{workThreadId}/messages", async (string workThreadId, int? take, IWorkThreadRepository repository, CancellationToken ct) =>
-            Results.Ok(await repository.GetConversationMessagesAsync(workThreadId, take ?? 100, ct)));
+            Results.Ok(await repository.GetConversationMessagesAsync(workThreadId, RequestValidator.ClampTake(take, 100), ct)));
 
         api.MapPost("/work-threads/{workThreadId}/messages", async (string workThreadId, SaveConversationMessageRequest request, IWorkThreadRepository repository, SecretRedactor redactor, IClock clock, CancellationToken ct) =>
         {
@@ -156,7 +156,7 @@ public static class WorkThreadEndpointMappings
         });
 
         api.MapGet("/work-threads/{workThreadId}/artifacts", async (string workThreadId, int? take, IWorkThreadRepository repository, CancellationToken ct) =>
-            Results.Ok(await repository.GetArtifactsAsync(workThreadId, take ?? 25, ct)));
+            Results.Ok(await repository.GetArtifactsAsync(workThreadId, RequestValidator.ClampTake(take, 25), ct)));
 
         api.MapGet("/work-threads/{workThreadId}/artifacts/{artifactId}/history", async (string workThreadId, string artifactId, IArtifactHistoryRepository history, CancellationToken ct) =>
             Results.Ok((await history.GetArtifactHistoryAsync(artifactId, ct)).Where(version => string.Equals(version.WorkThreadId, workThreadId, StringComparison.OrdinalIgnoreCase))));

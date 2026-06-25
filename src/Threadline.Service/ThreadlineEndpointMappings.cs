@@ -9,7 +9,17 @@ public static class ThreadlineEndpointMappings
 {
     public static WebApplication MapThreadlineHealth(this WebApplication app, ThreadlineServiceOptions options)
     {
-        app.MapGet("/health", (ThreadlineCommercialLifecycleService lifecycle) =>
+        app.MapGet("/health", () =>
+        {
+            return Results.Ok(new
+            {
+                status = "ok",
+                service = "Threadline.Service"
+            });
+        });
+
+        var healthAuthed = app.MapGroup(string.Empty).RequireThreadlineLocalAccess();
+        healthAuthed.MapGet("/health/details", (ThreadlineCommercialLifecycleService lifecycle) =>
         {
             var version = lifecycle.BuildVersionInfo();
             return Results.Ok(new
@@ -80,7 +90,7 @@ public static class ThreadlineEndpointMappings
             var invalidSession = RequestValidator.ValidateSessionId(sessionId);
             if (invalidSession is not null) return invalidSession;
 
-            return Results.Ok(await repository.GetRecentEventsAsync(sessionId, take ?? 20, ct));
+            return Results.Ok(await repository.GetRecentEventsAsync(sessionId, RequestValidator.ClampTake(take, 20), ct));
         });
 
         api.MapPost("/sessions/{sessionId}/summaries", async (string sessionId, SaveSummaryRequest request, ISessionRepository repository, CancellationToken ct) =>
@@ -103,7 +113,7 @@ public static class ThreadlineEndpointMappings
             var invalidQuestion = RequestValidator.ValidateQuestion(request.Question);
             if (invalidQuestion is not null) return invalidQuestion;
 
-            var events = await repository.GetRecentEventsAsync(sessionId, request.TakeRecentEvents ?? 20, ct);
+            var events = await repository.GetRecentEventsAsync(sessionId, RequestValidator.ClampTake(request.TakeRecentEvents, 20), ct);
             var summary = await repository.GetLatestSummaryAsync(sessionId, ct);
             return Results.Ok(promptComposer.Compose(new ThreadlinePromptContext(request.Question.Trim(), request.CurrentWindow, summary, events)));
         });
@@ -162,7 +172,7 @@ public static class ThreadlineEndpointMappings
             var invalidSession = RequestValidator.ValidateSessionId(sessionId);
             if (invalidSession is not null) return invalidSession;
 
-            return Results.Ok(await windows.ListAttachmentsAsync(sessionId, take ?? 20, ct));
+            return Results.Ok(await windows.ListAttachmentsAsync(sessionId, RequestValidator.ClampTake(take, 20), ct));
         });
 
         api.MapPost("/sessions/{sessionId}/windows/current/preview", async (string sessionId, StoreWindowContextRequest request, WindowAttachmentService windows, CancellationToken ct) =>
@@ -198,7 +208,7 @@ public static class ThreadlineEndpointMappings
             var invalidSession = RequestValidator.ValidateSessionId(sessionId);
             if (invalidSession is not null) return invalidSession;
 
-            return Results.Ok(await windows.ListActionsAsync(sessionId, take ?? 20, ct));
+            return Results.Ok(await windows.ListActionsAsync(sessionId, RequestValidator.ClampTake(take, 20), ct));
         });
 
         api.MapPost("/actions/{actionId}/approve", async (string actionId, WindowAttachmentService windows, CancellationToken ct) =>

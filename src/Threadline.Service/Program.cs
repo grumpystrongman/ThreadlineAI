@@ -28,8 +28,8 @@ if (serviceOptions.CorsAllowedOrigins.Count > 0)
         options.AddPolicy("ThreadlineLockedCors", policy =>
         {
             policy.WithOrigins(serviceOptions.CorsAllowedOrigins.ToArray())
-                .AllowAnyHeader()
-                .AllowAnyMethod();
+                .WithHeaders("Content-Type", "X-Threadline-Token", "Authorization")
+                .WithMethods("GET", "POST", "PUT", "DELETE");
         });
     });
 }
