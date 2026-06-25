@@ -31,7 +31,7 @@ public sealed class SqliteWorkThreadStore : IWorkThreadRepository, IThreadlineSt
             """;
         command.Parameters.AddWithValue("$id", workThreadId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken) ? ReadWorkThread(reader) : null;
+        return await reader.ReadAsync(cancellationToken) ? SqliteWorkThreadReaders.ReadWorkThread(reader) : null;
     }
 
     public async Task<WorkThread?> GetActiveWorkThreadAsync(CancellationToken cancellationToken = default)
@@ -47,7 +47,7 @@ public sealed class SqliteWorkThreadStore : IWorkThreadRepository, IThreadlineSt
             """;
         command.Parameters.AddWithValue("$status", WorkThreadStatus.Open.ToString());
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken) ? ReadWorkThread(reader) : null;
+        return await reader.ReadAsync(cancellationToken) ? SqliteWorkThreadReaders.ReadWorkThread(reader) : null;
     }
 
     public async Task<IReadOnlyList<WorkThread>> ListWorkThreadsAsync(int take = 25, CancellationToken cancellationToken = default)
@@ -66,7 +66,7 @@ public sealed class SqliteWorkThreadStore : IWorkThreadRepository, IThreadlineSt
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            results.Add(ReadWorkThread(reader));
+            results.Add(SqliteWorkThreadReaders.ReadWorkThread(reader));
         }
 
         return results;
@@ -89,12 +89,12 @@ public sealed class SqliteWorkThreadStore : IWorkThreadRepository, IThreadlineSt
             """;
         command.Parameters.AddWithValue("$id", workThread.Id);
         command.Parameters.AddWithValue("$title", workThread.Title);
-        command.Parameters.AddWithValue("$description", ToDbValue(workThread.Description));
+        command.Parameters.AddWithValue("$description", SqliteHelpers.ToDbValue(workThread.Description));
         command.Parameters.AddWithValue("$status", workThread.Status.ToString());
-        command.Parameters.AddWithValue("$createdAtUtc", ToText(workThread.CreatedAt));
-        command.Parameters.AddWithValue("$updatedAtUtc", ToText(workThread.UpdatedAt));
-        command.Parameters.AddWithValue("$closedAtUtc", ToNullableText(workThread.ClosedAt));
-        command.Parameters.AddWithValue("$lastResumedAtUtc", ToNullableText(workThread.LastResumedAt));
+        command.Parameters.AddWithValue("$createdAtUtc", SqliteHelpers.ToText(workThread.CreatedAt));
+        command.Parameters.AddWithValue("$updatedAtUtc", SqliteHelpers.ToText(workThread.UpdatedAt));
+        command.Parameters.AddWithValue("$closedAtUtc", SqliteHelpers.ToNullableText(workThread.ClosedAt));
+        command.Parameters.AddWithValue("$lastResumedAtUtc", SqliteHelpers.ToNullableText(workThread.LastResumedAt));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -110,12 +110,12 @@ public sealed class SqliteWorkThreadStore : IWorkThreadRepository, IThreadlineSt
         command.Parameters.AddWithValue("$workThreadId", contextEvent.WorkThreadId);
         command.Parameters.AddWithValue("$sourceType", contextEvent.SourceType);
         command.Parameters.AddWithValue("$sourceName", contextEvent.SourceName);
-        command.Parameters.AddWithValue("$appName", ToDbValue(contextEvent.AppName));
-        command.Parameters.AddWithValue("$windowTitle", ToDbValue(contextEvent.WindowTitle));
-        command.Parameters.AddWithValue("$url", ToDbValue(contextEvent.Url));
-        command.Parameters.AddWithValue("$contentSummary", ToDbValue(contextEvent.ContentSummary));
+        command.Parameters.AddWithValue("$appName", SqliteHelpers.ToDbValue(contextEvent.AppName));
+        command.Parameters.AddWithValue("$windowTitle", SqliteHelpers.ToDbValue(contextEvent.WindowTitle));
+        command.Parameters.AddWithValue("$url", SqliteHelpers.ToDbValue(contextEvent.Url));
+        command.Parameters.AddWithValue("$contentSummary", SqliteHelpers.ToDbValue(contextEvent.ContentSummary));
         command.Parameters.AddWithValue("$captureMode", contextEvent.CaptureMode.ToString());
-        command.Parameters.AddWithValue("$createdAtUtc", ToText(contextEvent.CreatedAt));
+        command.Parameters.AddWithValue("$createdAtUtc", SqliteHelpers.ToText(contextEvent.CreatedAt));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -137,7 +137,7 @@ public sealed class SqliteWorkThreadStore : IWorkThreadRepository, IThreadlineSt
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            results.Add(ReadWorkContextEvent(reader));
+            results.Add(SqliteWorkThreadReaders.ReadWorkContextEvent(reader));
         }
         results.Reverse();
         return results;
@@ -155,8 +155,8 @@ public sealed class SqliteWorkThreadStore : IWorkThreadRepository, IThreadlineSt
         command.Parameters.AddWithValue("$workThreadId", message.WorkThreadId);
         command.Parameters.AddWithValue("$role", message.Role);
         command.Parameters.AddWithValue("$content", message.Content);
-        command.Parameters.AddWithValue("$createdAtUtc", ToText(message.CreatedAt));
-        command.Parameters.AddWithValue("$contextReceiptId", ToDbValue(message.ContextReceiptId));
+        command.Parameters.AddWithValue("$createdAtUtc", SqliteHelpers.ToText(message.CreatedAt));
+        command.Parameters.AddWithValue("$contextReceiptId", SqliteHelpers.ToDbValue(message.ContextReceiptId));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -178,7 +178,7 @@ public sealed class SqliteWorkThreadStore : IWorkThreadRepository, IThreadlineSt
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            results.Add(ReadConversationMessage(reader));
+            results.Add(SqliteWorkThreadReaders.ReadConversationMessage(reader));
         }
         results.Reverse();
         return results;
@@ -199,9 +199,9 @@ public sealed class SqliteWorkThreadStore : IWorkThreadRepository, IThreadlineSt
         command.Parameters.AddWithValue("$id", contextReceipt.Id);
         command.Parameters.AddWithValue("$workThreadId", contextReceipt.WorkThreadId);
         command.Parameters.AddWithValue("$usedSourcesJson", contextReceipt.UsedSourcesJson);
-        command.Parameters.AddWithValue("$notUsedSourcesJson", ToDbValue(contextReceipt.NotUsedSourcesJson));
-        command.Parameters.AddWithValue("$limitations", ToDbValue(contextReceipt.Limitations));
-        command.Parameters.AddWithValue("$createdAtUtc", ToText(contextReceipt.CreatedAt));
+        command.Parameters.AddWithValue("$notUsedSourcesJson", SqliteHelpers.ToDbValue(contextReceipt.NotUsedSourcesJson));
+        command.Parameters.AddWithValue("$limitations", SqliteHelpers.ToDbValue(contextReceipt.Limitations));
+        command.Parameters.AddWithValue("$createdAtUtc", SqliteHelpers.ToText(contextReceipt.CreatedAt));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -216,7 +216,7 @@ public sealed class SqliteWorkThreadStore : IWorkThreadRepository, IThreadlineSt
             """;
         command.Parameters.AddWithValue("$id", contextReceiptId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken) ? ReadContextReceipt(reader) : null;
+        return await reader.ReadAsync(cancellationToken) ? SqliteWorkThreadReaders.ReadContextReceipt(reader) : null;
     }
 
     public async Task SaveArtifactAsync(WorkArtifact artifact, CancellationToken cancellationToken = default)
@@ -237,9 +237,9 @@ public sealed class SqliteWorkThreadStore : IWorkThreadRepository, IThreadlineSt
         command.Parameters.AddWithValue("$artifactType", artifact.ArtifactType);
         command.Parameters.AddWithValue("$title", artifact.Title);
         command.Parameters.AddWithValue("$content", artifact.Content);
-        command.Parameters.AddWithValue("$createdAtUtc", ToText(artifact.CreatedAt));
-        command.Parameters.AddWithValue("$updatedAtUtc", ToText(artifact.UpdatedAt));
-        command.Parameters.AddWithValue("$contextReceiptId", ToDbValue(artifact.ContextReceiptId));
+        command.Parameters.AddWithValue("$createdAtUtc", SqliteHelpers.ToText(artifact.CreatedAt));
+        command.Parameters.AddWithValue("$updatedAtUtc", SqliteHelpers.ToText(artifact.UpdatedAt));
+        command.Parameters.AddWithValue("$contextReceiptId", SqliteHelpers.ToDbValue(artifact.ContextReceiptId));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -261,70 +261,13 @@ public sealed class SqliteWorkThreadStore : IWorkThreadRepository, IThreadlineSt
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            results.Add(ReadArtifact(reader));
+            results.Add(SqliteWorkThreadReaders.ReadArtifact(reader));
         }
         return results;
     }
 
-    private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
-    {
-        var connection = new SqliteConnection(_options.ConnectionString);
-        await connection.OpenAsync(cancellationToken);
-        return connection;
-    }
-
-    private static WorkThread ReadWorkThread(SqliteDataReader reader) => new(
-        reader.GetString(0),
-        reader.GetString(1),
-        reader.IsDBNull(2) ? null : reader.GetString(2),
-        Enum.Parse<WorkThreadStatus>(reader.GetString(3)),
-        FromText(reader.GetString(4)),
-        FromText(reader.GetString(5)),
-        reader.IsDBNull(6) ? null : FromText(reader.GetString(6)),
-        reader.IsDBNull(7) ? null : FromText(reader.GetString(7)));
-
-    private static WorkContextEvent ReadWorkContextEvent(SqliteDataReader reader) => new(
-        reader.GetString(0),
-        reader.GetString(1),
-        reader.GetString(2),
-        reader.GetString(3),
-        reader.IsDBNull(4) ? null : reader.GetString(4),
-        reader.IsDBNull(5) ? null : reader.GetString(5),
-        reader.IsDBNull(6) ? null : reader.GetString(6),
-        reader.IsDBNull(7) ? null : reader.GetString(7),
-        Enum.Parse<WorkCaptureMode>(reader.GetString(8)),
-        FromText(reader.GetString(9)));
-
-    private static ConversationMessage ReadConversationMessage(SqliteDataReader reader) => new(
-        reader.GetString(0),
-        reader.GetString(1),
-        reader.GetString(2),
-        reader.GetString(3),
-        FromText(reader.GetString(4)),
-        reader.IsDBNull(5) ? null : reader.GetString(5));
-
-    private static ContextReceiptRecord ReadContextReceipt(SqliteDataReader reader) => new(
-        reader.GetString(0),
-        reader.GetString(1),
-        reader.GetString(2),
-        reader.IsDBNull(3) ? null : reader.GetString(3),
-        reader.IsDBNull(4) ? null : reader.GetString(4),
-        FromText(reader.GetString(5)));
-
-    private static WorkArtifact ReadArtifact(SqliteDataReader reader) => new(
-        reader.GetString(0),
-        reader.GetString(1),
-        reader.GetString(2),
-        reader.GetString(3),
-        reader.GetString(4),
-        FromText(reader.GetString(5)),
-        FromText(reader.GetString(6)),
-        reader.IsDBNull(7) ? null : reader.GetString(7));
-
-    private static string ToText(DateTimeOffset value) => value.ToUniversalTime().ToString("O");
-    private static object ToNullableText(DateTimeOffset? value) => value is null ? DBNull.Value : ToText(value.Value);
-    private static object ToDbValue(string? value) => value is null ? DBNull.Value : value;
-    private static DateTimeOffset FromText(string value) => DateTimeOffset.Parse(value, null, System.Globalization.DateTimeStyles.RoundtripKind);
+    private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken) =>
+        await SqliteHelpers.OpenConnectionAsync(_options, cancellationToken);
 
     private static readonly string[] SchemaStatements =
     [

@@ -61,8 +61,8 @@ public sealed class SqlitePrivacyAndMaintenanceStore : IThreadlineStoreInitializ
         command.Parameters.AddWithValue("$pattern", rule.Pattern);
         command.Parameters.AddWithValue("$action", rule.Action.ToString());
         command.Parameters.AddWithValue("$source", rule.Source.ToString());
-        command.Parameters.AddWithValue("$createdAtUtc", ToText(rule.CreatedAt));
-        command.Parameters.AddWithValue("$reason", ToDbValue(reason));
+        command.Parameters.AddWithValue("$createdAtUtc", SqliteHelpers.ToText(rule.CreatedAt));
+        command.Parameters.AddWithValue("$reason", SqliteHelpers.ToDbValue(reason));
         await command.ExecuteNonQueryAsync(cancellationToken);
         return rule;
     }
@@ -79,32 +79,32 @@ public sealed class SqlitePrivacyAndMaintenanceStore : IThreadlineStoreInitializ
     public async Task<WorkThreadExport?> ExportWorkThreadAsync(string workThreadId, CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        var workThread = await ReadSingleAsync(connection, workThreadId, ReadWorkThread, """
+        var workThread = await ReadSingleAsync(connection, workThreadId, SqliteWorkThreadReaders.ReadWorkThread, """
             SELECT Id, Title, Description, Status, CreatedAtUtc, UpdatedAtUtc, ClosedAtUtc, LastResumedAtUtc
             FROM WorkThreads
             WHERE Id = $id;
             """, cancellationToken);
         if (workThread is null) return null;
 
-        var contextEvents = await ReadManyAsync(connection, workThreadId, ReadWorkContextEvent, """
+        var contextEvents = await ReadManyAsync(connection, workThreadId, SqliteWorkThreadReaders.ReadWorkContextEvent, """
             SELECT Id, WorkThreadId, SourceType, SourceName, AppName, WindowTitle, Url, ContentSummary, CaptureMode, CreatedAtUtc
             FROM WorkContextEvents
             WHERE WorkThreadId = $id
             ORDER BY CreatedAtUtc;
             """, cancellationToken);
-        var messages = await ReadManyAsync(connection, workThreadId, ReadConversationMessage, """
+        var messages = await ReadManyAsync(connection, workThreadId, SqliteWorkThreadReaders.ReadConversationMessage, """
             SELECT Id, WorkThreadId, Role, Content, CreatedAtUtc, ContextReceiptId
             FROM ConversationMessages
             WHERE WorkThreadId = $id
             ORDER BY CreatedAtUtc;
             """, cancellationToken);
-        var receipts = await ReadManyAsync(connection, workThreadId, ReadContextReceipt, """
+        var receipts = await ReadManyAsync(connection, workThreadId, SqliteWorkThreadReaders.ReadContextReceipt, """
             SELECT Id, WorkThreadId, UsedSourcesJson, NotUsedSourcesJson, Limitations, CreatedAtUtc
             FROM ContextReceipts
             WHERE WorkThreadId = $id
             ORDER BY CreatedAtUtc;
             """, cancellationToken);
-        var artifacts = await ReadManyAsync(connection, workThreadId, ReadArtifact, """
+        var artifacts = await ReadManyAsync(connection, workThreadId, SqliteWorkThreadReaders.ReadArtifact, """
             SELECT Id, WorkThreadId, ArtifactType, Title, Content, CreatedAtUtc, UpdatedAtUtc, ContextReceiptId
             FROM WorkArtifacts
             WHERE WorkThreadId = $id
@@ -132,7 +132,7 @@ public sealed class SqlitePrivacyAndMaintenanceStore : IThreadlineStoreInitializ
         await using var connection = await OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         var deleted = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var cutoff = ToText(cutoffUtc);
+        var cutoff = SqliteHelpers.ToText(cutoffUtc);
 
         deleted["WorkArtifacts"] = await ExecuteMutationAsync(connection, transaction, "WorkArtifacts", "WorkThreadId IN (SELECT Id FROM WorkThreads WHERE UpdatedAtUtc < $cutoff)", cutoff, cancellationToken);
         deleted["ConversationMessages"] = await ExecuteMutationAsync(connection, transaction, "ConversationMessages", "WorkThreadId IN (SELECT Id FROM WorkThreads WHERE UpdatedAtUtc < $cutoff)", cutoff, cancellationToken);
@@ -164,18 +164,8 @@ public sealed class SqlitePrivacyAndMaintenanceStore : IThreadlineStoreInitializ
         return new LocalDataMutationResult(deleted);
     }
 
-    private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
-    {
-        var connection = new SqliteConnection(_options.ConnectionString);
-        await connection.OpenAsync(cancellationToken);
-        foreach (var pragma in Pragmas)
-        {
-            await using var command = connection.CreateCommand();
-            command.CommandText = pragma;
-            await command.ExecuteNonQueryAsync(cancellationToken);
-        }
-        return connection;
-    }
+    private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken) =>
+        await SqliteHelpers.OpenConnectionWithPragmasAsync(_options, cancellationToken);
 
     private static async Task<T?> ReadSingleAsync<T>(SqliteConnection connection, string id, Func<SqliteDataReader, T> read, string sql, CancellationToken cancellationToken)
     {
@@ -217,18 +207,7 @@ public sealed class SqlitePrivacyAndMaintenanceStore : IThreadlineStoreInitializ
 
     private static string RemoveSql(string table, string columnName) => "DE" + "LETE FROM " + table + " WHERE " + columnName + " = $id;";
 
-    private static CaptureRule ReadCaptureRule(SqliteDataReader reader) => new(reader.GetString(0), Enum.Parse<CaptureRuleType>(reader.GetString(1)), reader.GetString(2), Enum.Parse<CaptureRuleAction>(reader.GetString(3)), FromText(reader.GetString(5)), Enum.Parse<CaptureRuleSource>(reader.GetString(4)));
-    private static WorkThread ReadWorkThread(SqliteDataReader reader) => new(reader.GetString(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2), Enum.Parse<WorkThreadStatus>(reader.GetString(3)), FromText(reader.GetString(4)), FromText(reader.GetString(5)), reader.IsDBNull(6) ? null : FromText(reader.GetString(6)), reader.IsDBNull(7) ? null : FromText(reader.GetString(7)));
-    private static WorkContextEvent ReadWorkContextEvent(SqliteDataReader reader) => new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.IsDBNull(4) ? null : reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5), reader.IsDBNull(6) ? null : reader.GetString(6), reader.IsDBNull(7) ? null : reader.GetString(7), Enum.Parse<WorkCaptureMode>(reader.GetString(8)), FromText(reader.GetString(9)));
-    private static ConversationMessage ReadConversationMessage(SqliteDataReader reader) => new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), FromText(reader.GetString(4)), reader.IsDBNull(5) ? null : reader.GetString(5));
-    private static ContextReceiptRecord ReadContextReceipt(SqliteDataReader reader) => new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetString(3), reader.IsDBNull(4) ? null : reader.GetString(4), FromText(reader.GetString(5)));
-    private static WorkArtifact ReadArtifact(SqliteDataReader reader) => new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), FromText(reader.GetString(5)), FromText(reader.GetString(6)), reader.IsDBNull(7) ? null : reader.GetString(7));
-
-    private static object ToDbValue(string? value) => value is null ? DBNull.Value : value;
-    private static string ToText(DateTimeOffset value) => value.ToUniversalTime().ToString("O");
-    private static DateTimeOffset FromText(string value) => DateTimeOffset.Parse(value, null, System.Globalization.DateTimeStyles.RoundtripKind);
-
-    private static readonly string[] Pragmas = ["PRAGMA busy_timeout=5000;", "PRAGMA foreign_keys=ON;", "PRAGMA journal_mode=WAL;", "PRAGMA synchronous=FULL;"];
+    private static CaptureRule ReadCaptureRule(SqliteDataReader reader) => new(reader.GetString(0), Enum.Parse<CaptureRuleType>(reader.GetString(1)), reader.GetString(2), Enum.Parse<CaptureRuleAction>(reader.GetString(3)), SqliteHelpers.FromText(reader.GetString(5)), Enum.Parse<CaptureRuleSource>(reader.GetString(4)));
     private static readonly string[] SchemaStatements =
     [
         "CREATE TABLE IF NOT EXISTS SchemaMigrations (Id TEXT PRIMARY KEY, AppliedAtUtc TEXT NOT NULL);",
