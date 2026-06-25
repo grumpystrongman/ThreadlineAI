@@ -13,7 +13,6 @@ public static class SecurityPrivacyEndpointMappings
         api.MapGet("/privacy/status", (ThreadlineServiceOptions options, PrivacyRuntimeState runtime) =>
             Results.Ok(new PrivacyStatusResponse(
                 options.RequireApiToken,
-                options.ApiTokenPath,
                 options.RetentionDays,
                 options.LocalOnlyMode,
                 options.CorsAllowedOrigins,

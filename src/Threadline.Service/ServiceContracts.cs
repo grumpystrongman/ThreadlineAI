@@ -119,7 +119,6 @@ public sealed record NeverSendRequest(
 
 public sealed record PrivacyStatusResponse(
     bool AuthRequired,
-    string ApiTokenPath,
     int RetentionDays,
     bool LocalOnlyMode,
     IReadOnlySet<string> CorsAllowedOrigins,

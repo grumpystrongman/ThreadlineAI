@@ -169,4 +169,10 @@ public static class RequestValidator
 
         return null;
     }
+
+    public static int ClampTake(int? take, int defaultValue, int max = 200)
+    {
+        if (take is null or <= 0) return defaultValue;
+        return Math.Min(take.Value, max);
+    }
 }

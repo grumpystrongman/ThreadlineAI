@@ -214,10 +214,16 @@ public sealed class ThreadlineCommercialLifecycleService
     {
         if (!Directory.Exists(directory)) return;
 
+        var fullDirectoryPath = Path.GetFullPath(directory);
         foreach (var path in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories).Take(200))
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var fullPath = Path.GetFullPath(path);
+            if (!fullPath.StartsWith(fullDirectoryPath, StringComparison.OrdinalIgnoreCase))
+                continue;
             var relative = Path.GetRelativePath(directory, path).Replace('\\', '/');
+            if (relative.StartsWith("..", StringComparison.Ordinal))
+                continue;
             var entry = zip.CreateEntry($"{zipPrefix}/{relative}");
             await using var input = File.OpenRead(path);
             await using var output = entry.Open();
