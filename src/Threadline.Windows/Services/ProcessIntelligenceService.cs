@@ -15,7 +15,7 @@ public sealed class ProcessIntelligenceService
             window.ProcessId,
             processName,
             window.ExecutablePath,
-            "Not resolved in 11.8 safe process model",
+            null,
             null,
             appType,
             methods);
