@@ -302,7 +302,7 @@ public static class ThreadlineEndpointMappings
             var invalidAdapter = RequestValidator.ValidateAdapter(request);
             if (invalidAdapter is not null) return invalidAdapter;
 
-            var registered = AdapterRegistration.Create(request.Kind, request.DisplayName.Trim(), request.Permissions, clock.UtcNow, request.Version, NormalizeMetadata(request.Metadata));
+            var registered = AdapterRegistration.Create(request.Kind, request.DisplayName.Trim(), request.Permissions, clock.UtcNow, request.Version, MetadataHelpers.NormalizeMetadata(request.Metadata));
             await adapters.RegisterAsync(registered, ct);
             await audit.AppendAuditEventAsync(
                 AuditEvent.Create(
@@ -328,7 +328,7 @@ public static class ThreadlineEndpointMappings
             var registration = await adapters.GetAsync(adapterId.Trim(), ct);
             if (registration is null) return Results.NotFound(new { error = "Adapter is not registered. Register the extension before sending heartbeat." });
 
-            var metadata = MergeMetadata(registration.Metadata, request.Metadata);
+            var metadata = MetadataHelpers.MergeMetadata(registration.Metadata, request.Metadata);
             metadata["lastHeartbeatAt"] = clock.UtcNow.ToString("O");
             if (!string.IsNullOrWhiteSpace(request.Version)) metadata["heartbeatVersion"] = request.Version.Trim();
 
@@ -370,23 +370,4 @@ public static class ThreadlineEndpointMappings
         return null;
     }
 
-    private static Dictionary<string, string> NormalizeMetadata(IReadOnlyDictionary<string, string>? metadata) =>
-        metadata is null
-            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            : metadata.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
-
-    private static Dictionary<string, string> MergeMetadata(
-        IReadOnlyDictionary<string, string>? existing,
-        IReadOnlyDictionary<string, string>? incoming)
-    {
-        var metadata = NormalizeMetadata(existing);
-        if (incoming is null) return metadata;
-
-        foreach (var item in incoming)
-        {
-            if (!string.IsNullOrWhiteSpace(item.Key)) metadata[item.Key] = item.Value;
-        }
-
-        return metadata;
-    }
 }

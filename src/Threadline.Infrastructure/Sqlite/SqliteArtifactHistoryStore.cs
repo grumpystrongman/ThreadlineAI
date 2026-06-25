@@ -39,9 +39,9 @@ public sealed class SqliteArtifactHistoryStore : IArtifactHistoryRepository, ITh
         command.Parameters.AddWithValue("$title", artifact.Title);
         command.Parameters.AddWithValue("$content", artifact.Content);
         command.Parameters.AddWithValue("$operation", Normalize(operation, "generated"));
-        command.Parameters.AddWithValue("$actionId", ToDbValue(actionId));
-        command.Parameters.AddWithValue("$createdAtUtc", ToText(artifact.UpdatedAt));
-        command.Parameters.AddWithValue("$contextReceiptId", ToDbValue(artifact.ContextReceiptId));
+        command.Parameters.AddWithValue("$actionId", SqliteHelpers.ToTrimmedDbValue(actionId));
+        command.Parameters.AddWithValue("$createdAtUtc", SqliteHelpers.ToText(artifact.UpdatedAt));
+        command.Parameters.AddWithValue("$contextReceiptId", SqliteHelpers.ToTrimmedDbValue(artifact.ContextReceiptId));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -78,12 +78,8 @@ public sealed class SqliteArtifactHistoryStore : IArtifactHistoryRepository, ITh
         return Convert.ToInt32(result, System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
-    {
-        var connection = new SqliteConnection(_options.ConnectionString);
-        await connection.OpenAsync(cancellationToken);
-        return connection;
-    }
+    private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken) =>
+        await SqliteHelpers.OpenConnectionAsync(_options, cancellationToken);
 
     private static WorkArtifactVersion ReadArtifactVersion(SqliteDataReader reader) => new(
         reader.GetString(0),
@@ -95,13 +91,10 @@ public sealed class SqliteArtifactHistoryStore : IArtifactHistoryRepository, ITh
         reader.GetString(6),
         reader.GetString(7),
         reader.IsDBNull(8) ? null : reader.GetString(8),
-        FromText(reader.GetString(9)),
+        SqliteHelpers.FromText(reader.GetString(9)),
         reader.IsDBNull(10) ? null : reader.GetString(10));
 
     private static string Normalize(string? value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
-    private static string ToText(DateTimeOffset value) => value.ToUniversalTime().ToString("O");
-    private static object ToDbValue(string? value) => string.IsNullOrWhiteSpace(value) ? DBNull.Value : value.Trim();
-    private static DateTimeOffset FromText(string value) => DateTimeOffset.Parse(value, null, System.Globalization.DateTimeStyles.RoundtripKind);
 
     private static readonly string[] SchemaStatements =
     [
