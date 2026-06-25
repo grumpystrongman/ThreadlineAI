@@ -475,8 +475,9 @@ public sealed partial class MainWindow : Window
         {
             return toggle.IsChecked ?? defaultValue;
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"[Threadline] Toggle read failed: {ex.GetType().Name}: {ex.Message}");
             return defaultValue;
         }
     }
@@ -502,9 +503,9 @@ public sealed partial class MainWindow : Window
             {
                 ServiceStatusText.Text = "Service/action error";
             }
-            catch
+            catch (Exception uiEx)
             {
-                // Ignore secondary UI failures while reporting the original error.
+                System.Diagnostics.Debug.WriteLine($"[Threadline] Secondary UI update failed: {uiEx.GetType().Name}: {uiEx.Message}");
             }
 
             AddTimeline("Error: " + ex.Message);
@@ -551,9 +552,9 @@ public sealed partial class MainWindow : Window
                 TimelineList.ScrollIntoView(TimelineList.Items[^1]);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Timeline updates should never be able to crash the sidecar.
+            System.Diagnostics.Debug.WriteLine($"[Threadline] Timeline update failed: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -574,9 +575,9 @@ public sealed partial class MainWindow : Window
 
             ScrollTranscriptToBottom(force: true);
         }
-        catch
+        catch (Exception ex)
         {
-            // Transcript rendering should never be able to crash the sidecar.
+            System.Diagnostics.Debug.WriteLine($"[Threadline] Transcript append failed: {ex.GetType().Name}: {ex.Message}");
         }
 
         return transcriptMessage;
@@ -590,9 +591,9 @@ public sealed partial class MainWindow : Window
             transcriptMessage.Timestamp = DateTimeOffset.Now;
             ScrollTranscriptToBottom(force: true);
         }
-        catch
+        catch (Exception ex)
         {
-            // A failed visual update is non-fatal; the app should stay alive.
+            System.Diagnostics.Debug.WriteLine($"[Threadline] Transcript update failed: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -721,9 +722,9 @@ public sealed partial class MainWindow : Window
         {
             TranscriptScrollViewer.ChangeView(null, 0, null, disableAnimation: false);
         }
-        catch
+        catch (Exception ex)
         {
-            // Non-fatal visual update.
+            System.Diagnostics.Debug.WriteLine($"[Threadline] Scroll to top failed: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -741,15 +742,15 @@ public sealed partial class MainWindow : Window
                     TranscriptScrollViewer.UpdateLayout();
                     TranscriptScrollViewer.ChangeView(null, TranscriptScrollViewer.ScrollableHeight, null, disableAnimation: false);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Dispatcher-delayed scroll/layout updates should never crash after a successful Ask.
+                    System.Diagnostics.Debug.WriteLine($"[Threadline] Scroll layout update failed: {ex.GetType().Name}: {ex.Message}");
                 }
             });
         }
-        catch
+        catch (Exception ex)
         {
-            // Non-fatal visual update.
+            System.Diagnostics.Debug.WriteLine($"[Threadline] Scroll dispatch failed: {ex.GetType().Name}: {ex.Message}");
         }
     }
 

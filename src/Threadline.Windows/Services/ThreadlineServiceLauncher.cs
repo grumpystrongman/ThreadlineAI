@@ -106,7 +106,7 @@ public static class ThreadlineServiceLauncher
             using var response = await client.GetAsync("health", timeout.Token);
             return response.IsSuccessStatusCode;
         }
-        catch
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
         {
             return false;
         }

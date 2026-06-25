@@ -87,7 +87,7 @@ public sealed class NativeUiAutomationReader
         while (queue.Count > 0 && lines.Count < MaxItems && lines.Sum(line => line.Length) < MaxCharacters)
         {
             var item = queue.Dequeue();
-            AddAccessibleText(item, 0, lines, seen);
+            AddAccessibleText(item, 0, lines, seen, warnings);
             EnqueueChildren(item, queue, warnings, lines, seen);
         }
 
@@ -124,7 +124,7 @@ public sealed class NativeUiAutomationReader
 
                 if (child is int childId)
                 {
-                    AddAccessibleText(accessibleObject, childId, lines, seen);
+                    AddAccessibleText(accessibleObject, childId, lines, seen, warnings);
                     continue;
                 }
 
@@ -137,7 +137,7 @@ public sealed class NativeUiAutomationReader
         }
     }
 
-    private static void AddAccessibleText(object accessibleObject, int childId, List<string> lines, HashSet<string> seen)
+    private static void AddAccessibleText(object accessibleObject, int childId, List<string> lines, HashSet<string> seen, List<string> warnings)
     {
         try
         {
@@ -156,6 +156,7 @@ public sealed class NativeUiAutomationReader
         }
         catch (Exception ex) when (ex is COMException or RuntimeBinderException or InvalidCastException)
         {
+            warnings.Add($"An accessible text element could not be read: {ex.GetType().Name}");
         }
     }
 
@@ -181,7 +182,11 @@ public sealed class NativeUiAutomationReader
             using var process = System.Diagnostics.Process.GetProcessById((int)processId);
             return process.ProcessName;
         }
-        catch
+        catch (ArgumentException)
+        {
+            return "unknown";
+        }
+        catch (InvalidOperationException)
         {
             return "unknown";
         }

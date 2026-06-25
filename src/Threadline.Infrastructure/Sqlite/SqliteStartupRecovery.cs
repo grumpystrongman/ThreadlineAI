@@ -50,9 +50,17 @@ public static class SqliteStartupRecovery
         {
             File.Move(source, destination, overwrite: true);
         }
-        catch
+        catch (IOException ex)
         {
-            // Best-effort cleanup. The main database has already been moved aside.
+            System.Diagnostics.Trace.TraceWarning(
+                "SqliteStartupRecovery: best-effort move failed for '{0}' -> '{1}': {2}",
+                source, destination, ex.Message);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            System.Diagnostics.Trace.TraceWarning(
+                "SqliteStartupRecovery: best-effort move denied for '{0}' -> '{1}': {2}",
+                source, destination, ex.Message);
         }
     }
 }
