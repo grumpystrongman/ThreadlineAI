@@ -59,6 +59,33 @@ public static class SecurityPrivacyEndpointMappings
             return Results.Ok(await store.PurgeExpiredAsync(cutoff, ct));
         });
 
+        api.MapGet("/privacy/screenshot-vision-policies", async (SqlitePrivacyAndMaintenanceStore store, CancellationToken ct) =>
+        {
+            var settings = await store.GetPrivacySettingsByPrefixAsync("screenshot_vision_policy:", ct);
+            var entries = settings.Select(kv => new ScreenshotVisionPolicyEntry(
+                kv.Key["screenshot_vision_policy:".Length..],
+                kv.Value)).ToList();
+            return Results.Ok(entries);
+        });
+
+        api.MapPost("/privacy/screenshot-vision-policies", async (ScreenshotVisionPolicyRequest request, SqlitePrivacyAndMaintenanceStore store, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.AppKey)) return Results.BadRequest(new { error = "AppKey is required." });
+            if (request.Policy is not ("Allowed" or "Denied"))
+                return Results.BadRequest(new { error = "Policy must be 'Allowed' or 'Denied'." });
+            var key = "screenshot_vision_policy:" + request.AppKey.Trim();
+            await store.SetPrivacySettingAsync(key, request.Policy, ct);
+            return Results.Created($"/privacy/screenshot-vision-policies", new ScreenshotVisionPolicyEntry(request.AppKey.Trim(), request.Policy));
+        });
+
+        api.MapDelete("/privacy/screenshot-vision-policies/{*appKey}", async (string appKey, SqlitePrivacyAndMaintenanceStore store, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(appKey)) return Results.BadRequest(new { error = "AppKey is required." });
+            var key = "screenshot_vision_policy:" + appKey.Trim();
+            var removed = await store.DeletePrivacySettingAsync(key, ct);
+            return removed ? Results.NoContent() : Results.NotFound();
+        });
+
         api.MapDelete("/privacy/local-data", async (SqlitePrivacyAndMaintenanceStore store, DpapiProtectedSecretStore secrets, PrivacyRuntimeState runtime, IAuditRepository audit, IClock clock, CancellationToken ct) =>
         {
             var databaseResult = await store.ClearAllLocalDataAsync(ct);

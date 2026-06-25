@@ -36,6 +36,27 @@ public sealed class ScreenshotVisionConsentPolicy
 {
     private readonly Dictionary<string, ScreenshotVisionAppPolicy> _perAppPolicies = new(StringComparer.OrdinalIgnoreCase);
 
+    private Func<string, string, Task>? _persistPolicy;
+    private Func<string, Task>? _removePolicy;
+
+    public void SetPersistenceCallbacks(Func<string, string, Task> persist, Func<string, Task> remove)
+    {
+        _persistPolicy = persist;
+        _removePolicy = remove;
+    }
+
+    public void LoadPersistedPolicies(IReadOnlyList<ScreenshotVisionPolicyDto> policies)
+    {
+        foreach (var entry in policies)
+        {
+            if (Enum.TryParse<ScreenshotVisionAppPolicy>(entry.Policy, ignoreCase: true, out var parsed) &&
+                parsed != ScreenshotVisionAppPolicy.PromptEachTime)
+            {
+                _perAppPolicies[entry.AppKey] = parsed;
+            }
+        }
+    }
+
     public ScreenshotVisionConsentDecision Evaluate(ActiveWindowSnapshot window, bool userApprovedThisCapture, bool rawScreenshotStorageAllowed = false)
     {
         var key = BuildAppKey(window);
@@ -87,11 +108,38 @@ public sealed class ScreenshotVisionConsentPolicy
             : ScreenshotVisionAppPolicy.PromptEachTime;
     }
 
-    public void Allow(ActiveWindowSnapshot window) => _perAppPolicies[BuildAppKey(window)] = ScreenshotVisionAppPolicy.Allowed;
+    public void Allow(ActiveWindowSnapshot window)
+    {
+        var key = BuildAppKey(window);
+        _perAppPolicies[key] = ScreenshotVisionAppPolicy.Allowed;
+        _ = PersistAsync(key, "Allowed");
+    }
 
-    public void Deny(ActiveWindowSnapshot window) => _perAppPolicies[BuildAppKey(window)] = ScreenshotVisionAppPolicy.Denied;
+    public void Deny(ActiveWindowSnapshot window)
+    {
+        var key = BuildAppKey(window);
+        _perAppPolicies[key] = ScreenshotVisionAppPolicy.Denied;
+        _ = PersistAsync(key, "Denied");
+    }
 
-    public void ResetToPromptEachTime(ActiveWindowSnapshot window) => _perAppPolicies.Remove(BuildAppKey(window));
+    public void ResetToPromptEachTime(ActiveWindowSnapshot window)
+    {
+        var key = BuildAppKey(window);
+        _perAppPolicies.Remove(key);
+        _ = RemovePersistedAsync(key);
+    }
+
+    private async Task PersistAsync(string appKey, string policy)
+    {
+        try { if (_persistPolicy is not null) await _persistPolicy(appKey, policy); }
+        catch { /* persistence is best-effort; in-memory state is authoritative during the session */ }
+    }
+
+    private async Task RemovePersistedAsync(string appKey)
+    {
+        try { if (_removePolicy is not null) await _removePolicy(appKey); }
+        catch { /* persistence is best-effort */ }
+    }
 
     public string DescribePolicy(ActiveWindowSnapshot window)
     {

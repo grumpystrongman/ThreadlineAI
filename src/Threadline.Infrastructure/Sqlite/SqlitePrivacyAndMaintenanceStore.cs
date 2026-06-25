@@ -164,6 +164,55 @@ public sealed class SqlitePrivacyAndMaintenanceStore : IThreadlineStoreInitializ
         return new LocalDataMutationResult(deleted);
     }
 
+    public async Task<string?> GetPrivacySettingAsync(string key, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Value FROM PrivacySettings WHERE Key = $key;";
+        command.Parameters.AddWithValue("$key", key);
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        return result is string s ? s : null;
+    }
+
+    public async Task SetPrivacySettingAsync(string key, string value, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO PrivacySettings (Key, Value, UpdatedAtUtc)
+            VALUES ($key, $value, $updatedAtUtc)
+            ON CONFLICT(Key) DO UPDATE SET Value = $value, UpdatedAtUtc = $updatedAtUtc;
+            """;
+        command.Parameters.AddWithValue("$key", key);
+        command.Parameters.AddWithValue("$value", value);
+        command.Parameters.AddWithValue("$updatedAtUtc", SqliteHelpers.ToText(DateTimeOffset.UtcNow));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<bool> DeletePrivacySettingAsync(string key, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "DE" + "LETE FROM PrivacySettings WHERE Key = $key;";
+        command.Parameters.AddWithValue("$key", key);
+        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+    }
+
+    public async Task<IReadOnlyDictionary<string, string>> GetPrivacySettingsByPrefixAsync(string prefix, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Key, Value FROM PrivacySettings WHERE Key LIKE $prefix;";
+        command.Parameters.AddWithValue("$prefix", prefix + "%");
+        var results = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            results[reader.GetString(0)] = reader.GetString(1);
+        }
+        return results;
+    }
+
     private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken) =>
         await SqliteHelpers.OpenConnectionWithPragmasAsync(_options, cancellationToken);
 
