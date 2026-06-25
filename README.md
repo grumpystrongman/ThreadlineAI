@@ -4,7 +4,7 @@ ThreadlineAI is a Windows-native, local-first AI sidecar for high-context work. 
 
 Most AI tools start from a blank chat box. ThreadlineAI starts from the work surface the user is already using.
 
-![ThreadlineAI sidecar overview](docs/assets/screenshots/threadline-sidecar-overview.svg)
+![ThreadlineAI sidecar overview — illustrative placeholder, not a real screenshot](docs/assets/screenshots/threadline-sidecar-overview.svg)
 
 ## What it is
 
@@ -14,7 +14,7 @@ ThreadlineAI is a context-aware desktop companion made of:
 - an **ASP.NET Core local service** that acts as the context broker, provider bridge, health endpoint, and workflow API;
 - a **SQLite-backed local memory layer** for sessions, approved context events, Work Threads, receipts, and artifacts;
 - **context adapters** for Chrome/Edge, PowerShell, active windows, UI Automation, and file-backed document paths;
-- a **provider abstraction** for OpenAI-compatible provider execution and future provider options;
+- a **provider abstraction** for OpenAI-compatible provider execution (OpenAI, Gemini, DeepSeek, OpenRouter, Local);
 - **privacy-first controls** that make capture visible, previewable, pausable, and auditable.
 
 The product direction is not invisible automation. ThreadlineAI should help users understand what context is being used, what is missing, and what is safe to send to a provider.
@@ -55,19 +55,25 @@ Recent completed work includes:
 - diagnostics export;
 - guarded local-data clearing;
 - automated service/security tests;
-- Build 23 release-confidence gates, smoke tests, and release validation.
+- Build 23 release-confidence gates, smoke tests, and release validation;
+- screenshot/OCR consent decisions persisted across app restarts via SQLite.
+
+Known limitations:
+
+- Ambient capture records audio and metadata but does not yet produce a real transcript.
+- Only OpenAI-compatible providers are supported (OpenAI, Gemini, DeepSeek, OpenRouter, Local). Anthropic/Claude is not yet available — no adapter exists.
+- Screenshot/OCR vision is consent-gated and extracts text via OCR, but raw screenshot retention and direct vision-model image submission are not yet implemented.
+- Screenshots in this README and docs are illustrative SVG placeholders, not captures of the running application.
 
 Honest boundary: this is not yet a finished general-availability enterprise SKU. It is a serious Windows product foundation with real commercial direction and enough structure to test, evaluate, harden, and package.
 
 ## Screenshots
 
-The repo currently includes screenshot-style SVG visuals so the README and docs can communicate the product flow before final release screenshots are captured from a signed Windows build.
+> **Note:** The images below are **illustrative SVG placeholders**, not real screenshots of the running application. They communicate the intended product flow. Real screenshots will be captured from a signed Windows build before general availability. See [`docs/SCREENSHOTS.md`](docs/SCREENSHOTS.md) for the capture plan and naming standards.
 
 | Sidecar overview | Doctor/readiness |
 | --- | --- |
-| ![ThreadlineAI sidecar overview](docs/assets/screenshots/threadline-sidecar-overview.svg) | ![ThreadlineAI Doctor readiness](docs/assets/screenshots/threadline-doctor-readiness.svg) |
-
-See [`docs/SCREENSHOTS.md`](docs/SCREENSHOTS.md) for the real screenshot capture plan and naming standards.
+| ![ThreadlineAI sidecar overview — illustrative placeholder](docs/assets/screenshots/threadline-sidecar-overview.svg) | ![ThreadlineAI Doctor readiness — illustrative placeholder](docs/assets/screenshots/threadline-doctor-readiness.svg) |
 
 ## Core capabilities
 
@@ -94,11 +100,11 @@ Context sources include:
 - UI Automation text from readable apps;
 - file-backed document resolution where available;
 - PowerShell notes, transcript excerpts, and command output;
-- screenshot fallback seams for future OCR/vision extraction.
+- consent-gated screenshot/OCR text extraction (per-app allow/deny decisions persist across restarts).
 
 ### Provider-backed Ask
 
-Ask requests route through the local service and configured provider path. The provider model is intended to support OpenAI-compatible providers and future provider choices through a consistent abstraction.
+Ask requests route through the local service and configured provider path. All supported providers use the OpenAI-compatible API path.
 
 The Ask path supports:
 

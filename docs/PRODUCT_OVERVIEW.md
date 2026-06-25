@@ -54,13 +54,13 @@ Supported context paths include:
 - UI Automation text from readable desktop apps;
 - file-backed document resolution where available;
 - PowerShell notes and command output;
-- screenshot fallback seams where OCR/vision can be added later.
+- consent-gated screenshot/OCR text extraction (per-app allow/deny decisions persist across restarts).
 
 ### Provider-backed Ask
 
-ThreadlineAI routes Ask through the local service and configured provider connection. The provider abstraction is intended to support OpenAI-compatible providers and future provider choices behind the same interface.
+ThreadlineAI routes Ask through the local service and configured provider connection. All supported providers (OpenAI, Gemini, DeepSeek, OpenRouter, Local) use the OpenAI-compatible API path.
 
-The product direction supports:
+The Ask path supports:
 
 - OpenAI-compatible provider execution;
 - local provider credentials stored through secure local secret references;
@@ -143,14 +143,14 @@ This does not mean every commercial feature is finished. It means the foundation
 
 ## Screenshots and visuals
 
-The repository includes screenshot-style SVG visuals under `docs/assets/screenshots/` so GitHub can show the product flow before final binary screenshots are captured from a release build.
+The repository includes **illustrative SVG placeholders** under `docs/assets/screenshots/` so GitHub can show the intended product flow. These are not real screenshots of the running application.
 
 Current visuals:
 
-- `threadline-sidecar-overview.svg` — sidecar attached beside a work application.
-- `threadline-doctor-readiness.svg` — Doctor/readiness and release-gate view.
+- `threadline-sidecar-overview.svg` — sidecar attached beside a work application (placeholder).
+- `threadline-doctor-readiness.svg` — Doctor/readiness and release-gate view (placeholder).
 
-Before a public release, replace or supplement these with real captured screenshots from a signed Windows build.
+Real screenshots will be captured from a signed Windows build before general availability.
 
 ## Who should try it
 
@@ -172,7 +172,7 @@ Try ThreadlineAI if you want to evaluate a different interaction model for AI at
 - **Context-aware by design** — it starts from the app, tab, document, or workflow the user is actually working in.
 - **Visible and auditable** — it shows context state and can produce context receipts.
 - **Local-first** — the service, storage, diagnostics, and provider bridge are built around local control.
-- **Provider-flexible** — the provider layer is not meant to trap the product into one model vendor.
+- **Provider-flexible** — the provider layer supports OpenAI-compatible providers (OpenAI, Gemini, DeepSeek, OpenRouter, Local). Anthropic/Claude is not yet supported.
 - **Workflow-oriented** — summaries, handoffs, decisions, risks, and next actions are first-class outputs.
 - **Commercially shaped** — installer, service lifecycle, diagnostics, clear-data, tests, smoke scripts, and release gates are present.
 
@@ -195,5 +195,12 @@ The next commercial hardening passes should focus on signed installer polish, re
 ## Honest current boundary
 
 ThreadlineAI is still an actively developing product. It is not yet a polished general-availability app. The repo should be evaluated as a serious pre-release product foundation with real commercial direction, not as a finished enterprise SKU.
+
+Known limitations:
+
+- Ambient capture records audio and metadata but does not yet produce a real transcript.
+- Only OpenAI-compatible providers are supported. Anthropic/Claude is not available — no adapter exists.
+- Screenshot/OCR vision extracts text via OCR but does not yet retain raw screenshots or send images directly to vision-capable models.
+- Screenshots in the README and docs are illustrative SVG placeholders.
 
 The strongest thing about the product is the shape: context-aware Windows sidecar, local service, visible trust controls, provider flexibility, durable Work Thread memory, and artifact outputs. That is enough to make it worth testing, refining, and packaging properly.
