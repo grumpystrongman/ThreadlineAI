@@ -1,10 +1,13 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Threadline.Windows.Services;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.System;
 
 namespace Threadline.Windows;
 
@@ -69,6 +72,7 @@ public sealed partial class MainWindow : Window
     private async void CompleteLastAction_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(CompleteLastActionAsync);
     private async void CopyConversation_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => { CopyConversationToClipboard(); return Task.CompletedTask; });
     private async void CopyLastAnswer_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => { CopyLastAnswerToClipboard(); return Task.CompletedTask; });
+    private async void ExportTranscript_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(ExportTranscriptToFileAsync);
     private async void JumpTranscriptTop_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => { ScrollTranscriptToTop(); return Task.CompletedTask; });
     private async void JumpTranscriptBottom_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => { ScrollTranscriptToBottom(force: true); return Task.CompletedTask; });
     private async void CreateSummaryArtifact_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(() => CreateArtifactFromConversationAsync("Summary", "Thread Summary"));
@@ -633,6 +637,37 @@ public sealed partial class MainWindow : Window
 
         SetClipboardText(lastAnswer.Message);
         AddTimeline("Copied last Threadline answer.");
+    }
+
+    private async Task ExportTranscriptToFileAsync()
+    {
+        var text = BuildTranscriptText(_transcriptMessages);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            AddTimeline("Nothing to export — transcript is empty.");
+            return;
+        }
+
+        var folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "ThreadlineAI", "exports");
+        Directory.CreateDirectory(folder);
+        var fileName = $"Threadline-Transcript-{DateTime.Now:yyyyMMdd-HHmmss}.md";
+        var filePath = Path.Combine(folder, fileName);
+        await File.WriteAllTextAsync(filePath, text);
+
+        SetClipboardText(text);
+        AppendTranscript("Threadline", $"Transcript exported to {filePath} and copied to clipboard.");
+        AddTimeline($"Transcript exported: {fileName}");
+    }
+
+    private void QuestionBox_KeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == VirtualKey.Enter && Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down))
+        {
+            e.Handled = true;
+            _ = RunUiActionAsync(TrustedAskAsync);
+        }
     }
 
     private static string BuildTranscriptText(IEnumerable<TranscriptMessage> messages)

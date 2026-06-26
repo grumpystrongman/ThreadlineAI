@@ -260,16 +260,17 @@
         <Border Grid.Row="3" Background="#FFFFFF" BorderBrush="#DCE6F5" BorderThickness="1" CornerRadius="20" Padding="8">
           <Grid RowDefinitions="Auto,Auto" RowSpacing="6">
             <TextBox x:Name="QuestionBox"
-                     PlaceholderText="Ask ThreadlineAI..."
+                     PlaceholderText="Ask ThreadlineAI... (Ctrl+Enter to send)"
                      AcceptsReturn="True"
                      Height="64"
                      MaxHeight="88"
                      TextWrapping="Wrap"
                      BorderThickness="0"
                      Background="Transparent"
-                     FontSize="13" />
+                     FontSize="13"
+                     KeyDown="QuestionBox_KeyDown" />
 
-            <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="6">
+            <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="6">
               <Button Content="+"
                       Click="ToggleDiagnosticsTargetPickerPanel_Click"
                       MinWidth="34"
@@ -279,14 +280,26 @@
                       Click="ToggleDiagnosticsTargetPickerPanel_Click"
                       MinWidth="54"
                       Style="{StaticResource SidecarButtonStyle}" />
-              <TextBlock Grid.Column="2"
+              <Button Grid.Column="2"
+                      Content="Copy"
+                      Click="CopyLastAnswer_Click"
+                      ToolTipService.ToolTip="Copy last answer"
+                      MinWidth="44"
+                      Style="{StaticResource SidecarButtonStyle}" />
+              <Button Grid.Column="3"
+                      Content="Export"
+                      Click="ExportTranscript_Click"
+                      ToolTipService.ToolTip="Export transcript as Markdown"
+                      MinWidth="52"
+                      Style="{StaticResource SidecarButtonStyle}" />
+              <TextBlock Grid.Column="4"
                          x:Name="TrustControlStatusText"
                          Text="Governed"
                          FontSize="10"
                          Foreground="#6B7280"
                          TextTrimming="CharacterEllipsis"
                          VerticalAlignment="Center" />
-              <Button Grid.Column="3"
+              <Button Grid.Column="5"
                       Content="Ask"
                       Click="TrustedAsk_Click"
                       MinWidth="64"
@@ -379,6 +392,7 @@
                   <TextBox x:Name="ProviderModelBox" Header="Default model" PlaceholderText="gpt-4.1-mini" TextWrapping="NoWrap" />
                   <PasswordBox x:Name="ProviderApiKeyBox" Header="API key" PlaceholderText="Stored locally by Threadline" />
                   <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+                    <Button Content="Test" Click="ProviderTest_Click" Style="{StaticResource SidecarButtonStyle}" />
                     <Button Content="Defaults" Click="UseProviderDefaults_Click" Style="{StaticResource SidecarButtonStyle}" />
                     <Button Content="Save Provider" Click="SaveProviderSettings_Click" Style="{StaticResource PrimarySidecarButtonStyle}" />
                   </StackPanel>
