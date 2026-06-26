@@ -55,6 +55,10 @@ if ($shuttleManager -notmatch 'GetRightEdgeAnchoredShuttleX') {
   throw 'Smoke failed: Shuttle placement is not edge-anchoring the tab X coordinate.'
 }
 
+if ($shuttleManager -notmatch 'GetRightEdgeProbeRect') {
+  throw 'Smoke failed: Shuttle placement is not checking whether the target right edge is exposed.'
+}
+
 if ($shuttleManager -notmatch 'ShuttleTabEdgeOverlap') {
   throw 'Smoke failed: Shuttle placement has no explicit right-edge overlap.'
 }
@@ -73,6 +77,14 @@ if ($shuttleManager -notmatch 'IsAnchoredToRightEdge') {
 
 if ($shuttleManager.Contains('targetRect.Right - ShuttleTabWidth - ShuttleTabInset')) {
   throw 'Smoke failed: Shuttle placement regressed to the old inset-inside-window formula.'
+}
+
+if ($shuttleManager -match '!string\.Equals\(candidate\.Id,\s*_attachedSidecarTargetId') {
+  throw 'Smoke failed: Shuttle placement is hiding the currently attached target window.'
+}
+
+if ($shuttleManager -notmatch 'ShuttleTabMaximumVisibleWindows\s*=\s*16') {
+  throw 'Smoke failed: Shuttle capacity was reduced below the intended exposed-window affordance count.'
 }
 
 if ($shuttleManager -notmatch 'IsShuttleTargetWindow') {
