@@ -137,12 +137,7 @@ public sealed partial class MainWindow
                 return false;
             }
 
-            if (!seen.Add(handle) || !TryGetVisibleTopLevelWindowRect(handle, out var rect))
-            {
-                return true;
-            }
-
-            if (IsThreadlineShuttleWindow(handle))
+            if (!seen.Add(handle) || IsThreadlineOwnedWindow(handle) || !TryGetVisibleTopLevelWindowRect(handle, out var rect))
             {
                 return true;
             }
@@ -341,18 +336,10 @@ public sealed partial class MainWindow
         first.Top < second.Bottom &&
         first.Bottom > second.Top;
 
-    private static bool IsThreadlineShuttleWindow(nint handle)
+    private static bool IsThreadlineOwnedWindow(nint handle)
     {
         _ = ShuttleGetWindowThreadProcessId(handle, out var processId);
-        if (processId != Environment.ProcessId)
-        {
-            return false;
-        }
-
-        var className = GetShuttleWindowClassName(handle);
-        var title = GetShuttleWindowTitle(handle);
-        return className.StartsWith("ThreadlineShuttleTab_", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(title, "Threadline Shuttle", StringComparison.OrdinalIgnoreCase);
+        return processId == Environment.ProcessId;
     }
 
     private static string GetShuttleWindowClassName(nint handle)
