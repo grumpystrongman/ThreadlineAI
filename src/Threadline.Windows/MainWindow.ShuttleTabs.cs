@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Threadline.Windows.Services;
 using Windows.Graphics;
 using WinRT.Interop;
@@ -27,7 +28,13 @@ public sealed partial class MainWindow
             _edgeTriggerWindow.DirectWindowHoverEnabled = false;
         }
 
-        UpdateShuttleTerminology();
+        UpdateShuttleTerminology(
+            SidecarAttachmentText,
+            WorkThreadStatusText,
+            CurrentContextText,
+            ReceiptTrustText,
+            ReceiptSourceText,
+            TrustControlStatusText);
 
         if (_shuttleTabTimer.IsEnabled)
         {
@@ -40,16 +47,22 @@ public sealed partial class MainWindow
         SafeUpdateShuttleTabs();
     }
 
-    private void UpdateShuttleTerminology()
+    private static void UpdateShuttleTerminology(
+        TextBlock sidecarAttachmentText,
+        TextBlock workThreadStatusText,
+        TextBlock currentContextText,
+        TextBlock receiptTrustText,
+        TextBlock receiptSourceText,
+        TextBlock trustControlStatusText)
     {
         try
         {
-            SidecarAttachmentText.Text = "Loom ready. Click a Shuttle tab to open a Warp Thread.";
-            WorkThreadStatusText.Text = "Loom: ready";
-            CurrentContextText.Text = "Choose a Shuttle tab or continue with the current Warp Thread.";
-            ReceiptTrustText.Text = "Lineage on";
-            ReceiptSourceText.Text = "No Shuttle yet";
-            TrustControlStatusText.Text = "Lineage";
+            sidecarAttachmentText.Text = "Loom ready. Click a Shuttle tab to open a Warp Thread.";
+            workThreadStatusText.Text = "Loom: ready";
+            currentContextText.Text = "Choose a Shuttle tab or continue with the current Warp Thread.";
+            receiptTrustText.Text = "Lineage on";
+            receiptSourceText.Text = "No Shuttle yet";
+            trustControlStatusText.Text = "Lineage";
         }
         catch
         {
