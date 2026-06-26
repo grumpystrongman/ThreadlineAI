@@ -20,7 +20,7 @@ public sealed partial class MainWindow
     private async void RootShell_Loaded(object sender, RoutedEventArgs e)
     {
         SafeEnsureReadableCheckBoxLabels();
-        SafeEnsureFallbackFloatingTriggerVisible();
+        SafeEnsureMainSidecarVisible();
         StartBrowserExtensionGuidanceTimer();
         InitializeHotKeyService();
 
@@ -41,6 +41,24 @@ public sealed partial class MainWindow
         catch (Exception ex)
         {
             AddTimeline($"Checkbox label polish skipped: {ex.Message}");
+        }
+    }
+
+    private void SafeEnsureMainSidecarVisible()
+    {
+        try
+        {
+            _sidecarCollapsedToHandle = false;
+            _sidecarWindowHiddenForTrigger = false;
+            _floatingTriggerTarget = null;
+            _edgeTriggerWindow?.HideTrigger();
+            SetSidecarVisualState();
+            ShowMainSidecarWindow();
+            ForceVisibleStartupWindow();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Threadline] Main sidecar visibility fail-safe skipped: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
