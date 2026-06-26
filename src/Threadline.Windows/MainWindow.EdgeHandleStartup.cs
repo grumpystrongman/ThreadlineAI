@@ -1,6 +1,7 @@
 using Microsoft.UI;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
 using Windows.Graphics;
 using WinRT.Interop;
 
@@ -60,11 +61,11 @@ public sealed partial class MainWindow
             ChatShellPanel.Visibility = Visibility.Visible;
             ShowMainSidecarWindow();
             ForceVisibleStartupWindow();
-            AddTimeline("Sidecar opened at startup.");
+            AddTimeline("Sidecar opened visibly at startup.");
         }
-        catch
+        catch (Exception ex)
         {
-            // Startup should not fail just because the sidecar could not be placed immediately.
+            System.Diagnostics.Debug.WriteLine($"[Threadline] Startup sidecar reveal failed: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
