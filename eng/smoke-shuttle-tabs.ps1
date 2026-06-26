@@ -71,7 +71,7 @@ if ($shuttleManager -notmatch 'IsAnchoredToRightEdge') {
   throw 'Smoke failed: Shuttle placement does not verify right-edge anchoring.'
 }
 
-if ($shuttleManager -match 'targetRect\.Right\s*-\s*ShuttleTabWidth\s*-') {
+if ($shuttleManager -match 'targetRect\.Right\s*-\s*ShuttleTabWidth\s*-\s*ShuttleTab') {
   throw 'Smoke failed: Shuttle placement regressed to floating inside the target window.'
 }
 
