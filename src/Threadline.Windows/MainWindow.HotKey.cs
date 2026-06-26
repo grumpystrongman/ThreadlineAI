@@ -58,6 +58,20 @@ public sealed partial class MainWindow
         {
             DispatcherQueue.TryEnqueue(() =>
             {
+                var hwnd = WindowNative.GetWindowHandle(this);
+                if (hwnd != nint.Zero && IsIconic(hwnd))
+                {
+                    _sidecarCollapsedToHandle = false;
+                    _sidecarWindowHiddenForTrigger = false;
+                    _floatingTriggerTarget = null;
+                    _edgeTriggerWindow?.HideTrigger();
+                    ShowMainSidecarWindow();
+                    SetSidecarVisualState();
+                    PlaceSidecarForTarget(GetBestSidecarTarget(), "Restored from Ctrl+Shift+Space after Windows minimized the sidecar.");
+                    AddTimeline("Sidecar restored from minimized state with Ctrl+Shift+Space.");
+                    return;
+                }
+
                 if (_sidecarCollapsedToHandle || _sidecarWindowHiddenForTrigger)
                 {
                     RestoreSidecarFromFloatingTrigger();
@@ -85,4 +99,7 @@ public sealed partial class MainWindow
 
     [DllImport("user32.dll", EntryPoint = "CallWindowProcW")]
     private static extern nint CallWindowProc(nint lpPrevWndFunc, nint hWnd, uint msg, nint wParam, nint lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsIconic(nint hWnd);
 }
