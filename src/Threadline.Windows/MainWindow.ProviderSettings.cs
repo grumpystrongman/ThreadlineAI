@@ -9,6 +9,8 @@ namespace Threadline.Windows;
 
 public sealed partial class MainWindow
 {
+    private TextBox? _providerApiKeyPasteBox;
+
     private void ProviderBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (SettingsProviderBox is null) return;
@@ -36,7 +38,8 @@ public sealed partial class MainWindow
         }
 
         OpenSettingsDrawer();
-        ProviderSettingsStatusText.Text = "Provider settings panel open. It will stay open while you copy and paste values.";
+        EnsurePasteSafeProviderApiKeyInput();
+        ProviderSettingsStatusText.Text = "Provider settings panel open. Paste your API key into the visible API key field, then Save Provider.";
         ApplyProviderDefaults(GetSelectedSettingsProvider(), overwriteExisting: false);
     }
 
@@ -48,6 +51,7 @@ public sealed partial class MainWindow
     private void UseProviderDefaults_Click(object sender, RoutedEventArgs e)
     {
         OpenSettingsDrawer();
+        EnsurePasteSafeProviderApiKeyInput();
         ApplyProviderDefaults(GetSelectedSettingsProvider(), overwriteExisting: true);
         ProviderSettingsStatusText.Text = "Defaults applied. Add or confirm the credential, then click Save Provider.";
     }
@@ -56,6 +60,7 @@ public sealed partial class MainWindow
     {
         var provider = GetSelectedSettingsProvider();
         OpenSettingsDrawer();
+        EnsurePasteSafeProviderApiKeyInput();
         ProviderSettingsStatusText.Text = $"Saving {provider} provider settings...";
         ServiceStatusText.Text = $"Saving provider: {provider}";
 
@@ -81,7 +86,7 @@ public sealed partial class MainWindow
         var provider = GetSelectedSettingsProvider();
         var baseUrl = ProviderBaseUrlBox.Text?.Trim() ?? string.Empty;
         var model = ProviderModelBox.Text?.Trim() ?? string.Empty;
-        var apiKey = ProviderApiKeyBox.Password?.Trim() ?? string.Empty;
+        var apiKey = GetProviderApiKeyInput().Trim();
 
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
@@ -105,16 +110,104 @@ public sealed partial class MainWindow
             }
 
             await _client.SaveProviderCredentialAsync(provider, apiKey, baseUrl, model);
-            ProviderApiKeyBox.Password = string.Empty;
+            ClearProviderApiKeyInput();
         }
 
         SelectComboBoxItem(ProviderBox, provider);
         SelectComboBoxItem(SettingsProviderBox, provider);
         OpenSettingsDrawer();
+        EnsurePasteSafeProviderApiKeyInput();
         ProviderSettingsStatusText.Text = $"Saved {provider}. Start or restart a session to use this provider.";
         ServiceStatusText.Text = $"Provider saved: {provider}";
         AppendTranscript("Threadline Settings", $"Saved provider settings for {provider}. Start or restart a session with Provider set to {provider}.");
         AddTimeline($"Saved provider settings for {provider}.");
+    }
+
+    private string GetProviderApiKeyInput()
+    {
+        if (_providerApiKeyPasteBox is not null)
+        {
+            return _providerApiKeyPasteBox.Text ?? string.Empty;
+        }
+
+        try
+        {
+            return ProviderApiKeyBox.Password ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            AddTimeline($"Provider API key field read skipped: {ex.Message}");
+            return string.Empty;
+        }
+    }
+
+    private void ClearProviderApiKeyInput()
+    {
+        try
+        {
+            if (_providerApiKeyPasteBox is not null)
+            {
+                _providerApiKeyPasteBox.Text = string.Empty;
+            }
+
+            ProviderApiKeyBox.Password = string.Empty;
+        }
+        catch
+        {
+            // Clearing the visual input should never fail a successful credential save.
+        }
+    }
+
+    private void EnsurePasteSafeProviderApiKeyInput()
+    {
+        if (_providerApiKeyPasteBox is not null)
+        {
+            return;
+        }
+
+        try
+        {
+            var pasteBox = new TextBox
+            {
+                Header = "API key",
+                PlaceholderText = "Paste API key here, then Save Provider",
+                TextWrapping = TextWrapping.NoWrap,
+                IsSpellCheckEnabled = false
+            };
+
+            try
+            {
+                pasteBox.Text = ProviderApiKeyBox.Password ?? string.Empty;
+            }
+            catch
+            {
+                // The old PasswordBox may be unstable on paste/read in this shell. Ignore it.
+            }
+
+            if (ProviderApiKeyBox.Parent is Panel parent)
+            {
+                var insertIndex = parent.Children.Count;
+                for (var i = 0; i < parent.Children.Count; i++)
+                {
+                    if (ReferenceEquals(parent.Children[i], ProviderApiKeyBox))
+                    {
+                        insertIndex = i;
+                        break;
+                    }
+                }
+
+                parent.Children.Insert(insertIndex, pasteBox);
+            }
+
+            ProviderApiKeyBox.Visibility = Visibility.Collapsed;
+            ProviderApiKeyBox.IsEnabled = false;
+            _providerApiKeyPasteBox = pasteBox;
+        }
+        catch (Exception ex)
+        {
+            ProviderSettingsStatusText.Text = $"Paste-safe API key field could not be created: {ex.Message}";
+            AddTimeline($"Paste-safe provider key field setup failed: {ex.Message}");
+        }
     }
 
     private void RestoreSidecarLayoutAfterProviderSettings()
@@ -204,7 +297,7 @@ public sealed partial class MainWindow
         var provider = GetSelectedSettingsProvider();
         var baseUrl = ProviderBaseUrlBox.Text?.Trim() ?? string.Empty;
         var model = ProviderModelBox.Text?.Trim() ?? string.Empty;
-        var apiKey = ProviderApiKeyBox.Password?.Trim() ?? string.Empty;
+        var apiKey = GetProviderApiKeyInput().Trim();
 
         if (string.IsNullOrWhiteSpace(baseUrl))
         {

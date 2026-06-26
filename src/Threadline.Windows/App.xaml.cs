@@ -13,7 +13,11 @@ public partial class App : Application
         {
             LogMessage("WinUI unhandled exception captured.");
             LogException(args.Exception);
-            args.Handled = false;
+
+            // Keep the sidecar alive for recoverable UI faults such as focus, paste, layout,
+            // or provider-settings input errors. Fatal startup failures still rethrow from the
+            // explicit initialization and launch try/catch paths below.
+            args.Handled = true;
         };
 
         AppDomain.CurrentDomain.UnhandledException += (_, args) => LogException(args.ExceptionObject as Exception ?? new InvalidOperationException("Unknown non-Exception failure."));

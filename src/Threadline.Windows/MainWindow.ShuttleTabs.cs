@@ -137,12 +137,7 @@ public sealed partial class MainWindow
                 return false;
             }
 
-            if (!seen.Add(handle) || !TryGetVisibleTopLevelWindowRect(handle, out var rect))
-            {
-                return true;
-            }
-
-            if (IsThreadlineShuttleWindow(handle))
+            if (!seen.Add(handle) || IsThreadlineOwnedWindow(handle) || !TryGetVisibleTopLevelWindowRect(handle, out var rect))
             {
                 return true;
             }
@@ -172,16 +167,6 @@ public sealed partial class MainWindow
             return false;
         }
 
-        var exStyle = ShuttleGetWindowLongPtr(handle, GwlExStyle).ToInt64();
-        var hasOwner = ShuttleGetWindow(handle, GetWindowOwner) != nint.Zero;
-        var isToolWindow = (exStyle & WsExToolWindow) != 0;
-        var isExplicitAppWindow = (exStyle & WsExAppWindow) != 0;
-
-        if ((hasOwner || isToolWindow) && !isExplicitAppWindow)
-        {
-            return false;
-        }
-
         var className = GetShuttleWindowClassName(handle);
         if (string.Equals(className, "Progman", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(className, "WorkerW", StringComparison.OrdinalIgnoreCase) ||
@@ -190,7 +175,35 @@ public sealed partial class MainWindow
             return false;
         }
 
+        var exStyle = ShuttleGetWindowLongPtr(handle, GwlExStyle).ToInt64();
+        var hasOwner = ShuttleGetWindow(handle, GetWindowOwner) != nint.Zero;
+        var isToolWindow = (exStyle & WsExToolWindow) != 0;
+        var isExplicitAppWindow = (exStyle & WsExAppWindow) != 0;
+        var isKnownBrowserOrElectron = IsKnownBrowserOrElectronWindow(snapshot, className);
+
+        if ((hasOwner || isToolWindow) && !isExplicitAppWindow && !isKnownBrowserOrElectron)
+        {
+            return false;
+        }
+
         return true;
+    }
+
+    private static bool IsKnownBrowserOrElectronWindow(ActiveWindowSnapshot snapshot, string className)
+    {
+        var process = snapshot.ProcessName ?? string.Empty;
+        return className.StartsWith("Chrome_WidgetWin_", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(className, "MozillaWindowClass", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(className, "ApplicationFrameWindow", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(process, "chrome", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(process, "msedge", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(process, "firefox", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(process, "brave", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(process, "opera", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(process, "vivaldi", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(process, "Code", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(process, "Cursor", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(process, "Windsurf", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool TryGetVisibleTopLevelWindowRect(nint handle, out NativeRect rect)
@@ -341,18 +354,10 @@ public sealed partial class MainWindow
         first.Top < second.Bottom &&
         first.Bottom > second.Top;
 
-    private static bool IsThreadlineShuttleWindow(nint handle)
+    private static bool IsThreadlineOwnedWindow(nint handle)
     {
         _ = ShuttleGetWindowThreadProcessId(handle, out var processId);
-        if (processId != Environment.ProcessId)
-        {
-            return false;
-        }
-
-        var className = GetShuttleWindowClassName(handle);
-        var title = GetShuttleWindowTitle(handle);
-        return className.StartsWith("ThreadlineShuttleTab_", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(title, "Threadline Shuttle", StringComparison.OrdinalIgnoreCase);
+        return processId == Environment.ProcessId;
     }
 
     private static string GetShuttleWindowClassName(nint handle)
