@@ -41,21 +41,35 @@ public partial class App : Application
         {
             LogMessage("Application launch started.");
 
-            var serviceStartup = ThreadlineServiceLauncher.EnsureStartedAsync().GetAwaiter().GetResult();
-            LogMessage(serviceStartup.Message);
-
             var mainWindow = new MainWindow();
             _window = mainWindow;
             LogMessage("Main window constructed.");
+
             _window.Activate();
             LogMessage("Main window activated.");
+
             mainWindow.EnsureCollapsedEdgeHandleStartedAfterActivation();
-            LogMessage("Collapsed edge handle startup requested after activation.");
+            LogMessage("Sidecar startup reveal requested after activation.");
+
+            _ = StartLocalServiceAfterWindowIsVisibleAsync();
         }
         catch (Exception ex)
         {
             LogException(ex);
             throw;
+        }
+    }
+
+    private static async Task StartLocalServiceAfterWindowIsVisibleAsync()
+    {
+        try
+        {
+            var serviceStartup = await ThreadlineServiceLauncher.EnsureStartedAsync();
+            LogMessage(serviceStartup.Message);
+        }
+        catch (Exception ex)
+        {
+            LogException(ex);
         }
     }
 
