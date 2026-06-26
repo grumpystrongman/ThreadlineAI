@@ -13,12 +13,13 @@ public sealed partial class MainWindow
 {
     private const int ShuttleTabWidth = 24;
     private const int ShuttleTabHeight = 72;
-    private const int ShuttleTabInset = 2;
     private const int ShuttleTabMinimumWindowWidth = 240;
     private const int ShuttleTabMinimumWindowHeight = 160;
     private const int ShuttleTabMaximumVisibleWindows = 8;
     private const int ShuttleTabVerticalMargin = 24;
     private const int ShuttleTabVerticalSearchStep = 28;
+    private const int ShuttleTabEdgeOverlap = 4;
+    private const int ShuttleTabScreenMargin = 1;
     private const int GetWindowOwner = 4;
     private const int GwlExStyle = -20;
     private const long WsExToolWindow = 0x00000080L;
@@ -224,17 +225,13 @@ public sealed partial class MainWindow
         var sidecarHwnd = WindowNative.GetWindowHandle(this);
         var sidecarId = Win32Interop.GetWindowIdFromWindow(sidecarHwnd);
         var workArea = GetTargetWorkArea(sidecarId, targetHandle);
+        var x = GetRightEdgeAnchoredShuttleX(targetRect, workArea);
 
-        var x = ClampToArea(
-            targetRect.Right - ShuttleTabWidth - ShuttleTabInset,
-            workArea.X + SidecarScreenMargin,
-            workArea.X + workArea.Width - ShuttleTabWidth - SidecarScreenMargin);
-
-        var minY = Math.Max(targetRect.Top + ShuttleTabVerticalMargin, workArea.Y + SidecarScreenMargin);
-        var maxY = Math.Min(targetRect.Bottom - ShuttleTabHeight - ShuttleTabVerticalMargin, workArea.Y + workArea.Height - ShuttleTabHeight - SidecarScreenMargin);
+        var minY = Math.Max(targetRect.Top + ShuttleTabVerticalMargin, workArea.Y + ShuttleTabScreenMargin);
+        var maxY = Math.Min(targetRect.Bottom - ShuttleTabHeight - ShuttleTabVerticalMargin, workArea.Y + workArea.Height - ShuttleTabHeight - ShuttleTabScreenMargin);
         if (maxY < minY)
         {
-            minY = ClampToArea(targetRect.Top + ((targetRect.Height - ShuttleTabHeight) / 2), workArea.Y + SidecarScreenMargin, workArea.Y + workArea.Height - ShuttleTabHeight - SidecarScreenMargin);
+            minY = ClampToArea(targetRect.Top + ((targetRect.Height - ShuttleTabHeight) / 2), workArea.Y + ShuttleTabScreenMargin, workArea.Y + workArea.Height - ShuttleTabHeight - ShuttleTabScreenMargin);
             maxY = minY;
         }
 
@@ -249,6 +246,11 @@ public sealed partial class MainWindow
                 Bottom = y + ShuttleTabHeight
             };
 
+            if (!IsAnchoredToRightEdge(shuttleRect, targetRect))
+            {
+                continue;
+            }
+
             if (!IsCoveredByHigherWindow(shuttleRect, occludingRects))
             {
                 location = new PointInt32(x, y);
@@ -258,6 +260,30 @@ public sealed partial class MainWindow
 
         location = default;
         return false;
+    }
+
+    private static int GetRightEdgeAnchoredShuttleX(NativeRect targetRect, RectInt32 workArea)
+    {
+        var preferredOutsideX = targetRect.Right - ShuttleTabEdgeOverlap;
+        var edgeFlushInsideX = targetRect.Right - ShuttleTabWidth;
+        var minX = workArea.X + ShuttleTabScreenMargin;
+        var maxX = workArea.X + workArea.Width - ShuttleTabWidth - ShuttleTabScreenMargin;
+
+        if (preferredOutsideX <= maxX)
+        {
+            return Math.Max(preferredOutsideX, minX);
+        }
+
+        // If the target is already against the monitor edge, keep the tab flush with the window's
+        // right border instead of sliding it inward and making it look like content floating in the window.
+        return ClampToArea(edgeFlushInsideX, minX, maxX);
+    }
+
+    private static bool IsAnchoredToRightEdge(NativeRect shuttleRect, NativeRect targetRect)
+    {
+        var overlapsRightEdge = shuttleRect.Left <= targetRect.Right && shuttleRect.Right >= targetRect.Right;
+        var isFlushInsideRightEdge = shuttleRect.Right == targetRect.Right;
+        return overlapsRightEdge || isFlushInsideRightEdge;
     }
 
     private static IEnumerable<int> EnumerateCandidateShuttleYPositions(int centerY, int minY, int maxY)
