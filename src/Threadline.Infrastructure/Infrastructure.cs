@@ -218,7 +218,8 @@ public sealed class OpenAiCompatibleProvider : ILlmProvider
     public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken = default)
     {
         var model = string.IsNullOrWhiteSpace(request.Model) ? _options.DefaultModel : request.Model;
-        return ShouldUseResponsesApi(_options)
+        var hasImages = request.Messages.Any(m => m.HasImages);
+        return ShouldUseResponsesApi(_options) && !hasImages
             ? await CompleteWithResponsesApiAsync(request, model, cancellationToken)
             : await CompleteWithChatCompletionsAsync(request, model, cancellationToken);
     }
