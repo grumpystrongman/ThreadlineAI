@@ -191,23 +191,58 @@ public sealed partial class MainWindow
         }
     }
 
-    private Task StopAmbientCaptureAsync()
+    private async Task StopAmbientCaptureAsync()
     {
         _ambientCaptureLastError = null;
         _ambientCaptureIsProcessing = true;
         RefreshAmbientCaptureIndicator();
 
+        AmbientCaptureSession? session = null;
         try
         {
-            var session = _ambientCapture.Stop();
-            AppendTranscript("Ambient Capture", $"Recording stopped. Audio, manifest, and handoff were saved. No transcript was produced — only raw audio and metadata are available.\n\nFolder:\n{session.OutputFolder}");
+            session = _ambientCapture.Stop();
+            AppendTranscript("Ambient Capture", $"Recording stopped. Audio, manifest, and handoff saved.\n\nFolder:\n{session.OutputFolder}");
             AddTimeline("Ambient capture stopped and handoff files were generated.");
-            return Task.CompletedTask;
         }
         catch (Exception ex)
         {
             _ambientCaptureLastError = ex.Message;
+            _ambientCaptureIsProcessing = false;
+            RefreshAmbientCaptureUi();
+            RefreshAmbientCaptureIndicator();
             throw;
+        }
+
+        // Attempt transcription if audio files exist
+        try
+        {
+            var audioPath = session.MicrophoneAudioPath ?? session.SystemAudioPath;
+            if (!string.IsNullOrWhiteSpace(audioPath) && File.Exists(audioPath))
+            {
+                AppendTranscript("Ambient Capture", "Attempting transcription via configured provider...");
+
+                var translate = _ambientCaptureTranslateToggle?.IsChecked == true;
+                var language = string.IsNullOrWhiteSpace(_ambientCaptureTargetLanguageBox?.Text)
+                    ? null
+                    : _ambientCaptureTargetLanguageBox!.Text.Trim();
+
+                var result = await _threadlineClient.TranscribeAudioAsync(
+                    audioPath, provider: null, language: language, translate: translate);
+
+                _ambientCapture.UpdateTranscript(session, result.Transcript, result.Provider);
+
+                AppendTranscript("Ambient Capture",
+                    $"Transcription complete ({result.Provider}, {result.DurationMs}ms).\n\n{(result.Transcript.Length > 300 ? result.Transcript[..300] + "..." : result.Transcript)}");
+                AddTimeline($"Ambient capture transcribed by {result.Provider}.");
+            }
+            else
+            {
+                AppendTranscript("Ambient Capture", "No audio file available for transcription.");
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendTranscript("Ambient Capture", $"Transcription not available: {ex.Message}\nAudio and metadata are still stored — you can transcribe manually later.");
         }
         finally
         {

@@ -127,3 +127,9 @@ public sealed record PrivacyStatusResponse(
 public sealed record ScreenshotVisionPolicyRequest(string AppKey, string Policy);
 
 public sealed record ScreenshotVisionPolicyEntry(string AppKey, string Policy);
+
+public sealed record TranscribeAudioRequest(
+    string AudioFilePath,
+    string? Provider = null,
+    string? Language = null,
+    bool Translate = false);

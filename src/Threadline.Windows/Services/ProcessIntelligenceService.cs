@@ -58,8 +58,8 @@ public sealed class ProcessIntelligenceService
             new(
                 CaptureMethodKind.ImageExtraction,
                 "Image Extraction",
-                false,
-                "Raw image provider handoff is not implemented yet. Redacted OCR/summary text is sent instead."),
+                true,
+                "Raw screenshots can be saved locally when storage consent is granted and sent to vision-capable models (GPT-4V, Claude) as image attachments."),
             new(
                 CaptureMethodKind.LayoutAnalysis,
                 "Layout Analysis",

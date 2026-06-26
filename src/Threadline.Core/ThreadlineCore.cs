@@ -181,10 +181,15 @@ public sealed class SecretRedactor
 }
 
 public sealed record LlmProviderCapabilities(bool SupportsStreaming, bool SupportsVision, bool SupportsToolUse, int MaxInputTokens = 0);
-public sealed record LlmMessage(string Role, string Content)
+
+public sealed record LlmImageAttachment(byte[] ImageBytes, string MediaType = "image/png");
+
+public sealed record LlmMessage(string Role, string Content, IReadOnlyList<LlmImageAttachment>? ImageAttachments = null)
 {
     public static LlmMessage System(string content) => new("system", content);
     public static LlmMessage User(string content) => new("user", content);
+    public static LlmMessage UserWithImages(string content, IReadOnlyList<LlmImageAttachment> images) => new("user", content, images);
+    public bool HasImages => ImageAttachments is { Count: > 0 };
 }
 public sealed record LlmRequest(string Model, IReadOnlyList<LlmMessage> Messages, double Temperature = 0.2, int? MaxOutputTokens = null, IReadOnlyDictionary<string, string>? Metadata = null);
 public sealed record LlmResponse(string ProviderName, string Model, string Content, IReadOnlyDictionary<string, string>? Metadata = null);

@@ -65,9 +65,9 @@ public sealed class ThreadlineProviderProbeService
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            var llmProvider = new OpenAiCompatibleProvider(
+            var llmProvider = LlmProviderFactory.Create(
                 _httpClientFactory.CreateClient(nameof(ThreadlineProviderProbeService)),
-                new OpenAiCompatibleProviderOptions(provider.ProviderName, provider.BaseUrl!, apiKey, provider.DefaultModel!));
+                provider.ProviderName, provider.BaseUrl!, apiKey, provider.DefaultModel!);
 
             var response = await llmProvider.CompleteAsync(
                 new LlmRequest(

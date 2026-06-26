@@ -262,6 +262,32 @@ public sealed class AmbientCaptureCoordinator : IDisposable
         return needles.Any(needle => value.Contains(needle, StringComparison.OrdinalIgnoreCase));
     }
 
+    public void UpdateTranscript(AmbientCaptureSession session, string transcriptText, string providerName)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("# Ambient Capture Transcript");
+        builder.AppendLine();
+        builder.AppendLine($"Session: {session.Title}");
+        builder.AppendLine($"Started: {session.StartedAt:O}");
+        builder.AppendLine($"Ended: {session.EndedAt:O}");
+        builder.AppendLine();
+        builder.AppendLine("## Transcription");
+        builder.AppendLine();
+        builder.AppendLine($"Transcribed by: {providerName}");
+        builder.AppendLine();
+        builder.AppendLine(transcriptText);
+        builder.AppendLine();
+        builder.AppendLine("## Recorded tracks");
+        builder.AppendLine();
+        if (!string.IsNullOrWhiteSpace(session.MicrophoneAudioPath)) builder.AppendLine($"- Microphone: `{Path.GetFileName(session.MicrophoneAudioPath)}`");
+        if (!string.IsNullOrWhiteSpace(session.SystemAudioPath)) builder.AppendLine($"- System audio loopback: `{Path.GetFileName(session.SystemAudioPath)}`");
+
+        File.WriteAllText(session.TranscriptPath, builder.ToString());
+
+        var handoffContent = BuildHandoff(session, transcriptSummary: transcriptText);
+        File.WriteAllText(session.HandoffPath, handoffContent);
+    }
+
     private static string BuildPendingTranscriptNotice(AmbientCaptureSession session)
     {
         var builder = new StringBuilder();
@@ -273,7 +299,7 @@ public sealed class AmbientCaptureCoordinator : IDisposable
         builder.AppendLine();
         builder.AppendLine("## Transcription status");
         builder.AppendLine();
-        builder.AppendLine("Audio was recorded and stored locally. The pluggable transcription/translation provider is not configured in this build yet, so this transcript is intentionally marked pending rather than pretending speech-to-text has completed.");
+        builder.AppendLine("Transcription is pending. Audio was recorded and stored locally. If a transcription-capable provider (e.g. OpenAI with Whisper) is configured, transcription will be attempted automatically.");
         builder.AppendLine();
         builder.AppendLine("## Recorded tracks");
         builder.AppendLine();
@@ -289,7 +315,7 @@ public sealed class AmbientCaptureCoordinator : IDisposable
         File.WriteAllText(session.HandoffPath, BuildHandoff(session));
     }
 
-    private static string BuildHandoff(AmbientCaptureSession session)
+    private static string BuildHandoff(AmbientCaptureSession session, string? transcriptSummary = null)
     {
         var builder = new StringBuilder();
         builder.AppendLine($"# Handoff: {session.Title}");
@@ -308,9 +334,21 @@ public sealed class AmbientCaptureCoordinator : IDisposable
         builder.AppendLine();
         builder.AppendLine("## Summary");
         builder.AppendLine();
-        builder.AppendLine(session.Status.Equals("Completed", StringComparison.OrdinalIgnoreCase)
-            ? "Recording completed and source audio is stored locally. Transcription and translation are pending provider integration."
-            : "Recording is in progress.");
+        if (!string.IsNullOrWhiteSpace(transcriptSummary))
+        {
+            builder.AppendLine("Transcription completed successfully.");
+            builder.AppendLine();
+            builder.AppendLine("### Transcript excerpt");
+            builder.AppendLine();
+            var excerpt = transcriptSummary.Length > 500 ? transcriptSummary[..500] + "..." : transcriptSummary;
+            builder.AppendLine(excerpt);
+        }
+        else
+        {
+            builder.AppendLine(session.Status.Equals("Completed", StringComparison.OrdinalIgnoreCase)
+                ? "Recording completed and source audio is stored locally. Transcription is pending — a transcription-capable provider (e.g. OpenAI with Whisper) must be configured."
+                : "Recording is in progress.");
+        }
         builder.AppendLine();
         builder.AppendLine("## Share checklist");
         builder.AppendLine();
