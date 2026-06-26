@@ -37,11 +37,14 @@ public sealed class EdgeTriggerWindow
     private const int SemiBoldFontWeight = 600;
     private const uint GetAncestorRoot = 2;
     private const uint GetAncestorRootOwner = 3;
-    private const int EdgeHoverZone = 180;
-    private const int EdgeOuterTolerance = 18;
+    private const int EdgeHoverZone = 48;
+    private const int EdgeOuterTolerance = 12;
     private const int TriggerWidth = 64;
     private const int TriggerHeight = 144;
     private const int TriggerInsetFromEdge = 24;
+    private const int DirectHoverPollMilliseconds = 200;
+    private const int DirectHoverHideGraceMilliseconds = 900;
+    private const int MoveTolerancePixels = 6;
 
     private readonly WndProc _wndProc;
     private readonly string _windowClassName = "ThreadlineNativeEdgeIcon_" + Guid.NewGuid().ToString("N");
@@ -54,6 +57,8 @@ public sealed class EdgeTriggerWindow
     private bool _isPointerInside;
     private bool _isTrackingMouseLeave;
     private bool _showingDirectWindowHover;
+    private int _directWindowHoverEnabled;
+    private DateTimeOffset _lastDirectHoverEligibleAt = DateTimeOffset.MinValue;
     private PointInt32 _lastLocation;
     private SizeInt32 _lastSize;
 
@@ -62,10 +67,10 @@ public sealed class EdgeTriggerWindow
         _wndProc = HandleWindowMessage;
         EnsureWindow();
 
-        // This timer is intentionally self-contained. The MainWindow hover path can fail when a HWND
-        // has not been converted into a ThreadlineTarget yet, but the affordance still needs to appear
-        // beside ordinary open windows as soon as the app/service is running.
-        _windowEdgeHoverTimer = new System.Threading.Timer(_ => SafeUpdateDirectWindowHover(), null, 100, 75);
+        // This timer is intentionally self-contained, but it now stays disabled unless MainWindow
+        // arms it while the sidecar is collapsed. That prevents the AI bubble from appearing over
+        // every app while the main sidecar is already open.
+        _windowEdgeHoverTimer = new System.Threading.Timer(_ => SafeUpdateDirectWindowHover(), null, 250, DirectHoverPollMilliseconds);
     }
 
     public event EventHandler? TriggerRequested;
@@ -73,6 +78,24 @@ public sealed class EdgeTriggerWindow
     public bool IsVisible => _isVisible;
 
     public bool IsPointerInside => _isPointerInside;
+
+    public bool DirectWindowHoverEnabled
+    {
+        get => System.Threading.Volatile.Read(ref _directWindowHoverEnabled) != 0;
+        set
+        {
+            var next = value ? 1 : 0;
+            if (System.Threading.Interlocked.Exchange(ref _directWindowHoverEnabled, next) == next)
+            {
+                return;
+            }
+
+            if (!value)
+            {
+                HideTrigger();
+            }
+        }
+    }
 
     public bool IsCursorWithinReach(int x, int y, int padding)
     {
@@ -115,14 +138,21 @@ public sealed class EdgeTriggerWindow
 
     private void UpdateDirectWindowHover()
     {
+        if (!DirectWindowHoverEnabled)
+        {
+            HideTrigger();
+            return;
+        }
+
         if (_hwnd == nint.Zero || !GetCursorPos(out var cursor))
         {
             HideDirectHoverIfDetached();
             return;
         }
 
-        if (_isPointerInside || IsCursorWithinReach(cursor.X, cursor.Y, 24))
+        if (_isPointerInside || IsCursorWithinReach(cursor.X, cursor.Y, 48))
         {
+            _lastDirectHoverEligibleAt = DateTimeOffset.Now;
             return;
         }
 
@@ -148,6 +178,7 @@ public sealed class EdgeTriggerWindow
             targetRect.Bottom - TriggerHeight - 8);
 
         _showingDirectWindowHover = true;
+        _lastDirectHoverEligibleAt = DateTimeOffset.Now;
         ShowAtCore(new PointInt32(x, y), new SizeInt32(TriggerWidth, TriggerHeight));
     }
 
@@ -222,6 +253,11 @@ public sealed class EdgeTriggerWindow
             return;
         }
 
+        if ((DateTimeOffset.Now - _lastDirectHoverEligibleAt).TotalMilliseconds < DirectHoverHideGraceMilliseconds)
+        {
+            return;
+        }
+
         HideTrigger();
     }
 
@@ -231,13 +267,25 @@ public sealed class EdgeTriggerWindow
         if (_hwnd == nint.Zero) return;
 
         var safeSize = new SizeInt32(Math.Max(48, size.Width), Math.Max(48, size.Height));
-        _lastLocation = location;
-        _lastSize = safeSize;
+        var shouldMove = !_isVisible ||
+                         Math.Abs(_lastLocation.X - location.X) > MoveTolerancePixels ||
+                         Math.Abs(_lastLocation.Y - location.Y) > MoveTolerancePixels ||
+                         _lastSize.Width != safeSize.Width ||
+                         _lastSize.Height != safeSize.Height;
 
-        _ = SetWindowPos(_hwnd, HwndTopmost, location.X, location.Y, safeSize.Width, safeSize.Height, SwpNoActivate | SwpNoOwnerZOrder | SwpShowWindow);
-        _ = ShowWindow(_hwnd, SwShowNoActivate);
-        _isVisible = true;
-        _ = InvalidateRect(_hwnd, nint.Zero, true);
+        if (shouldMove)
+        {
+            _lastLocation = location;
+            _lastSize = safeSize;
+            _ = SetWindowPos(_hwnd, HwndTopmost, location.X, location.Y, safeSize.Width, safeSize.Height, SwpNoActivate | SwpNoOwnerZOrder | SwpShowWindow);
+        }
+
+        if (!_isVisible)
+        {
+            _ = ShowWindow(_hwnd, SwShowNoActivate);
+            _isVisible = true;
+            _ = InvalidateRect(_hwnd, nint.Zero, true);
+        }
     }
 
     private void EnsureWindow()
