@@ -15,13 +15,15 @@ public sealed partial class MainWindow
 
     public void EnsureCollapsedEdgeHandleStartedAfterActivation()
     {
-        StartShuttleTabs();
+        // The main sidecar is the fail-safe. It must become visible before any optional Shuttle
+        // affordance or background window tracking can run.
         OpenSidecarAtStartup();
 
         // Keep a couple of low-priority placement passes after activation so the sidecar wins over
         // startup layout timing without depending on the old hover trigger.
         QueueStartupSidecarReveal();
         QueueStartupSidecarReveal();
+        QueueStartupShuttleTabs();
     }
 
     private void QueueStartupSidecarReveal()
@@ -40,6 +42,30 @@ public sealed partial class MainWindow
         }
     }
 
+    private void QueueStartupShuttleTabs()
+    {
+        try
+        {
+            _ = DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+            {
+                try
+                {
+                    StartShuttleTabs();
+                    AddTimeline("Shuttle tabs armed after the main sidecar became visible.");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[Threadline] Shuttle startup skipped: {ex.GetType().Name}: {ex.Message}");
+                    AddTimeline($"Shuttle tabs skipped at startup: {ex.Message}");
+                }
+            });
+        }
+        catch
+        {
+            // Shuttle tabs are optional. The main sidecar must stay visible even if queueing fails.
+        }
+    }
+
     private void OpenSidecarAtStartup()
     {
         try
@@ -48,13 +74,37 @@ public sealed partial class MainWindow
             _sidecarWindowHiddenForTrigger = false;
             _floatingTriggerTarget = null;
             _edgeTriggerWindow?.HideTrigger();
-            HideAllShuttleTabs();
+        }
+        catch
+        {
+            // Continue into the visibility path even if optional trigger cleanup fails.
+        }
 
+        try
+        {
+            HideAllShuttleTabs();
+        }
+        catch
+        {
+            // Shuttle tabs must never prevent the main sidecar from appearing.
+        }
+
+        try
+        {
             EdgeHandlePanel.Visibility = Visibility.Collapsed;
             ChatShellPanel.Visibility = Visibility.Visible;
+            SetSidecarVisualState();
+        }
+        catch
+        {
+            // Named controls may still be settling during startup. Native window restore below is the fail-safe.
+        }
+
+        try
+        {
             ShowMainSidecarWindow();
             ForceVisibleStartupWindow();
-            AddTimeline("Sidecar opened visibly at startup. Shuttle tabs are available on eligible windows.");
+            AddTimeline("Sidecar opened visibly at startup. Shuttle tabs will arm after startup.");
         }
         catch (Exception ex)
         {
@@ -80,6 +130,6 @@ public sealed partial class MainWindow
 
         appWindow.Resize(new SizeInt32(width, height));
         appWindow.Move(new PointInt32(x, y));
-        _ = SetWindowPos(hwnd, HwndTopmost, x, y, width, height, SetWindowPosNoActivate | SetWindowPosShowWindow);
+        _ = SetWindowPos(hwnd, HwndTopmost, x, y, width, height, SetWindowPosShowWindow);
     }
 }

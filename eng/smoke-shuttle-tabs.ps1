@@ -39,8 +39,60 @@ if ($shuttleManager -notmatch 'DirectWindowHoverEnabled\s*=\s*false') {
   throw 'Smoke failed: old direct hover affordance is not explicitly disabled.'
 }
 
+if ($shuttleManager -match 'Win32Interop' -and $shuttleManager -notmatch 'using Microsoft\.UI;') {
+  throw 'Smoke failed: Shuttle manager uses Win32Interop without importing Microsoft.UI.'
+}
+
+if ($shuttleManager -notmatch 'occludingRects') {
+  throw 'Smoke failed: Shuttle placement is not tracking higher-window occlusion.'
+}
+
+if ($shuttleManager -notmatch 'TryFindUnoccludedShuttleLocation') {
+  throw 'Smoke failed: Shuttle placement does not require an unoccluded edge location.'
+}
+
+if ($shuttleManager -notmatch 'GetRightEdgeAnchoredShuttleX') {
+  throw 'Smoke failed: Shuttle placement is not edge-anchoring the tab X coordinate.'
+}
+
+if ($shuttleManager -notmatch 'ShuttleTabEdgeOverlap') {
+  throw 'Smoke failed: Shuttle placement has no explicit right-edge overlap.'
+}
+
+if ($shuttleManager -notmatch 'targetRect\.Right\s*-\s*ShuttleTabEdgeOverlap') {
+  throw 'Smoke failed: Shuttle preferred placement is not anchored just outside the right edge.'
+}
+
+if ($shuttleManager -notmatch 'targetRect\.Right\s*-\s*ShuttleTabWidth') {
+  throw 'Smoke failed: Shuttle screen-edge fallback is not flush to the right edge.'
+}
+
+if ($shuttleManager -notmatch 'IsAnchoredToRightEdge') {
+  throw 'Smoke failed: Shuttle placement does not verify right-edge anchoring.'
+}
+
+if ($shuttleManager.Contains('targetRect.Right - ShuttleTabWidth - ShuttleTabInset')) {
+  throw 'Smoke failed: Shuttle placement regressed to the old inset-inside-window formula.'
+}
+
+if ($shuttleManager -notmatch 'IsShuttleTargetWindow') {
+  throw 'Smoke failed: Shuttle placement is not filtering real target windows.'
+}
+
+if ($shuttleManager -notmatch 'ShuttleGetWindowLongPtr') {
+  throw 'Smoke failed: Shuttle placement is not checking tool/owned window styles.'
+}
+
+if ($shuttleManager -notmatch 'ShuttleDwmGetWindowAttribute') {
+  throw 'Smoke failed: Shuttle placement is not filtering cloaked windows.'
+}
+
 if ($edgeStartup -notmatch 'StartShuttleTabs\(\)') {
   throw 'Smoke failed: startup is not arming Shuttle tabs.'
+}
+
+if ($edgeStartup -notmatch 'OpenSidecarAtStartup\(\)') {
+  throw 'Smoke failed: startup does not force the sidecar visible first.'
 }
 
 if ($edgeStartup -match 'StartFallbackFloatingTriggerTimer\(\)') {
