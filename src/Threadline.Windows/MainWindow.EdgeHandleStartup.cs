@@ -15,21 +15,13 @@ public sealed partial class MainWindow
 
     public void EnsureCollapsedEdgeHandleStartedAfterActivation()
     {
-        StartFallbackFloatingTriggerTimer();
+        StartShuttleTabs();
         OpenSidecarAtStartup();
 
         // Keep a couple of low-priority placement passes after activation so the sidecar wins over
-        // startup layout timing without depending on the collapsed hover trigger.
+        // startup layout timing without depending on the old hover trigger.
         QueueStartupSidecarReveal();
         QueueStartupSidecarReveal();
-    }
-
-    private void StartFallbackFloatingTriggerTimer()
-    {
-        if (!_edgeHoverTimer.IsEnabled)
-        {
-            StartFloatingEdgeTrigger();
-        }
     }
 
     private void QueueStartupSidecarReveal()
@@ -56,12 +48,13 @@ public sealed partial class MainWindow
             _sidecarWindowHiddenForTrigger = false;
             _floatingTriggerTarget = null;
             _edgeTriggerWindow?.HideTrigger();
+            HideAllShuttleTabs();
 
             EdgeHandlePanel.Visibility = Visibility.Collapsed;
             ChatShellPanel.Visibility = Visibility.Visible;
             ShowMainSidecarWindow();
             ForceVisibleStartupWindow();
-            AddTimeline("Sidecar opened visibly at startup.");
+            AddTimeline("Sidecar opened visibly at startup. Shuttle tabs are available on eligible windows.");
         }
         catch (Exception ex)
         {
