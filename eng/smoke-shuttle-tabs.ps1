@@ -51,6 +51,30 @@ if ($shuttleManager -notmatch 'TryFindUnoccludedShuttleLocation') {
   throw 'Smoke failed: Shuttle placement does not require an unoccluded edge location.'
 }
 
+if ($shuttleManager -notmatch 'GetRightEdgeAnchoredShuttleX') {
+  throw 'Smoke failed: Shuttle placement is not edge-anchoring the tab X coordinate.'
+}
+
+if ($shuttleManager -notmatch 'ShuttleTabEdgeOverlap') {
+  throw 'Smoke failed: Shuttle placement has no explicit right-edge overlap.'
+}
+
+if ($shuttleManager -notmatch 'targetRect\.Right\s*-\s*ShuttleTabEdgeOverlap') {
+  throw 'Smoke failed: Shuttle preferred placement is not anchored just outside the right edge.'
+}
+
+if ($shuttleManager -notmatch 'targetRect\.Right\s*-\s*ShuttleTabWidth') {
+  throw 'Smoke failed: Shuttle screen-edge fallback is not flush to the right edge.'
+}
+
+if ($shuttleManager -notmatch 'IsAnchoredToRightEdge') {
+  throw 'Smoke failed: Shuttle placement does not verify right-edge anchoring.'
+}
+
+if ($shuttleManager -match 'targetRect\.Right\s*-\s*ShuttleTabWidth\s*-') {
+  throw 'Smoke failed: Shuttle placement regressed to floating inside the target window.'
+}
+
 if ($shuttleManager -notmatch 'IsShuttleTargetWindow') {
   throw 'Smoke failed: Shuttle placement is not filtering real target windows.'
 }
