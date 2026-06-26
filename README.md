@@ -56,11 +56,21 @@ Recent completed work includes:
 - guarded local-data clearing;
 - automated service/security tests;
 - Build 23 release-confidence gates, smoke tests, and release validation;
-- screenshot/OCR consent decisions persisted across app restarts via SQLite.
+- screenshot/OCR consent decisions persisted across app restarts via SQLite;
+- real ambient capture transcription via Whisper API;
+- Anthropic/Claude native Messages API adapter with vision support;
+- screenshot retention and image payloads to vision-capable models (GPT-4V, Claude);
+- global hotkey (Ctrl+Shift+Space) to toggle the sidecar from any application;
+- in-app provider testing from the settings panel;
+- transcript export to Markdown file and clipboard;
+- Ctrl+Enter keyboard shortcut to send Ask from the question box;
+- copy last answer button in the composer bar.
 
 Known limitations:
 
 - Ambient capture transcription requires a provider with Whisper-compatible transcription support (e.g. OpenAI). Providers without transcription capability will produce audio and metadata only.
+- Streaming responses from providers are not yet supported; all responses are returned as complete messages.
+- The global hotkey (Ctrl+Shift+Space) requires the hotkey to be available; if another application holds it, registration will fail gracefully with a timeline message.
 - Layout analysis and full visual layout extraction remain future work.
 - Screenshots in this README and docs are illustrative SVG placeholders, not captures of the running application.
 

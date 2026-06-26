@@ -86,6 +86,33 @@ Expected response body:
 
 The Windows sidecar appends the user question and assistant answer as separate transcript messages. Provider/configuration failures return a non-success status with a useful error body so the UI can show a readable failure instead of crashing. Provider calls are audit-logged with metadata such as provider, model, duration, message count, and answer length; secrets and prompt content are not written to audit metadata.
 
+## Transcription
+
+```http
+POST /transcribe
+```
+
+Sends a recorded audio file to the configured provider's Whisper-compatible endpoint for speech-to-text transcription. Used by the ambient capture feature to produce real transcripts from recorded audio.
+
+Request body:
+
+```json
+{
+  "audioFilePath": "C:/Users/.../recording.wav",
+  "providerName": "OpenAI"
+}
+```
+
+Returns the transcription text or an error if the provider is not configured or the file cannot be read.
+
+## Provider testing
+
+```http
+POST /providers/{providerName}/test
+```
+
+Sends a lightweight probe request to the named provider to verify connectivity, authentication, and model availability. Returns a structured result with status, success flag, response detail, model used, and duration.
+
 ## Providers
 
 ```http
@@ -96,6 +123,8 @@ POST /providers/{providerName}/credential
 ```
 
 Provider records store credential references, not raw secrets. Actual secret material must be stored in Windows Credential Manager, DPAPI-protected storage, or an enterprise vault in later phases.
+
+Supported providers: OpenAI (Responses API), Claude/Anthropic (native Messages API), Gemini, DeepSeek, OpenRouter (OpenAI-compatible), and Local (any OpenAI-compatible local endpoint). OpenAI requests with image attachments automatically fall back to the chat completions path for vision support.
 
 ## Adapters
 
@@ -109,13 +138,73 @@ Adapters identify the local component calling the service, such as the Windows s
 
 Adapter registration is in-memory in Phase 3. Durable adapter identity and secure adapter secrets are deferred until the credential/security phase.
 
+## Privacy and consent
+
+```http
+GET /privacy/status
+GET /privacy/exclusions
+POST /privacy/exclusions/apps
+POST /privacy/exclusions/processes
+POST /privacy/exclusions/domains
+POST /privacy/exclusions/uris
+POST /privacy/never-send
+DELETE /privacy/exclusions/{ruleId}
+POST /privacy/retention/apply
+GET /privacy/screenshot-vision-policies
+POST /privacy/screenshot-vision-policies
+DELETE /privacy/screenshot-vision-policies/{appKey}
+DELETE /privacy/local-data
+```
+
+Privacy endpoints manage capture exclusions (which apps, processes, domains, or URIs are never captured), screenshot/OCR vision consent policies (allow/deny per application, persisted across restarts via SQLite), and local data deletion. The `DELETE /privacy/local-data` endpoint performs a full wipe of all locally stored data.
+
+Screenshot/OCR vision policies are persisted in the SQLite privacy store. Each policy records an application key and a decision (Allow or Deny) that survives restarts and reinstalls, ensuring a user's deny decision is never silently reset.
+
+## Work Threads
+
+```http
+GET /work-threads/active
+GET /work-threads
+POST /work-threads
+POST /work-threads/{workThreadId}/resume
+POST /work-threads/{workThreadId}/rename
+POST /work-threads/{workThreadId}/close
+GET /work-threads/{workThreadId}/export
+DELETE /work-threads/{workThreadId}
+GET /work-threads/{workThreadId}/context-events
+POST /work-threads/{workThreadId}/context-events
+GET /work-threads/{workThreadId}/messages
+POST /work-threads/{workThreadId}/messages
+POST /work-threads/{workThreadId}/context-receipts
+POST /work-threads/{workThreadId}/artifacts
+GET /work-threads/{workThreadId}/artifacts
+GET /work-threads/{workThreadId}/artifacts/{artifactId}/history
+GET /work-threads/{workThreadId}/artifacts/{artifactId}/export
+POST /work-threads/{workThreadId}/artifacts/{artifactId}/regenerate
+```
+
+Work Threads provide durable session memory. Context events, conversation messages, context receipts, and artifacts are stored per thread and persist across restarts. Artifacts can be regenerated, exported, and versioned through the history endpoint.
+
+## Doctor and capabilities
+
+```http
+GET /doctor
+GET /capabilities
+GET /actions
+GET /actions/catalog
+POST /actions/{actionId}/run
+```
+
+The doctor endpoint returns readiness status with individual check results. The capabilities endpoint lists what the current configuration supports. The action catalog exposes registered actions (artifact generation, provider test, memory management) that the UI can invoke.
+
 ## Audit
 
 ```http
 GET /audit/recent?sessionId={sessionId}&take=50
+GET /audit/provider-context?sessionId={sessionId}&take=50
 ```
 
-Returns recent audit events. Audit records must not include raw captured content.
+Returns recent audit events. The `provider-context` variant returns audit records specific to provider interactions. Audit records must not include raw captured content.
 
 ## Smoke test
 

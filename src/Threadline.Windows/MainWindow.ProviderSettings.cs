@@ -187,6 +187,12 @@ public sealed partial class MainWindow
         }
     }
 
+    private static string BuildModelsEndpoint(string baseUrl)
+    {
+        var normalized = baseUrl.Trim().TrimEnd('/');
+        return normalized + "/models";
+    }
+
     private sealed record ProviderDefaults(string BaseUrl, string DefaultModel, string Hint);
 
     /// <summary>
@@ -220,7 +226,8 @@ public sealed partial class MainWindow
             using var client = new HttpClient();
             client.Timeout = TimeSpan.FromSeconds(10);
 
-            var request = new HttpRequestMessage(HttpMethod.Get, baseUrl);
+            var testUrl = BuildModelsEndpoint(baseUrl);
+            var request = new HttpRequestMessage(HttpMethod.Get, testUrl);
             if (provider.Equals("Claude", StringComparison.OrdinalIgnoreCase))
             {
                 request.Headers.Add("x-api-key", apiKey);

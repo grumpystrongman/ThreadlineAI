@@ -22,6 +22,7 @@ public sealed partial class MainWindow
         SafeEnsureReadableCheckBoxLabels();
         SafeEnsureFallbackFloatingTriggerVisible();
         StartBrowserExtensionGuidanceTimer();
+        InitializeHotKeyService();
 
         await RunUiActionAsync(EnsureLocalServiceStartedAsync);
         await ShowFirstRunSetupWizardIfNeededAsync();
