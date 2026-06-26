@@ -97,9 +97,9 @@ public sealed class ThreadlineAskService
         var redactedCurrentWindow = string.IsNullOrWhiteSpace(request.CurrentWindow) ? null : _redactor.Redact(request.CurrentWindow);
         var messages = _promptComposer.Compose(new ThreadlinePromptContext(redactedQuestion, redactedCurrentWindow, summary, events));
         var llmRequest = new LlmRequest(providerConnection.DefaultModel, messages, Temperature: 0.2, MaxOutputTokens: DefaultMaxOutputTokens);
-        var provider = new OpenAiCompatibleProvider(
+        var provider = LlmProviderFactory.Create(
             _httpClientFactory.CreateClient(nameof(ThreadlineAskService)),
-            new OpenAiCompatibleProviderOptions(providerConnection.ProviderName, providerConnection.BaseUrl, apiKey, providerConnection.DefaultModel));
+            providerConnection.ProviderName, providerConnection.BaseUrl, apiKey, providerConnection.DefaultModel);
 
         var payloadHash = HashMessages(messages);
         await AppendAuditAsync(

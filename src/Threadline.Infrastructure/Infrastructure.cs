@@ -186,6 +186,24 @@ public sealed class ProviderConnectionService
         _repository.ListProviderConnectionsAsync(cancellationToken);
 }
 
+public static class LlmProviderFactory
+{
+    private static readonly HashSet<string> AnthropicProviderNames = new(StringComparer.OrdinalIgnoreCase) { "Claude", "Anthropic" };
+
+    public static bool IsAnthropicProvider(string providerName) =>
+        AnthropicProviderNames.Contains(providerName);
+
+    public static ILlmProvider Create(HttpClient httpClient, string providerName, string baseUrl, string apiKey, string defaultModel)
+    {
+        if (IsAnthropicProvider(providerName))
+        {
+            return new AnthropicProvider(httpClient, new AnthropicProviderOptions(baseUrl, apiKey, defaultModel));
+        }
+
+        return new OpenAiCompatibleProvider(httpClient, new OpenAiCompatibleProviderOptions(providerName, baseUrl, apiKey, defaultModel));
+    }
+}
+
 public sealed record OpenAiCompatibleProviderOptions(string ProviderName, string BaseUrl, string ApiKey, string DefaultModel);
 
 public sealed class OpenAiCompatibleProvider : ILlmProvider
@@ -322,4 +340,118 @@ public sealed class OpenAiCompatibleProvider : ILlmProvider
     private sealed record ChatMessage([property: JsonPropertyName("role")] string Role, [property: JsonPropertyName("content")] string Content);
     private sealed record ChatCompletionResponse([property: JsonPropertyName("choices")] IReadOnlyList<ChatChoice> Choices);
     private sealed record ChatChoice([property: JsonPropertyName("message")] ChatMessage? Message);
+}
+
+public sealed record AnthropicProviderOptions(string BaseUrl, string ApiKey, string DefaultModel);
+
+public sealed class AnthropicProvider : ILlmProvider
+{
+    private const string AnthropicVersion = "2023-06-01";
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
+    private readonly HttpClient _httpClient;
+    private readonly AnthropicProviderOptions _options;
+
+    public AnthropicProvider(HttpClient httpClient, AnthropicProviderOptions options)
+    {
+        _httpClient = httpClient;
+        _options = options;
+    }
+
+    public string Name => "Claude";
+    public LlmProviderCapabilities Capabilities { get; } = new(false, true, false);
+
+    public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken = default)
+    {
+        var model = string.IsNullOrWhiteSpace(request.Model) ? _options.DefaultModel : request.Model;
+        var (systemPrompt, userMessages) = SeparateSystemPrompt(request.Messages);
+
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, BuildEndpointUri(_options.BaseUrl, "messages"));
+        httpRequest.Headers.Add("x-api-key", _options.ApiKey);
+        httpRequest.Headers.Add("anthropic-version", AnthropicVersion);
+
+        var body = new AnthropicMessagesRequest(
+            model,
+            request.MaxOutputTokens ?? 2200,
+            systemPrompt,
+            userMessages.Select(m => new AnthropicMessage(m.Role, m.Content)).ToArray());
+
+        httpRequest.Content = JsonContent.Create(body, options: JsonOptions);
+
+        using var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<AnthropicMessagesResponse>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Anthropic returned an empty response.");
+
+        var text = ExtractResponseText(payload);
+        return new LlmResponse(Name, payload.Model ?? model, text, new Dictionary<string, string>
+        {
+            ["providerEndpoint"] = "messages",
+            ["stopReason"] = payload.StopReason ?? "unknown"
+        });
+    }
+
+    private static (string? SystemPrompt, IReadOnlyList<LlmMessage> Messages) SeparateSystemPrompt(IReadOnlyList<LlmMessage> messages)
+    {
+        string? systemPrompt = null;
+        var userMessages = new List<LlmMessage>();
+
+        foreach (var message in messages)
+        {
+            if (message.Role.Equals("system", StringComparison.OrdinalIgnoreCase))
+            {
+                systemPrompt = string.IsNullOrWhiteSpace(systemPrompt) ? message.Content : systemPrompt + "\n\n" + message.Content;
+            }
+            else
+            {
+                userMessages.Add(message);
+            }
+        }
+
+        return (systemPrompt, userMessages);
+    }
+
+    private static string ExtractResponseText(AnthropicMessagesResponse payload)
+    {
+        if (payload.Content is null || payload.Content.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var parts = payload.Content
+            .Where(c => c.Type == "text" && !string.IsNullOrWhiteSpace(c.Text))
+            .Select(c => c.Text!);
+
+        return string.Join(Environment.NewLine, parts);
+    }
+
+    private static Uri BuildEndpointUri(string baseUrl, string relativePath)
+    {
+        var normalizedBaseUrl = baseUrl.Trim();
+        if (!normalizedBaseUrl.EndsWith('/', StringComparison.Ordinal))
+        {
+            normalizedBaseUrl += "/";
+        }
+
+        return new Uri(new Uri(normalizedBaseUrl), relativePath);
+    }
+
+    private sealed record AnthropicMessagesRequest(
+        [property: JsonPropertyName("model")] string Model,
+        [property: JsonPropertyName("max_tokens")] int MaxTokens,
+        [property: JsonPropertyName("system")] string? System,
+        [property: JsonPropertyName("messages")] IReadOnlyList<AnthropicMessage> Messages);
+
+    private sealed record AnthropicMessage(
+        [property: JsonPropertyName("role")] string Role,
+        [property: JsonPropertyName("content")] string Content);
+
+    private sealed record AnthropicMessagesResponse(
+        [property: JsonPropertyName("content")] IReadOnlyList<AnthropicContentBlock>? Content,
+        [property: JsonPropertyName("model")] string? Model,
+        [property: JsonPropertyName("stop_reason")] string? StopReason);
+
+    private sealed record AnthropicContentBlock(
+        [property: JsonPropertyName("type")] string Type,
+        [property: JsonPropertyName("text")] string? Text);
 }

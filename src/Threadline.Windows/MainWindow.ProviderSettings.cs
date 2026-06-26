@@ -164,6 +164,7 @@ public sealed partial class MainWindow
     private static ProviderDefaults GetProviderDefaults(string provider) => provider switch
     {
         "OpenAI" => new("https://api.openai.com/v1/", "gpt-4.1-mini", "Paste your OpenAI API key once, then click Save Provider. OpenAI calls use the Responses API while the key stays in local Threadline secret storage."),
+        "Claude" => new("https://api.anthropic.com/v1/", "claude-sonnet-4-20250514", "Paste your Anthropic API key once, then click Save Provider. Claude uses the Anthropic Messages API natively."),
         "Gemini" => new("https://generativelanguage.googleapis.com/v1beta/openai/", "gemini-1.5-flash", "Use Gemini's OpenAI-compatible endpoint when available for your key/project."),
         "DeepSeek" => new("https://api.deepseek.com/v1/", "deepseek-chat", "DeepSeek is OpenAI-compatible. Paste the API key once, then save."),
         "OpenRouter" => new("https://openrouter.ai/api/v1/", "openai/gpt-4o-mini", "OpenRouter is OpenAI-compatible. Pick a model your OpenRouter account can access."),
@@ -220,7 +221,12 @@ public sealed partial class MainWindow
             client.Timeout = TimeSpan.FromSeconds(10);
 
             var request = new HttpRequestMessage(HttpMethod.Get, baseUrl);
-            if (!IsLocalProvider(provider))
+            if (provider.Equals("Claude", StringComparison.OrdinalIgnoreCase))
+            {
+                request.Headers.Add("x-api-key", apiKey);
+                request.Headers.Add("anthropic-version", "2023-06-01");
+            }
+            else if (!IsLocalProvider(provider))
             {
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
             }
