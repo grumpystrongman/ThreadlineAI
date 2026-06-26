@@ -92,7 +92,7 @@ public sealed class EdgeTriggerWindow
 
             if (!value)
             {
-                HideTrigger();
+                HideDirectHover();
             }
         }
     }
@@ -124,6 +124,16 @@ public sealed class EdgeTriggerWindow
         _showingDirectWindowHover = false;
     }
 
+    private void HideDirectHover()
+    {
+        if (!_showingDirectWindowHover)
+        {
+            return;
+        }
+
+        HideTrigger();
+    }
+
     private void SafeUpdateDirectWindowHover()
     {
         try
@@ -140,7 +150,7 @@ public sealed class EdgeTriggerWindow
     {
         if (!DirectWindowHoverEnabled)
         {
-            HideTrigger();
+            HideDirectHover();
             return;
         }
 
