@@ -383,6 +383,34 @@ public static class ThreadlineEndpointMappings
             return Results.Ok(updated);
         });
 
+        api.MapPost("/transcribe", async (TranscribeAudioRequest request, ThreadlineTranscriptionService transcription, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.AudioFilePath))
+            {
+                return Results.BadRequest(new { error = "audioFilePath is required." });
+            }
+
+            try
+            {
+                var result = await transcription.TranscribeAsync(
+                    new TranscriptionRequest(request.AudioFilePath, request.Provider, request.Language, request.Translate),
+                    ct);
+
+                return Results.Ok(new
+                {
+                    transcript = result.Transcript,
+                    provider = result.Provider,
+                    language = result.Language,
+                    durationMs = result.DurationMs,
+                    metadata = result.Metadata
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+        });
+
         return app;
     }
 

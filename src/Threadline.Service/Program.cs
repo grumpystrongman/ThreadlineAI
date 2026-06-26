@@ -72,6 +72,7 @@ builder.Services.AddSingleton<WindowAttachmentService>();
 builder.Services.AddSingleton<PromptComposer>();
 builder.Services.AddSingleton<ThreadlineAskService>();
 builder.Services.AddSingleton<ThreadlineProviderProbeService>();
+builder.Services.AddSingleton<ThreadlineTranscriptionService>();
 builder.Services.AddSingleton<ThreadlineActionExecutionService>();
 builder.Services.AddSingleton<ThreadlineDoctorService>();
 builder.Services.AddSingleton<ThreadlineCommercialLifecycleService>();

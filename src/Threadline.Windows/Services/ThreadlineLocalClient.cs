@@ -228,6 +228,12 @@ public sealed class ThreadlineLocalClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
+    public async Task<TranscriptionResultDto> TranscribeAudioAsync(string audioFilePath, string? provider = null, string? language = null, bool translate = false, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync("transcribe", new { audioFilePath, provider, language, translate }, _jsonOptions, cancellationToken);
+        return await ReadRequiredAsync<TranscriptionResultDto>(response, cancellationToken);
+    }
+
     private async Task<T> ReadRequiredAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         await EnsureSuccessAsync(response, cancellationToken);
@@ -274,3 +280,4 @@ public sealed record LlmMessageDto(string Role, string Content);
 public sealed record AskResponseDto(string Answer, IReadOnlyList<LlmMessageDto>? Messages);
 public sealed record WindowActionDto(string Id, string SessionId, string? AttachmentId, string Kind, string Description, string Payload, string Risk, string Status, bool RequiresApproval, string? ResultMessage);
 public sealed record ScreenshotVisionPolicyDto(string AppKey, string Policy);
+public sealed record TranscriptionResultDto(string Transcript, string Provider, string? Language, long DurationMs, IReadOnlyDictionary<string, string>? Metadata);
