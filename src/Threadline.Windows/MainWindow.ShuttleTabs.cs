@@ -15,7 +15,7 @@ public sealed partial class MainWindow
     private const int ShuttleTabHeight = 72;
     private const int ShuttleTabMinimumWindowWidth = 240;
     private const int ShuttleTabMinimumWindowHeight = 160;
-    private const int ShuttleTabMaximumVisibleWindows = 8;
+    private const int ShuttleTabMaximumVisibleWindows = 16;
     private const int ShuttleTabVerticalMargin = 24;
     private const int ShuttleTabVerticalSearchStep = 28;
     private const int ShuttleTabEdgeOverlap = 4;
@@ -148,13 +148,9 @@ public sealed partial class MainWindow
             }
 
             var snapshot = GetUsableWindowSnapshot(handle);
-            if (snapshot is not null && IsShuttleTargetWindow(handle, snapshot, rect))
+            if (snapshot is not null && IsShuttleTargetWindow(handle, snapshot, rect) && TryFindUnoccludedShuttleLocation(handle, rect, occludingRects, out var location))
             {
-                var target = CreateWindowTarget(snapshot);
-                if (ShouldShowShuttleForTarget(target) && TryFindUnoccludedShuttleLocation(handle, rect, occludingRects, out var location))
-                {
-                    placements.Add(new ShuttleTabPlacement(target, location));
-                }
+                placements.Add(new ShuttleTabPlacement(CreateWindowTarget(snapshot), location));
             }
 
             AddOccludingRect(occludingRects, rect);
@@ -162,13 +158,6 @@ public sealed partial class MainWindow
         }, nint.Zero);
 
         return placements;
-    }
-
-    private bool ShouldShowShuttleForTarget(ThreadlineTarget candidate)
-    {
-        return _sidecarCollapsedToHandle ||
-               _sidecarWindowHiddenForTrigger ||
-               !string.Equals(candidate.Id, _attachedSidecarTargetId, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsShuttleTargetWindow(nint handle, ActiveWindowSnapshot snapshot, NativeRect rect)
@@ -246,12 +235,13 @@ public sealed partial class MainWindow
                 Bottom = y + ShuttleTabHeight
             };
 
+            var edgeProbeRect = GetRightEdgeProbeRect(targetRect, y);
             if (!IsAnchoredToRightEdge(shuttleRect, targetRect))
             {
                 continue;
             }
 
-            if (!IsCoveredByHigherWindow(shuttleRect, occludingRects))
+            if (!IsCoveredByHigherWindow(edgeProbeRect, occludingRects) && !IsCoveredByHigherWindow(shuttleRect, occludingRects))
             {
                 location = new PointInt32(x, y);
                 return true;
@@ -260,6 +250,24 @@ public sealed partial class MainWindow
 
         location = default;
         return false;
+    }
+
+    private static NativeRect GetRightEdgeProbeRect(NativeRect targetRect, int shuttleTop)
+    {
+        var top = Math.Max(targetRect.Top, shuttleTop);
+        var bottom = Math.Min(targetRect.Bottom, shuttleTop + ShuttleTabHeight);
+        if (bottom <= top)
+        {
+            bottom = Math.Min(targetRect.Bottom, top + 1);
+        }
+
+        return new NativeRect
+        {
+            Left = targetRect.Right - ShuttleTabEdgeOverlap,
+            Top = top,
+            Right = targetRect.Right,
+            Bottom = bottom
+        };
     }
 
     private static int GetRightEdgeAnchoredShuttleX(NativeRect targetRect, RectInt32 workArea)
