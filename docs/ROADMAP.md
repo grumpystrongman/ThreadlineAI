@@ -21,34 +21,42 @@
 - Rolling summary.
 - Secure credential storage.
 
-## v0.3 Release-candidate cleanup (this pass)
+## v0.3 Release-candidate cleanup (complete)
 
 Completed in this pass:
 
 - Removed placeholder behavior that misleads users: ambient capture stop message no longer claims a transcript was saved when only audio/manifest/handoff are produced.
 - Removed hardcoded version-leaking strings from process intelligence diagnostics.
 - Removed empty-payload fallback that sent fake "placeholder" text to the service.
-- Removed Claude from selectable provider list (no Anthropic adapter exists); all remaining providers (OpenAI, Gemini, DeepSeek, OpenRouter, Local) execute end-to-end via the OpenAI-compatible path.
 - Screenshot/OCR consent allow/deny decisions now persist across app restarts via SQLite PrivacySettings table.
 - README and PRODUCT_OVERVIEW reconciled with actual capabilities; SVG screenshots clearly labeled as illustrative placeholders.
 - Known limitations documented honestly in README, PRODUCT_OVERVIEW, and this roadmap.
 
+## v0.4 Feature completion (this pass)
+
+Completed in this pass:
+
+- Ambient capture real transcription via Whisper API: TranscriptionService connects to OpenAI-compatible providers, POST /transcribe endpoint, automatic transcription on capture stop with transcript.md and handoff.md generation.
+- Anthropic/Claude provider adapter: native Messages API implementation with system prompt extraction, proper content block serialization, and x-api-key authentication. Claude re-added to selectable providers with correct defaults.
+- Raw screenshot retention: consent-gated PNG storage to %LOCALAPPDATA%/ThreadlineAI/screenshots/ with timestamp and process name.
+- Vision model image support: LlmImageAttachment added to LlmMessage, OpenAI provider sends data URI content arrays, Anthropic provider sends base64 image source blocks. Both providers report SupportsVision=true.
+- Image extraction capability updated from not-implemented to implemented in process intelligence diagnostics.
+- All six providers (OpenAI, Gemini, DeepSeek, OpenRouter, Local, Claude) execute end-to-end.
+- Documentation updated to reflect new capabilities honestly.
+
 Known limitations remaining after this pass:
 
-- Ambient capture records audio and metadata but does not produce a real transcript (no speech-to-text integration yet).
-- Anthropic/Claude provider requires a dedicated adapter before it can be offered.
-- Screenshot/OCR vision extracts text via Windows OCR but does not retain raw screenshots or send images directly to vision-capable models.
+- Ambient capture transcription requires a provider with Whisper-compatible support (e.g. OpenAI). Non-transcription providers produce audio and metadata only.
+- Layout analysis and full visual layout extraction remain future work.
 - Screenshots in README/docs are illustrative SVG placeholders, not captures of the running application.
 - Signing requires a real certificate (`THREADLINE_SIGN_CERT_SHA1`).
 
-## v1.0 Enterprise-ready beta (out of scope for v0.3)
+## v1.0 Enterprise-ready beta (out of scope for v0.4)
 
 - Admin policy controls.
 - Enterprise SSO.
 - Audit logs.
 - Local-only/private mode.
 - Signed installer and auto-update channel.
-- Anthropic/Claude provider adapter.
-- Real transcript from ambient capture (speech-to-text).
 - Real screenshots from signed Windows build.
-- Raw screenshot retention and direct vision-model image submission.
+- Full visual layout analysis.

@@ -14,7 +14,7 @@ ThreadlineAI is a context-aware desktop companion made of:
 - an **ASP.NET Core local service** that acts as the context broker, provider bridge, health endpoint, and workflow API;
 - a **SQLite-backed local memory layer** for sessions, approved context events, Work Threads, receipts, and artifacts;
 - **context adapters** for Chrome/Edge, PowerShell, active windows, UI Automation, and file-backed document paths;
-- a **provider abstraction** for OpenAI-compatible provider execution (OpenAI, Gemini, DeepSeek, OpenRouter, Local);
+- a **provider abstraction** for OpenAI-compatible and Anthropic provider execution (OpenAI, Gemini, DeepSeek, OpenRouter, Local, Claude);
 - **privacy-first controls** that make capture visible, previewable, pausable, and auditable.
 
 The product direction is not invisible automation. ThreadlineAI should help users understand what context is being used, what is missing, and what is safe to send to a provider.
@@ -60,9 +60,8 @@ Recent completed work includes:
 
 Known limitations:
 
-- Ambient capture records audio and metadata but does not yet produce a real transcript.
-- Only OpenAI-compatible providers are supported (OpenAI, Gemini, DeepSeek, OpenRouter, Local). Anthropic/Claude is not yet available — no adapter exists.
-- Screenshot/OCR vision is consent-gated and extracts text via OCR, but raw screenshot retention and direct vision-model image submission are not yet implemented.
+- Ambient capture transcription requires a provider with Whisper-compatible transcription support (e.g. OpenAI). Providers without transcription capability will produce audio and metadata only.
+- Layout analysis and full visual layout extraction remain future work.
 - Screenshots in this README and docs are illustrative SVG placeholders, not captures of the running application.
 
 Honest boundary: this is not yet a finished general-availability enterprise SKU. It is a serious Windows product foundation with real commercial direction and enough structure to test, evaluate, harden, and package.
@@ -104,7 +103,7 @@ Context sources include:
 
 ### Provider-backed Ask
 
-Ask requests route through the local service and configured provider path. All supported providers use the OpenAI-compatible API path.
+Ask requests route through the local service and configured provider path. Supported providers include OpenAI-compatible endpoints (OpenAI, Gemini, DeepSeek, OpenRouter, Local) and Anthropic/Claude with native Messages API support.
 
 The Ask path supports:
 

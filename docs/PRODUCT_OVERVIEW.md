@@ -58,11 +58,11 @@ Supported context paths include:
 
 ### Provider-backed Ask
 
-ThreadlineAI routes Ask through the local service and configured provider connection. All supported providers (OpenAI, Gemini, DeepSeek, OpenRouter, Local) use the OpenAI-compatible API path.
+ThreadlineAI routes Ask through the local service and configured provider connection. Supported providers include OpenAI-compatible endpoints (OpenAI, Gemini, DeepSeek, OpenRouter, Local) and Anthropic/Claude with native Messages API support.
 
 The Ask path supports:
 
-- OpenAI-compatible provider execution;
+- OpenAI-compatible and Anthropic provider execution;
 - local provider credentials stored through secure local secret references;
 - provider testing;
 - provider success/failure audit events without storing prompt content or secrets.
@@ -172,7 +172,7 @@ Try ThreadlineAI if you want to evaluate a different interaction model for AI at
 - **Context-aware by design** — it starts from the app, tab, document, or workflow the user is actually working in.
 - **Visible and auditable** — it shows context state and can produce context receipts.
 - **Local-first** — the service, storage, diagnostics, and provider bridge are built around local control.
-- **Provider-flexible** — the provider layer supports OpenAI-compatible providers (OpenAI, Gemini, DeepSeek, OpenRouter, Local). Anthropic/Claude is not yet supported.
+- **Provider-flexible** — the provider layer supports OpenAI-compatible providers (OpenAI, Gemini, DeepSeek, OpenRouter, Local) and Anthropic/Claude with native Messages API.
 - **Workflow-oriented** — summaries, handoffs, decisions, risks, and next actions are first-class outputs.
 - **Commercially shaped** — installer, service lifecycle, diagnostics, clear-data, tests, smoke scripts, and release gates are present.
 
@@ -198,9 +198,8 @@ ThreadlineAI is still an actively developing product. It is not yet a polished g
 
 Known limitations:
 
-- Ambient capture records audio and metadata but does not yet produce a real transcript.
-- Only OpenAI-compatible providers are supported. Anthropic/Claude is not available — no adapter exists.
-- Screenshot/OCR vision extracts text via OCR but does not yet retain raw screenshots or send images directly to vision-capable models.
+- Ambient capture transcription requires a provider with Whisper-compatible transcription support (e.g. OpenAI). Providers without transcription capability will produce audio and metadata only.
+- Layout analysis and full visual layout extraction remain future work.
 - Screenshots in the README and docs are illustrative SVG placeholders.
 
 The strongest thing about the product is the shape: context-aware Windows sidecar, local service, visible trust controls, provider flexibility, durable Work Thread memory, and artifact outputs. That is enough to make it worth testing, refining, and packaging properly.
