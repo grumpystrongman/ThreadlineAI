@@ -12,12 +12,16 @@ public sealed partial class MainWindow
     private const int StartupSidecarWidth = 430;
     private const int StartupSidecarHeight = 760;
     private const int StartupSidecarMargin = 24;
+    private const int StartupVisibilityWatchdogAttempts = 8;
+    private static readonly TimeSpan StartupVisibilityWatchdogInterval = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan StartupShuttleDelay = TimeSpan.FromMilliseconds(2400);
 
     public void EnsureCollapsedEdgeHandleStartedAfterActivation()
     {
         // The main sidecar is the fail-safe. It must become visible before any optional Shuttle
         // affordance or background window tracking can run.
         OpenSidecarAtStartup();
+        StartStartupVisibilityWatchdog();
 
         // Keep a couple of low-priority placement passes after activation so the sidecar wins over
         // startup layout timing without depending on the old hover trigger.
@@ -42,12 +46,37 @@ public sealed partial class MainWindow
         }
     }
 
+    private void StartStartupVisibilityWatchdog()
+    {
+        try
+        {
+            var attempts = 0;
+            var timer = new DispatcherTimer { Interval = StartupVisibilityWatchdogInterval };
+            timer.Tick += (_, _) =>
+            {
+                attempts++;
+                OpenSidecarAtStartup();
+                if (attempts >= StartupVisibilityWatchdogAttempts)
+                {
+                    timer.Stop();
+                }
+            };
+            timer.Start();
+        }
+        catch
+        {
+            // The direct startup open already ran. Do not fail launch if the watchdog cannot start.
+        }
+    }
+
     private void QueueStartupShuttleTabs()
     {
         try
         {
-            _ = DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+            var timer = new DispatcherTimer { Interval = StartupShuttleDelay };
+            timer.Tick += (_, _) =>
             {
+                timer.Stop();
                 try
                 {
                     StartShuttleTabs();
@@ -58,7 +87,8 @@ public sealed partial class MainWindow
                     System.Diagnostics.Debug.WriteLine($"[Threadline] Shuttle startup skipped: {ex.GetType().Name}: {ex.Message}");
                     AddTimeline($"Shuttle tabs skipped at startup: {ex.Message}");
                 }
-            });
+            };
+            timer.Start();
         }
         catch
         {
