@@ -57,8 +57,7 @@ public sealed class ScreenshotVisionContextProvider
 
         var warnings = new List<string>
         {
-            "Screenshot/OCR/vision ran only because one-time user approval and app policy allowed this capture.",
-            "Raw screenshot bytes are kept in memory only unless raw screenshot storage is explicitly enabled."
+            "Screenshot/OCR/vision ran only because one-time user approval and app policy allowed this capture."
         };
 
         if (!TryGetWindowRegion(target.Window.Handle, out var region, out var regionWarning))
@@ -87,16 +86,28 @@ public sealed class ScreenshotVisionContextProvider
             warnings.Add($"Redaction before provider handoff replaced {redacted.RedactionCount.ToString(System.Globalization.CultureInfo.InvariantCulture)} sensitive-looking value(s): {string.Join(", ", redacted.Categories)}.");
         }
 
+        bool rawStored = false;
+        string? rawPath = null;
+
         if (!consent.RawScreenshotStorageAllowed)
         {
             Array.Clear(screenshotPngBytes, 0, screenshotPngBytes.Length);
         }
         else
         {
-            warnings.Add("Raw screenshot storage was approved by consent, but persistent image storage is not implemented in this build; image bytes were not written to disk.");
+            try
+            {
+                rawPath = SaveRawScreenshot(screenshotPngBytes, target);
+                rawStored = true;
+                warnings.Add($"Raw screenshot saved to local storage: {Path.GetFileName(rawPath)}");
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                warnings.Add($"Raw screenshot storage failed: {ex.Message}. Image bytes remain in memory only for this request.");
+            }
         }
 
-        var visionSummary = BuildVisionSummary(target, redacted.Text, region, warnings);
+        var visionSummary = BuildVisionSummary(target, redacted.Text, region, warnings, rawStored);
         var confidence = string.IsNullOrWhiteSpace(redacted.Text)
             ? ContextConfidence.Low
             : ContextConfidence.Medium;
@@ -109,8 +120,8 @@ public sealed class ScreenshotVisionContextProvider
             redacted.RedactionCount,
             redacted.Categories,
             region,
-            false,
-            null,
+            rawStored,
+            rawPath,
             confidence,
             warnings);
     }
@@ -168,12 +179,41 @@ public sealed class ScreenshotVisionContextProvider
         return Truncate(text);
     }
 
-    private static string BuildVisionSummary(ThreadlineTarget target, string redactedOcrText, ScreenshotRegion region, IReadOnlyList<string> warnings)
+    private static string SaveRawScreenshot(byte[] pngBytes, ThreadlineTarget target)
+    {
+        var root = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "ThreadlineAI",
+            "screenshots");
+        Directory.CreateDirectory(root);
+
+        var processName = string.IsNullOrWhiteSpace(target.Window.ProcessName)
+            ? "unknown"
+            : SanitizeFileName(target.Window.ProcessName);
+        var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss-fff", System.Globalization.CultureInfo.InvariantCulture);
+        var fileName = $"{timestamp}_{processName}.png";
+        var filePath = Path.Combine(root, fileName);
+
+        File.WriteAllBytes(filePath, pngBytes);
+        return filePath;
+    }
+
+    private static string SanitizeFileName(string name)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var sanitized = new string(name.Where(c => !invalid.Contains(c)).ToArray());
+        return string.IsNullOrWhiteSpace(sanitized) ? "unknown" : sanitized;
+    }
+
+    private static string BuildVisionSummary(ThreadlineTarget target, string redactedOcrText, ScreenshotRegion region, IReadOnlyList<string> warnings, bool rawScreenshotStored = false)
     {
         var targetTitle = string.IsNullOrWhiteSpace(target.Title) ? "the attached window" : target.Title;
         if (string.IsNullOrWhiteSpace(redactedOcrText))
         {
-            return $"Threadline captured an approved screenshot region for '{targetTitle}' ({region.ToDisplayText()}) and attempted OCR, but no readable text was detected. The raw image was not stored or sent as an image provider payload.";
+            var storageNote = rawScreenshotStored
+                ? "The raw screenshot was saved locally and can be sent to vision-capable models."
+                : "The raw image was not stored or sent as an image provider payload.";
+            return $"Threadline captured an approved screenshot region for '{targetTitle}' ({region.ToDisplayText()}) and attempted OCR, but no readable text was detected. {storageNote}";
         }
 
         var cleanedLines = redactedOcrText
@@ -188,7 +228,10 @@ public sealed class ScreenshotVisionContextProvider
         }
 
         var warningHint = warnings.Count == 0 ? string.Empty : $" Warnings: {warnings.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)}.";
-        return $"Threadline captured an approved screenshot region for '{targetTitle}' ({region.ToDisplayText()}), extracted visible OCR text, redacted sensitive-looking values before prompt handoff, and did not store the raw screenshot. The visible content appears to focus on: {joined}{warningHint}";
+        var rawNote = rawScreenshotStored
+            ? "The raw screenshot was saved locally and can be sent to vision-capable models."
+            : "The raw screenshot was not stored.";
+        return $"Threadline captured an approved screenshot region for '{targetTitle}' ({region.ToDisplayText()}), extracted visible OCR text, and redacted sensitive-looking values before prompt handoff. {rawNote} The visible content appears to focus on: {joined}{warningHint}";
     }
 
     private static bool TryGetWindowRegion(nint handle, out ScreenshotRegion region, out string? warning)

@@ -213,7 +213,7 @@ public sealed class OpenAiCompatibleProvider : ILlmProvider
     private readonly OpenAiCompatibleProviderOptions _options;
     public OpenAiCompatibleProvider(HttpClient httpClient, OpenAiCompatibleProviderOptions options) { _httpClient = httpClient; _options = options; }
     public string Name => _options.ProviderName;
-    public LlmProviderCapabilities Capabilities { get; } = new(false, false, false);
+    public LlmProviderCapabilities Capabilities { get; } = new(false, true, false);
 
     public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken = default)
     {
@@ -238,13 +238,14 @@ public sealed class OpenAiCompatibleProvider : ILlmProvider
     private async Task<LlmResponse> CompleteWithChatCompletionsAsync(LlmRequest request, string model, CancellationToken cancellationToken)
     {
         using var message = CreateProviderRequest("chat/completions");
-        message.Content = JsonContent.Create(new ChatCompletionRequest(model, request.Messages.Select(m => new ChatMessage(m.Role, m.Content)).ToArray(), request.Temperature, request.MaxOutputTokens), options: JsonOptions);
+        var chatMessages = request.Messages.Select(BuildChatMessage).ToArray();
+        message.Content = JsonContent.Create(new ChatCompletionRequest(model, chatMessages, request.Temperature, request.MaxOutputTokens), options: JsonOptions);
 
         using var response = await _httpClient.SendAsync(message, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var payload = await response.Content.ReadFromJsonAsync<ChatCompletionResponse>(cancellationToken: cancellationToken) ?? throw new InvalidOperationException("Provider returned an empty response.");
-        return new LlmResponse(Name, model, payload.Choices.FirstOrDefault()?.Message?.Content ?? string.Empty, new Dictionary<string, string> { ["providerEndpoint"] = "chat/completions" });
+        return new LlmResponse(Name, model, payload.Choices.FirstOrDefault()?.Message?.ContentText ?? string.Empty, new Dictionary<string, string> { ["providerEndpoint"] = "chat/completions" });
     }
 
     private HttpRequestMessage CreateProviderRequest(string relativePath)
@@ -336,8 +337,62 @@ public sealed class OpenAiCompatibleProvider : ILlmProvider
     private sealed record ResponsesOutputItem([property: JsonPropertyName("content")] IReadOnlyList<ResponsesContentItem>? Content);
     private sealed record ResponsesContentItem([property: JsonPropertyName("text")] string? Text);
 
+    private static ChatMessage BuildChatMessage(LlmMessage m)
+    {
+        if (!m.HasImages)
+            return new ChatMessage(m.Role, new ChatContentValue(m.Content));
+
+        var parts = new List<object>();
+        parts.Add(new ChatContentTextPart("text", m.Content));
+        foreach (var img in m.ImageAttachments!)
+        {
+            var dataUri = $"data:{img.MediaType};base64,{Convert.ToBase64String(img.ImageBytes)}";
+            parts.Add(new ChatContentImagePart("image_url", new ChatImageUrl(dataUri)));
+        }
+        return new ChatMessage(m.Role, new ChatContentValue(parts));
+    }
+
     private sealed record ChatCompletionRequest([property: JsonPropertyName("model")] string Model, [property: JsonPropertyName("messages")] IReadOnlyList<ChatMessage> Messages, [property: JsonPropertyName("temperature")] double Temperature, [property: JsonPropertyName("max_tokens")] int? MaxTokens);
-    private sealed record ChatMessage([property: JsonPropertyName("role")] string Role, [property: JsonPropertyName("content")] string Content);
+
+    /// Content can be a string or an array of content parts for vision.
+    [JsonConverter(typeof(ChatContentValueConverter))]
+    private readonly record struct ChatContentValue
+    {
+        public string? StringValue { get; }
+        public IReadOnlyList<object>? ArrayValue { get; }
+        public ChatContentValue(string s) { StringValue = s; ArrayValue = null; }
+        public ChatContentValue(IReadOnlyList<object> a) { StringValue = null; ArrayValue = a; }
+    }
+
+    private sealed class ChatContentValueConverter : JsonConverter<ChatContentValue>
+    {
+        public override ChatContentValue Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.String)
+                return new ChatContentValue(reader.GetString()!);
+            // For reading responses, we only need strings
+            using var doc = JsonDocument.ParseValue(ref reader);
+            return new ChatContentValue(doc.RootElement.GetRawText());
+        }
+
+        public override void Write(Utf8JsonWriter writer, ChatContentValue value, JsonSerializerOptions options)
+        {
+            if (value.ArrayValue is not null)
+                JsonSerializer.Serialize(writer, value.ArrayValue, options);
+            else
+                writer.WriteStringValue(value.StringValue ?? string.Empty);
+        }
+    }
+
+    private sealed record ChatMessage([property: JsonPropertyName("role")] string Role, [property: JsonPropertyName("content")] ChatContentValue Content)
+    {
+        // For deserialization from responses where content is always a string
+        [JsonIgnore]
+        public string ContentText => Content.StringValue ?? string.Empty;
+    }
+    private sealed record ChatContentTextPart([property: JsonPropertyName("type")] string Type, [property: JsonPropertyName("text")] string Text);
+    private sealed record ChatContentImagePart([property: JsonPropertyName("type")] string Type, [property: JsonPropertyName("image_url")] ChatImageUrl ImageUrl);
+    private sealed record ChatImageUrl([property: JsonPropertyName("url")] string Url);
     private sealed record ChatCompletionResponse([property: JsonPropertyName("choices")] IReadOnlyList<ChatChoice> Choices);
     private sealed record ChatChoice([property: JsonPropertyName("message")] ChatMessage? Message);
 }
@@ -373,7 +428,7 @@ public sealed class AnthropicProvider : ILlmProvider
             model,
             request.MaxOutputTokens ?? 2200,
             systemPrompt,
-            userMessages.Select(m => new AnthropicMessage(m.Role, m.Content)).ToArray());
+            userMessages.Select(BuildAnthropicMessage).ToArray());
 
         httpRequest.Content = JsonContent.Create(body, options: JsonOptions);
 
@@ -420,7 +475,8 @@ public sealed class AnthropicProvider : ILlmProvider
 
         var parts = payload.Content
             .Where(c => c.Type == "text" && !string.IsNullOrWhiteSpace(c.Text))
-            .Select(c => c.Text!);
+            .Select(c => c.Text!)
+            .ToList();
 
         return string.Join(Environment.NewLine, parts);
     }
@@ -436,22 +492,78 @@ public sealed class AnthropicProvider : ILlmProvider
         return new Uri(new Uri(normalizedBaseUrl), relativePath);
     }
 
+    private static AnthropicMessage BuildAnthropicMessage(LlmMessage m)
+    {
+        if (!m.HasImages)
+            return new AnthropicMessage(m.Role, new AnthropicContentValue(m.Content));
+
+        var parts = new List<object>();
+        foreach (var img in m.ImageAttachments!)
+        {
+            var b64 = Convert.ToBase64String(img.ImageBytes);
+            parts.Add(new AnthropicImageContentBlock("image", new AnthropicImageSource("base64", img.MediaType, b64)));
+        }
+        parts.Add(new AnthropicTextContentBlock("text", m.Content));
+        return new AnthropicMessage(m.Role, new AnthropicContentValue(parts));
+    }
+
     private sealed record AnthropicMessagesRequest(
         [property: JsonPropertyName("model")] string Model,
         [property: JsonPropertyName("max_tokens")] int MaxTokens,
         [property: JsonPropertyName("system")] string? System,
         [property: JsonPropertyName("messages")] IReadOnlyList<AnthropicMessage> Messages);
 
+    [JsonConverter(typeof(AnthropicContentValueConverter))]
+    private readonly record struct AnthropicContentValue
+    {
+        public string? StringValue { get; }
+        public IReadOnlyList<object>? ArrayValue { get; }
+        public AnthropicContentValue(string s) { StringValue = s; ArrayValue = null; }
+        public AnthropicContentValue(IReadOnlyList<object> a) { StringValue = null; ArrayValue = a; }
+    }
+
+    private sealed class AnthropicContentValueConverter : JsonConverter<AnthropicContentValue>
+    {
+        public override AnthropicContentValue Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.String)
+                return new AnthropicContentValue(reader.GetString()!);
+            using var doc = JsonDocument.ParseValue(ref reader);
+            return new AnthropicContentValue(doc.RootElement.GetRawText());
+        }
+
+        public override void Write(Utf8JsonWriter writer, AnthropicContentValue value, JsonSerializerOptions options)
+        {
+            if (value.ArrayValue is not null)
+                JsonSerializer.Serialize(writer, value.ArrayValue, options);
+            else
+                writer.WriteStringValue(value.StringValue ?? string.Empty);
+        }
+    }
+
     private sealed record AnthropicMessage(
         [property: JsonPropertyName("role")] string Role,
-        [property: JsonPropertyName("content")] string Content);
+        [property: JsonPropertyName("content")] AnthropicContentValue Content);
+
+    private sealed record AnthropicTextContentBlock(
+        [property: JsonPropertyName("type")] string Type,
+        [property: JsonPropertyName("text")] string Text);
+
+    private sealed record AnthropicImageContentBlock(
+        [property: JsonPropertyName("type")] string Type,
+        [property: JsonPropertyName("source")] AnthropicImageSource Source);
+
+    private sealed record AnthropicImageSource(
+        [property: JsonPropertyName("type")] string Type,
+        [property: JsonPropertyName("media_type")] string MediaType,
+        [property: JsonPropertyName("data")] string Data);
 
     private sealed record AnthropicMessagesResponse(
-        [property: JsonPropertyName("content")] IReadOnlyList<AnthropicContentBlock>? Content,
+        [property: JsonPropertyName("content")] IReadOnlyList<AnthropicResponseContentBlock>? Content,
         [property: JsonPropertyName("model")] string? Model,
         [property: JsonPropertyName("stop_reason")] string? StopReason);
 
-    private sealed record AnthropicContentBlock(
+    private sealed record AnthropicResponseContentBlock(
         [property: JsonPropertyName("type")] string Type,
         [property: JsonPropertyName("text")] string? Text);
 }
