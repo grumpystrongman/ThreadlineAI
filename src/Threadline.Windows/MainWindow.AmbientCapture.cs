@@ -200,7 +200,7 @@ public sealed partial class MainWindow
         try
         {
             var session = _ambientCapture.Stop();
-            AppendTranscript("Ambient Capture", $"Recording stopped. Audio, manifest, transcript placeholder, and handoff were saved.\n\nFolder:\n{session.OutputFolder}");
+            AppendTranscript("Ambient Capture", $"Recording stopped. Audio, manifest, and handoff were saved. No transcript was produced — only raw audio and metadata are available.\n\nFolder:\n{session.OutputFolder}");
             AddTimeline("Ambient capture stopped and handoff files were generated.");
             return Task.CompletedTask;
         }

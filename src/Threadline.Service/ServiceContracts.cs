@@ -123,3 +123,7 @@ public sealed record PrivacyStatusResponse(
     bool LocalOnlyMode,
     IReadOnlySet<string> CorsAllowedOrigins,
     int ActivePrivacyRuleCount);
+
+public sealed record ScreenshotVisionPolicyRequest(string AppKey, string Policy);
+
+public sealed record ScreenshotVisionPolicyEntry(string AppKey, string Policy);

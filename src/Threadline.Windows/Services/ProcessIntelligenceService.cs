@@ -15,7 +15,7 @@ public sealed class ProcessIntelligenceService
             window.ProcessId,
             processName,
             window.ExecutablePath,
-            "Not resolved in 11.8 safe process model",
+            null,
             null,
             appType,
             methods);
@@ -59,12 +59,12 @@ public sealed class ProcessIntelligenceService
                 CaptureMethodKind.ImageExtraction,
                 "Image Extraction",
                 false,
-                "Raw image provider handoff is intentionally not implemented yet; Build 19 sends redacted OCR/summary text only."),
+                "Raw image provider handoff is not implemented yet. Redacted OCR/summary text is sent instead."),
             new(
                 CaptureMethodKind.LayoutAnalysis,
                 "Layout Analysis",
                 false,
-                "Only a local text vision summary is produced in Build 19. Full visual layout analysis remains future work."),
+                "Only a local text vision summary is produced. Full visual layout analysis remains future work."),
             new(
                 CaptureMethodKind.TitleProcessFallback,
                 "Title/process fallback",

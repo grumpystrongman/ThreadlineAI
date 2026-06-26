@@ -98,7 +98,7 @@ This keeps the answer honest about what Threadline actually saw.
 ## Known limits
 
 - OCR quality depends on Windows OCR availability and the user's installed language support.
-- The build does not yet persist app allow/deny policy across app restarts.
+- App allow/deny policies are persisted across restarts via the SQLite privacy store (PrivacySettings table).
 - The build does not yet support raw screenshot retention, even when the consent model has a placeholder for it.
 - The build does not yet send raw images to a vision-capable provider. That should remain a separate, explicit-consent build.
 - Redaction is regex-based and should be treated as best effort.

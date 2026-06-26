@@ -360,7 +360,6 @@
                   <TextBlock Text="Chat provider" FontWeight="SemiBold" FontSize="11" Foreground="#111827" />
                   <ComboBox x:Name="ProviderBox" SelectedIndex="0" SelectionChanged="ProviderBox_SelectionChanged" HorizontalAlignment="Stretch">
                     <ComboBoxItem Content="OpenAI" />
-                    <ComboBoxItem Content="Claude" />
                     <ComboBoxItem Content="Gemini" />
                     <ComboBoxItem Content="DeepSeek" />
                     <ComboBoxItem Content="OpenRouter" />
@@ -369,7 +368,6 @@
                   <TextBlock Text="Settings provider" FontWeight="SemiBold" FontSize="11" Foreground="#111827" />
                   <ComboBox x:Name="SettingsProviderBox" SelectedIndex="0" SelectionChanged="SettingsProviderBox_SelectionChanged" HorizontalAlignment="Stretch">
                     <ComboBoxItem Content="OpenAI" />
-                    <ComboBoxItem Content="Claude" />
                     <ComboBoxItem Content="Gemini" />
                     <ComboBoxItem Content="DeepSeek" />
                     <ComboBoxItem Content="OpenRouter" />

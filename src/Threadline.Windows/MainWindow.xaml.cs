@@ -36,6 +36,23 @@ public sealed partial class MainWindow : Window
         StartAutoFollow();
         _ = RunUiActionAsync(CheckServiceAsync);
         _ = RunUiActionAsync(InitializeWorkThreadAsync);
+        _ = LoadPersistedScreenshotVisionPoliciesAsync();
+    }
+
+    private async Task LoadPersistedScreenshotVisionPoliciesAsync()
+    {
+        try
+        {
+            _screenshotVisionPolicy.SetPersistenceCallbacks(
+                (appKey, policy) => _client.SaveScreenshotVisionPolicyAsync(appKey, policy),
+                appKey => _client.DeleteScreenshotVisionPolicyAsync(appKey));
+            var policies = await _client.GetScreenshotVisionPoliciesAsync();
+            _screenshotVisionPolicy.LoadPersistedPolicies(policies);
+        }
+        catch
+        {
+            // Service may not be running yet; policies will be in-memory only until service is available.
+        }
     }
 
     private async void CheckService_Click(object sender, RoutedEventArgs e) => await RunUiActionAsync(CheckServiceAsync);
@@ -294,7 +311,8 @@ public sealed partial class MainWindow : Window
         var payload = QuestionBox.Text?.Trim();
         if (string.IsNullOrWhiteSpace(payload))
         {
-            payload = "Threadline generated text placeholder.";
+            AddTimeline("No text provided for insert action.");
+            return;
         }
 
         _lastAction = await _client.ProposeInsertActionAsync(_session!.Id, payload, userApproved: true);

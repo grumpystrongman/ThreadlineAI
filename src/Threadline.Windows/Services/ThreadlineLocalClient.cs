@@ -213,6 +213,21 @@ public sealed class ThreadlineLocalClient
         return await ReadRequiredAsync<T>(response, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ScreenshotVisionPolicyDto>> GetScreenshotVisionPoliciesAsync(CancellationToken cancellationToken = default) =>
+        await GetRequiredAsync<List<ScreenshotVisionPolicyDto>>("privacy/screenshot-vision-policies", cancellationToken);
+
+    public async Task SaveScreenshotVisionPolicyAsync(string appKey, string policy, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync("privacy/screenshot-vision-policies", new { appKey, policy }, _jsonOptions, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task DeleteScreenshotVisionPolicyAsync(string appKey, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.DeleteAsync($"privacy/screenshot-vision-policies/{Uri.EscapeDataString(appKey)}", cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
     private async Task<T> ReadRequiredAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         await EnsureSuccessAsync(response, cancellationToken);
@@ -258,3 +273,4 @@ public sealed record ContextEventDto(string Id, string SessionId, string Source,
 public sealed record LlmMessageDto(string Role, string Content);
 public sealed record AskResponseDto(string Answer, IReadOnlyList<LlmMessageDto>? Messages);
 public sealed record WindowActionDto(string Id, string SessionId, string? AttachmentId, string Kind, string Description, string Payload, string Risk, string Status, bool RequiresApproval, string? ResultMessage);
+public sealed record ScreenshotVisionPolicyDto(string AppKey, string Policy);
