@@ -390,7 +390,7 @@
                   </ComboBox>
                   <TextBox x:Name="ProviderBaseUrlBox" Header="Base URL" PlaceholderText="https://api.openai.com/v1/" TextWrapping="NoWrap" />
                   <TextBox x:Name="ProviderModelBox" Header="Default model" PlaceholderText="gpt-4.1-mini" TextWrapping="NoWrap" />
-                  <TextBox x:Name="ProviderApiKeyBox" Header="API key" PlaceholderText="Paste API key here, then Save Provider" TextWrapping="NoWrap" IsSpellCheckEnabled="False" />
+                  <PasswordBox x:Name="ProviderApiKeyBox" Header="API key" PlaceholderText="Stored locally by Threadline" />
                   <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
                     <Button Content="Test" Click="ProviderTest_Click" Style="{StaticResource SidecarButtonStyle}" />
                     <Button Content="Defaults" Click="UseProviderDefaults_Click" Style="{StaticResource SidecarButtonStyle}" />
@@ -441,30 +441,9 @@
                         <Button Grid.Column="1" Content="Handoff" Click="HandoffArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
                         <Button Grid.Column="2" Content="Decide" Click="DecisionsArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
                         <Button Grid.Row="1" Content="Risks" Click="RisksArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
-                        <Button Grid.Row="1" Grid.Column="1" Content="Next" Click="NextActionsArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
-                        <Button Grid.Row="1" Grid.Column="2" Content="Regen" Click="RegenerateArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
-                        <Button Grid.Row="2" Content="Copy Art" Click="CopyArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
-                        <Button Grid.Row="2" Grid.Column="1" Content="Export" Click="ExportArtifactAction_Click" Style="{StaticResource SidecarButtonStyle}" />
+                        <Button Grid.Row="1" Grid.Column="1" Content="Next" Click="NextActionsArtifact_Click" Style="{StaticResource SidecarButtonStyle}" />
                       </Grid>
                     </StackPanel>
-                  </Border>
-
-                  <Border BorderBrush="#E5EDF8" BorderThickness="1" CornerRadius="12" Padding="8">
-                    <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="5">
-                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                          <TextBlock Text="Privacy &amp; Trust" FontSize="12" FontWeight="SemiBold" Foreground="#111827" />
-                          <TextBlock Text="● Protected" FontSize="10" FontWeight="SemiBold" Foreground="#16A34A" />
-                        </StackPanel>
-                      </Grid>
-                      <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*" ColumnSpacing="6">
-                        <CheckBox x:Name="AllowProviderContextToggle" Content="Provider" IsChecked="True" FontSize="10" Foreground="#374151" MinWidth="0" />
-                        <CheckBox x:Name="SaveWorkThreadMemoryToggle" Grid.Column="1" Content="Memory" IsChecked="True" FontSize="10" Foreground="#374151" MinWidth="0" />
-                        <CheckBox x:Name="ShowContextReceiptsToggle" Grid.Column="2" Content="Receipts" IsChecked="True" FontSize="10" Foreground="#374151" MinWidth="0" />
-                        <CheckBox x:Name="ScreenshotVisionConsentToggle" Grid.Column="3" Content="Vision once" IsChecked="False" FontSize="10" Foreground="#7C2D12" MinWidth="0" />
-                      </Grid>
-                      <TextBlock Grid.Row="2" x:Name="ScreenshotVisionPolicyText" Text="Vision: off. Screenshot/OCR needs visible consent each time." TextWrapping="WrapWholeWords" FontSize="10" Foreground="#6B7280" />
-                    </Grid>
                   </Border>
                 </StackPanel>
               </ScrollViewer>
