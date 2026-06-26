@@ -27,6 +27,8 @@ public sealed partial class MainWindow
             _edgeTriggerWindow.DirectWindowHoverEnabled = false;
         }
 
+        UpdateShuttleTerminology();
+
         if (_shuttleTabTimer.IsEnabled)
         {
             return;
@@ -36,6 +38,23 @@ public sealed partial class MainWindow
         _shuttleTabTimer.Tick += (_, _) => SafeUpdateShuttleTabs();
         _shuttleTabTimer.Start();
         SafeUpdateShuttleTabs();
+    }
+
+    private void UpdateShuttleTerminology()
+    {
+        try
+        {
+            SidecarAttachmentText.Text = "Loom ready. Click a Shuttle tab to open a Warp Thread.";
+            WorkThreadStatusText.Text = "Loom: ready";
+            CurrentContextText.Text = "Choose a Shuttle tab or continue with the current Warp Thread.";
+            ReceiptTrustText.Text = "Lineage on";
+            ReceiptSourceText.Text = "No Shuttle yet";
+            TrustControlStatusText.Text = "Lineage";
+        }
+        catch
+        {
+            // Startup-safe terminology polish only. Never block the shell.
+        }
     }
 
     private void SafeUpdateShuttleTabs()
