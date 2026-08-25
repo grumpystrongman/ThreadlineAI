@@ -19,10 +19,9 @@ public sealed record AgentIntentDecision(
     string Confidence);
 
 /// <summary>
-/// Small, deterministic routing layer that keeps the common chat path fast while
-/// escalating operational / multi-step work to the agent runtime. This is intentionally
-/// not an LLM classifier: routing must remain inspectable, cheap, and available when a
-/// provider is degraded.
+/// Small, deterministic routing layer that keeps ordinary conversation fast while
+/// escalating operational, discovery, current-information, and multi-step work to Jarvis.
+/// This remains inspectable and available even when a provider is degraded.
 /// </summary>
 public sealed class AgentIntentClassifier
 {
@@ -41,11 +40,28 @@ public sealed class AgentIntentClassifier
         "update the repo", "update this repo", "work on the repo", "work on this repo"
     ];
 
+    private static readonly string[] DiscoveryPhrases =
+    [
+        "find me", "find a", "find the", "find some", "search for", "look for",
+        "give me a list", "make me a list", "build me a list", "compile a list",
+        "who are the", "which agents", "which companies", "which vendors",
+        "contact information", "contact details", "submission guidelines",
+        "submission requirements", "currently accepting", "open to submissions"
+    ];
+
+    private static readonly string[] FreshInformationMarkers =
+    [
+        "current", "currently", "latest", "recent", "today", "this week", "this month",
+        "up-to-date", "up to date", "online", "website", "availability", "price", "prices",
+        "schedule", "hours", "contact info", "submission guidelines"
+    ];
+
     private static readonly string[] StrongActionVerbs =
     [
         "build", "implement", "fix", "debug", "refactor", "edit", "modify", "install",
         "configure", "download", "launch", "click", "send", "email", "commit", "push",
-        "merge", "delete", "remove", "move", "rename", "organize", "research", "investigate"
+        "merge", "delete", "remove", "move", "rename", "organize", "research", "investigate",
+        "find", "search"
     ];
 
     private static readonly string[] MultiStepMarkers =
@@ -84,12 +100,31 @@ public sealed class AgentIntentClassifier
             return new AgentIntentDecision(ThreadlineAgentRoute.Mission, "The request explicitly asks for agentic execution.", "High");
         }
 
-        var matchedPhrase = MissionPhrases.FirstOrDefault(phrase => normalized.Contains($" {phrase} ", StringComparison.Ordinal)
-            || normalized.Contains($" {phrase}.", StringComparison.Ordinal)
-            || normalized.Contains($" {phrase},", StringComparison.Ordinal));
+        var matchedPhrase = MissionPhrases.FirstOrDefault(phrase => ContainsPhrase(normalized, phrase));
         if (matchedPhrase is not null)
         {
             return new AgentIntentDecision(ThreadlineAgentRoute.Mission, $"Operational phrase detected: '{matchedPhrase}'.", "High");
+        }
+
+        var discoveryPhrase = DiscoveryPhrases.FirstOrDefault(phrase => normalized.Contains(phrase, StringComparison.Ordinal));
+        if (discoveryPhrase is not null)
+        {
+            return new AgentIntentDecision(
+                ThreadlineAgentRoute.Mission,
+                $"Discovery/research intent detected: '{discoveryPhrase}'.",
+                "High");
+        }
+
+        var freshMarker = FreshInformationMarkers.FirstOrDefault(marker => normalized.Contains($" {marker} ", StringComparison.Ordinal)
+            || normalized.Contains($" {marker}?", StringComparison.Ordinal)
+            || normalized.Contains($" {marker}.", StringComparison.Ordinal)
+            || normalized.Contains($" {marker},", StringComparison.Ordinal));
+        if (freshMarker is not null)
+        {
+            return new AgentIntentDecision(
+                ThreadlineAgentRoute.Mission,
+                $"Current/external information signal detected: '{freshMarker}'.",
+                "Medium");
         }
 
         var actionVerbCount = StrongActionVerbs.Count(verb => ContainsWord(normalized, verb));
@@ -104,8 +139,14 @@ public sealed class AgentIntentClassifier
             return new AgentIntentDecision(ThreadlineAgentRoute.Mission, "The request contains multiple operational actions.", "Medium");
         }
 
-        return new AgentIntentDecision(ThreadlineAgentRoute.Direct, "The request looks conversational or analytical and does not require autonomous execution.", "Medium");
+        return new AgentIntentDecision(ThreadlineAgentRoute.Direct, "The request looks conversational or analytical and does not require autonomous execution or fresh external information.", "Medium");
     }
+
+    private static bool ContainsPhrase(string normalizedText, string phrase) =>
+        normalizedText.Contains($" {phrase} ", StringComparison.Ordinal)
+        || normalizedText.Contains($" {phrase}.", StringComparison.Ordinal)
+        || normalizedText.Contains($" {phrase},", StringComparison.Ordinal)
+        || normalizedText.Contains($" {phrase}?", StringComparison.Ordinal);
 
     private static bool ContainsWord(string normalizedText, string word) =>
         normalizedText.Contains($" {word} ", StringComparison.Ordinal)
