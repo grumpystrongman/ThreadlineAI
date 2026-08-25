@@ -1,0 +1,70 @@
+name: Sonar Diagnostics
+
+on:
+  push:
+    branches:
+      - feature/jarvis-runtime-bridge
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Allow automatic Sonar analysis to settle
+        run: sleep 45
+
+      - name: Report Sonar issues for PR 40
+        shell: python
+        run: |
+          import json
+          import urllib.parse
+          import urllib.request
+
+          base = "https://sonarcloud.io/api/issues/search"
+          params = urllib.parse.urlencode({
+              "componentKeys": "grumpystrongman_ThreadlineAI",
+              "pullRequest": "40",
+              "resolved": "false",
+              "ps": "500",
+          })
+          with urllib.request.urlopen(f"{base}?{params}", timeout=30) as response:
+              payload = json.load(response)
+
+          issues = payload.get("issues", [])
+          print(f"OPEN_ISSUES={len(issues)}")
+          for issue in issues:
+              component = issue.get("component", "")
+              path = component.split(":", 1)[-1]
+              print("SONAR_ISSUE|{type}|{severity}|{rule}|{path}|{line}|{message}".format(
+                  type=issue.get("type", ""),
+                  severity=issue.get("severity", ""),
+                  rule=issue.get("rule", ""),
+                  path=path,
+                  line=issue.get("line", ""),
+                  message=issue.get("message", "").replace("\n", " "),
+              ))
+
+      - name: Report new-code duplication by file
+        shell: python
+        run: |
+          import json
+          import urllib.parse
+          import urllib.request
+
+          base = "https://sonarcloud.io/api/measures/component_tree"
+          params = urllib.parse.urlencode({
+              "component": "grumpystrongman_ThreadlineAI",
+              "pullRequest": "40",
+              "metricKeys": "new_duplicated_lines_density,new_duplicated_lines,new_lines",
+              "qualifiers": "FIL",
+              "ps": "500",
+          })
+          with urllib.request.urlopen(f"{base}?{params}", timeout=30) as response:
+              payload = json.load(response)
+
+          for component in payload.get("components", []):
+              measures = {m.get("metric"): m.get("period", {}).get("value", m.get("value")) for m in component.get("measures", [])}
+              density = float(measures.get("new_duplicated_lines_density") or 0)
+              duplicated = float(measures.get("new_duplicated_lines") or 0)
+              new_lines = float(measures.get("new_lines") or 0)
+              if density > 0 or duplicated > 0:
+                  print(f"SONAR_DUP|{component.get('path','')}|density={density}|duplicated={duplicated}|new_lines={new_lines}")
