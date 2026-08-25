@@ -11,6 +11,7 @@ public sealed class ThreadlineAgentClient
     private readonly HttpClient _httpClient;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
     {
+        PropertyNameCaseInsensitive = true,
         Converters = { new JsonStringEnumConverter() }
     };
 
@@ -68,6 +69,59 @@ public sealed class ThreadlineAgentClient
         return await GetRequiredAsync<JarvisMissionChangesDto>(path, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<JarvisToolApprovalDto>> GetMissionToolApprovalsAsync(string missionId, CancellationToken cancellationToken = default)
+    {
+        var path = $"v1/jarvis/missions/{Uri.EscapeDataString(missionId)}/tool-approvals";
+        using var response = await _httpClient.GetAsync(path, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.ServiceUnavailable) return Array.Empty<JarvisToolApprovalDto>();
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException($"Threadline Jarvis tool-approval endpoint returned {(int)response.StatusCode}: {body}");
+        }
+
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        if (!document.RootElement.TryGetProperty("approvals", out var approvals) || approvals.ValueKind != JsonValueKind.Array)
+            return Array.Empty<JarvisToolApprovalDto>();
+
+        var result = new List<JarvisToolApprovalDto>();
+        foreach (var item in approvals.EnumerateArray())
+        {
+            result.Add(new JarvisToolApprovalDto(
+                TraceId: ReadString(item, "trace_id") ?? string.Empty,
+                MissionId: ReadString(item, "mission_id") ?? missionId,
+                WorkerId: ReadString(item, "worker_id"),
+                ToolName: ReadString(item, "tool_name") ?? "unknown tool",
+                RiskTier: ReadString(item, "risk_tier") ?? "ask",
+                Reason: ReadString(item, "reason") ?? "risk_tier",
+                ArgsPreview: ReadString(item, "args_preview") ?? "",
+                RequestedAtNs: ReadLong(item, "requested_at_ns"),
+                ExpiresAtNs: ReadLong(item, "expires_at_ns")));
+        }
+        return result;
+    }
+
+    public Task ApproveMissionToolAsync(string missionId, string traceId, CancellationToken cancellationToken = default) =>
+        PostApprovalAsync(missionId, traceId, approve: true, reason: null, cancellationToken);
+
+    public Task DenyMissionToolAsync(string missionId, string traceId, string reason = "user_denied", CancellationToken cancellationToken = default) =>
+        PostApprovalAsync(missionId, traceId, approve: false, reason, cancellationToken);
+
+    private async Task PostApprovalAsync(string missionId, string traceId, bool approve, string? reason, CancellationToken cancellationToken)
+    {
+        var escapedMission = Uri.EscapeDataString(missionId);
+        var escapedTrace = Uri.EscapeDataString(traceId);
+        var path = $"v1/jarvis/missions/{escapedMission}/tool-approvals/{escapedTrace}/{(approve ? "approve" : "deny")}";
+        using HttpResponseMessage response = approve
+            ? await _httpClient.PostAsync(path, content: null, cancellationToken)
+            : await _httpClient.PostAsJsonAsync(path, new { reason = string.IsNullOrWhiteSpace(reason) ? "user_denied" : reason }, _jsonOptions, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException($"Jarvis tool approval returned {(int)response.StatusCode}: {body}");
+        }
+    }
+
     private async Task<T> GetRequiredAsync<T>(string path, CancellationToken cancellationToken)
     {
         var response = await _httpClient.GetAsync(path, cancellationToken);
@@ -79,6 +133,18 @@ public sealed class ThreadlineAgentClient
 
         return await response.Content.ReadFromJsonAsync<T>(_jsonOptions, cancellationToken)
             ?? throw new InvalidOperationException("Threadline Jarvis endpoint returned an empty response.");
+    }
+
+    private static string? ReadString(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var value)) return null;
+        return value.ValueKind == JsonValueKind.String ? value.GetString() : value.ValueKind == JsonValueKind.Null ? null : value.ToString();
+    }
+
+    private static long ReadLong(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var value)) return 0;
+        return value.TryGetInt64(out var parsed) ? parsed : long.TryParse(value.ToString(), out parsed) ? parsed : 0;
     }
 }
 
@@ -131,3 +197,14 @@ public sealed record JarvisMissionChangesDto(
     string MissionId,
     JsonElement? Files,
     JsonElement? Changes);
+
+public sealed record JarvisToolApprovalDto(
+    string TraceId,
+    string MissionId,
+    string? WorkerId,
+    string ToolName,
+    string RiskTier,
+    string Reason,
+    string ArgsPreview,
+    long RequestedAtNs,
+    long ExpiresAtNs);
