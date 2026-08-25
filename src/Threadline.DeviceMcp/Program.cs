@@ -144,7 +144,7 @@ internal sealed class DeviceMcpServer
             Id("set-text"), DeviceOperationKind.SetText, BuildTarget(args, requireControl: true),
             new Dictionary<string, string> { ["text"] = text },
             string.IsNullOrEmpty(expected) ? DeviceExpectedState.None : new(DeviceVerificationKind.AccessibleTextContains, expected, 8_000),
-            Rationale: "Set text through native UI Automation Value pattern and verify resulting state.");
+            Rationale: "Set text through native UI Automation Value pattern and verify accessible state.");
     }
 
     private static DeviceCommand BuildKeyboard(JsonObject args)
@@ -302,7 +302,7 @@ internal sealed class DeviceMcpServer
         return new JsonObject
         {
             ["type"] = "object", ["properties"] = objectProperties,
-            ["required"] = new JsonArray(required.Select(JsonValue.Create).ToArray()), ["additionalProperties"] = false
+            ["required"] = new JsonArray(required.Select(item => JsonValue.Create(item)).ToArray()), ["additionalProperties"] = false
         };
     }
 
