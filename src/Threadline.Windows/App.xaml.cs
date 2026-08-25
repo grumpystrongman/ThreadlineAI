@@ -47,12 +47,14 @@ public partial class App : Application
             LogMessage("Application launch started.");
             var mainWindow = new MainWindow();
             _window = mainWindow;
-            LogMessage("Main AI window constructed.");
+            LogMessage("Threadline companion window constructed.");
             _window.Activate();
-            LogMessage("Main AI window activated.");
+            LogMessage("Threadline companion window activated for interactive-session services.");
 
+            // Keep the existing Threadline shell available as a recovery/setup surface while
+            // the full Jarvis desktop comes up. Once Jarvis is healthy we hide this window and
+            // leave its Device Host/context/shuttle infrastructure running in the background.
             mainWindow.EnsureJarvisFrontAndCenterStartedAfterActivation();
-            LogMessage("AIKA / JARVIS front-and-center startup requested after activation.");
 
             StartInteractiveDeviceAgent(mainWindow);
             _ = StartLocalAiRuntimeAfterWindowIsVisibleAsync(mainWindow);
@@ -98,6 +100,12 @@ public partial class App : Application
                 jarvisResult.Success,
                 jarvisResult.Installed,
                 jarvisResult.Message);
+
+            if (jarvisResult.Success)
+            {
+                mainWindow.HandOffForegroundToJarvisDesktop();
+                LogMessage("PersonalJarvis desktop is primary; Threadline WinUI companion moved to background mode.");
+            }
         }
         catch (Exception ex)
         {
