@@ -6,6 +6,7 @@ namespace Threadline.Windows;
 public partial class App : Application
 {
     private Window? _window;
+    private WindowsDeviceAgentPipeHost? _deviceAgentHost;
 
     public App()
     {
@@ -51,12 +52,27 @@ public partial class App : Application
             mainWindow.EnsureJarvisFrontAndCenterStartedAfterActivation();
             LogMessage("AIKA / JARVIS front-and-center startup requested after activation.");
 
+            StartInteractiveDeviceAgent();
             _ = StartLocalAiRuntimeAfterWindowIsVisibleAsync(mainWindow);
         }
         catch (Exception ex)
         {
             LogException(ex);
             throw;
+        }
+    }
+
+    private void StartInteractiveDeviceAgent()
+    {
+        try
+        {
+            _deviceAgentHost ??= new WindowsDeviceAgentPipeHost();
+            _deviceAgentHost.Start();
+            LogMessage($"Windows Device Agent host started on current-user pipe '{WindowsDeviceAgentPipeHost.PipeName}'.");
+        }
+        catch (Exception ex)
+        {
+            LogException(ex);
         }
     }
 
