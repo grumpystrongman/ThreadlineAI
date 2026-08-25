@@ -31,6 +31,32 @@ jobs:
       - name: Build Windows Device MCP
         run: dotnet build src/Threadline.DeviceMcp/Threadline.DeviceMcp.csproj --configuration Release --no-restore
 
+      - name: Smoke test Windows Device MCP protocol
+        shell: pwsh
+        run: |
+          $dll = Resolve-Path 'src/Threadline.DeviceMcp/bin/Release/net8.0-windows10.0.19041.0/Threadline.DeviceMcp.dll'
+          $requests = @(
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"threadline-ci","version":"1.0"}}}',
+            '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}',
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+          )
+          $output = @($requests | & dotnet $dll)
+          if ($LASTEXITCODE -ne 0) { throw "Device MCP exited with code $LASTEXITCODE" }
+          if ($output.Count -lt 2) { throw "Expected initialize and tools/list responses; got $($output.Count)." }
+
+          $initialize = $output[0] | ConvertFrom-Json
+          if ($initialize.id -ne 1 -or -not $initialize.result.serverInfo.name) {
+            throw 'Device MCP initialize response was invalid.'
+          }
+
+          $toolResponse = $output[-1] | ConvertFrom-Json
+          $names = @($toolResponse.result.tools | ForEach-Object { $_.name })
+          $required = @('observe_desktop','open_application','focus_window','invoke_control','set_control_text','send_keys','click_at')
+          foreach ($name in $required) {
+            if ($names -notcontains $name) { throw "Device MCP tool '$name' was not advertised." }
+          }
+          Write-Host "Device MCP advertised $($names.Count) tools: $($names -join ', ')"
+
       - name: Restore and build Windows app with Visual Studio MSBuild
         shell: pwsh
         run: |
