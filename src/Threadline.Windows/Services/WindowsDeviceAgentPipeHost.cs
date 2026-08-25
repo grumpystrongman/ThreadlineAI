@@ -1,6 +1,7 @@
 using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Threadline.Core;
 
 namespace Threadline.Windows.Services;
@@ -115,7 +116,8 @@ public sealed class WindowsDeviceAgentPipeHost : IAsyncDisposable
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true,
-        WriteIndented = false
+        WriteIndented = false,
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
     };
 
     private sealed record DevicePipeRequest(
