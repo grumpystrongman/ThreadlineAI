@@ -51,7 +51,7 @@ public partial class App : Application
             mainWindow.EnsureJarvisFrontAndCenterStartedAfterActivation();
             LogMessage("AIKA / JARVIS front-and-center startup requested after activation.");
 
-            _ = StartLocalAiRuntimeAfterWindowIsVisibleAsync();
+            _ = StartLocalAiRuntimeAfterWindowIsVisibleAsync(mainWindow);
         }
         catch (Exception ex)
         {
@@ -60,7 +60,7 @@ public partial class App : Application
         }
     }
 
-    private static async Task StartLocalAiRuntimeAfterWindowIsVisibleAsync()
+    private static async Task StartLocalAiRuntimeAfterWindowIsVisibleAsync(MainWindow mainWindow)
     {
         try
         {
@@ -69,14 +69,29 @@ public partial class App : Application
 
             await Task.WhenAll(serviceTask, jarvisTask);
 
-            LogMessage(serviceTask.Result.Message);
-            LogMessage(jarvisTask.Result.Message);
+            var serviceResult = serviceTask.Result;
+            var jarvisResult = jarvisTask.Result;
+            LogMessage(serviceResult.Message);
+            LogMessage(jarvisResult.Message);
+
+            mainWindow.ReportAiRuntimeStartup(
+                serviceResult.Success,
+                serviceResult.Message,
+                jarvisResult.Success,
+                jarvisResult.Installed,
+                jarvisResult.Message);
         }
         catch (Exception ex)
         {
             // The assistant window is intentionally independent of runtime startup.
             // A provider/runtime can be repaired without making the visible app disappear.
             LogException(ex);
+            mainWindow.ReportAiRuntimeStartup(
+                threadlineReady: false,
+                threadlineMessage: "Local AI startup encountered an unexpected error.",
+                jarvisReady: false,
+                jarvisInstalled: true,
+                jarvisMessage: ex.Message);
         }
     }
 
