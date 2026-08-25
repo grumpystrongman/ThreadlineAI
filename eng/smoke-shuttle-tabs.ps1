@@ -9,19 +9,22 @@ $windowsProject = Join-Path $repoRoot 'src/Threadline.Windows'
 $requiredFiles = @(
   'ShuttleTabWindow.cs',
   'MainWindow.ShuttleTabs.cs',
-  'MainWindow.EdgeHandleStartup.cs'
+  'MainWindow.EdgeHandleStartup.cs',
+  'MainWindow.ProviderSettings.cs'
 )
 
 foreach ($file in $requiredFiles) {
   $path = Join-Path $windowsProject $file
   if (-not (Test-Path $path)) {
-    throw "Missing required Shuttle file: $path"
+    throw "Missing required Shuttle/provider file: $path"
   }
 }
 
 $shuttleManager = Get-Content (Join-Path $windowsProject 'MainWindow.ShuttleTabs.cs') -Raw
 $edgeStartup = Get-Content (Join-Path $windowsProject 'MainWindow.EdgeHandleStartup.cs') -Raw
 $shuttleWindow = Get-Content (Join-Path $windowsProject 'ShuttleTabWindow.cs') -Raw
+$providerSettings = Get-Content (Join-Path $windowsProject 'MainWindow.ProviderSettings.cs') -Raw
+$appStartup = Get-Content (Join-Path $windowsProject 'App.xaml.cs') -Raw
 
 if ($shuttleManager -notmatch 'StartShuttleTabs') {
   throw 'Smoke failed: StartShuttleTabs is missing.'
@@ -99,16 +102,40 @@ if ($shuttleManager -notmatch 'ShuttleDwmGetWindowAttribute') {
   throw 'Smoke failed: Shuttle placement is not filtering cloaked windows.'
 }
 
-if ($edgeStartup -notmatch 'StartShuttleTabs\(\)') {
-  throw 'Smoke failed: startup is not arming Shuttle tabs.'
-}
-
 if ($edgeStartup -notmatch 'OpenSidecarAtStartup\(\)') {
   throw 'Smoke failed: startup does not force the sidecar visible first.'
 }
 
+if ($edgeStartup -notmatch 'StartStartupVisibilityWatchdog') {
+  throw 'Smoke failed: startup visibility watchdog is missing.'
+}
+
+if ($edgeStartup -notmatch 'StartupShuttleDelay') {
+  throw 'Smoke failed: Shuttle startup delay is missing.'
+}
+
 if ($edgeStartup -match 'StartFallbackFloatingTriggerTimer\(\)') {
   throw 'Smoke failed: startup still arms the old fallback hover trigger.'
+}
+
+if ($providerSettings -notmatch 'EnsurePasteSafeProviderApiKeyInput') {
+  throw 'Smoke failed: provider settings do not replace the API key PasswordBox with a paste-safe input.'
+}
+
+if ($providerSettings -notmatch 'ProviderApiKeyBox\.Visibility\s*=\s*Visibility\.Collapsed') {
+  throw 'Smoke failed: provider PasswordBox is not hidden before key paste.'
+}
+
+if ($providerSettings -notmatch 'ProviderApiKeyBox\.IsEnabled\s*=\s*false') {
+  throw 'Smoke failed: provider PasswordBox is not disabled before key paste.'
+}
+
+if ($providerSettings -notmatch 'GetProviderApiKeyInput\(\)') {
+  throw 'Smoke failed: provider save/test paths do not use the paste-safe key input.'
+}
+
+if ($appStartup -notmatch 'args\.Handled\s*=\s*true') {
+  throw 'Smoke failed: WinUI recoverable exceptions are not marked handled.'
 }
 
 if ($shuttleWindow -notmatch 'Threadline Shuttle') {
@@ -119,7 +146,7 @@ if ($shuttleWindow -notmatch 'Clicked') {
   throw 'Smoke failed: Shuttle tab click event is missing.'
 }
 
-Write-Host 'Shuttle tabs smoke checks passed.' -ForegroundColor Green
+Write-Host 'Shuttle tabs and provider paste smoke checks passed.' -ForegroundColor Green
 
 if ($Build) {
   & (Join-Path $PSScriptRoot 'build-windows.ps1')
