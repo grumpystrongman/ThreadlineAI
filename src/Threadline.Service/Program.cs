@@ -69,12 +69,14 @@ builder.Services.AddSingleton(sp => new CapturePolicy(() => sp.GetRequiredServic
 builder.Services.AddSingleton<ContextPreviewBuilder>();
 builder.Services.AddSingleton<CapabilityRegistry>();
 builder.Services.AddSingleton<ThreadlineActionCatalog>();
+builder.Services.AddSingleton<AgentIntentClassifier>();
 builder.Services.AddSingleton<SessionService>();
 builder.Services.AddSingleton<ProviderConnectionService>();
 builder.Services.AddSingleton<SecretService>();
 builder.Services.AddSingleton<WindowAttachmentService>();
 builder.Services.AddSingleton<PromptComposer>();
 builder.Services.AddSingleton<ThreadlineAskService>();
+builder.Services.AddTransient<ThreadlineAgentRouterService>();
 builder.Services.AddSingleton<ThreadlineProviderProbeService>();
 builder.Services.AddSingleton<ThreadlineTranscriptionService>();
 builder.Services.AddSingleton<ThreadlineActionExecutionService>();
@@ -110,6 +112,7 @@ app.MapThreadlineSecurityPrivacyApi();
 app.MapThreadlineProviderAuditApi();
 app.MapThreadlineWorkThreadApi();
 app.MapThreadlineJarvisApi();
+app.MapThreadlineAgentApi();
 app.MapThreadlineApi();
 
 app.Run();
