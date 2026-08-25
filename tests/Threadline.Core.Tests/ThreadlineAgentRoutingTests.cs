@@ -23,7 +23,11 @@ public sealed class ThreadlineAgentRoutingTests
     [InlineData("Install the package, configure it, then test it.")]
     [InlineData("Commit this change and push the branch.")]
     [InlineData("Mission: inspect the repository and implement the fix.")]
-    public void Operational_requests_become_missions(string request)
+    [InlineData("Find me literary agents who represent horror novels.")]
+    [InlineData("Give me a list of literary agents with contact information and submission guidelines.")]
+    [InlineData("Who are the current literary agents accepting horror submissions?")]
+    [InlineData("What are the latest submission guidelines for horror agents?")]
+    public void Operational_and_external_research_requests_become_missions(string request)
     {
         var decision = _classifier.Decide(request);
         Assert.Equal(ThreadlineAgentRoute.Mission, decision.Route);
