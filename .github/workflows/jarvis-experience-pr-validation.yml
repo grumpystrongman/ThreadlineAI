@@ -1,0 +1,33 @@
+name: Jarvis Experience PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/Threadline.Core/**'
+      - 'src/Threadline.Windows/**'
+      - 'tests/Threadline.Core.Tests/**'
+      - '.github/workflows/jarvis-experience-pr-validation.yml'
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
+
+      - name: Run routing tests
+        run: |
+          dotnet restore tests/Threadline.Core.Tests/Threadline.Core.Tests.csproj
+          dotnet test tests/Threadline.Core.Tests/Threadline.Core.Tests.csproj --configuration Release --no-restore --logger trx
+
+      - name: Build Windows companion
+        shell: pwsh
+        run: |
+          msbuild src/Threadline.Windows/Threadline.Windows.csproj /restore /m /p:Configuration=Release /p:Platform=x64
