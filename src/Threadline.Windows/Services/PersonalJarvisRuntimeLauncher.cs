@@ -20,9 +20,10 @@ public static class PersonalJarvisRuntimeLauncher
 
     public static async Task<PersonalJarvisLaunchResult> EnsureStartedAsync(CancellationToken cancellationToken = default)
     {
-        if (await IsHealthyAsync(cancellationToken))
+        var backendHealthy = await IsHealthyAsync(cancellationToken);
+        if (backendHealthy && IsDesktopUiVisible())
         {
-            return new PersonalJarvisLaunchResult(true, true, false, null, "Jarvis: running");
+            return new PersonalJarvisLaunchResult(true, true, false, null, "Jarvis desktop: running");
         }
 
         var target = FindInstalledRuntime();
@@ -36,14 +37,24 @@ public static class PersonalJarvisRuntimeLauncher
                 "Jarvis: runtime not installed yet. Use the Threadline PersonalJarvis bootstrap once; future launches will start it automatically.");
         }
 
+        if (backendHealthy)
+        {
+            return new PersonalJarvisLaunchResult(
+                false,
+                true,
+                false,
+                null,
+                "Jarvis backend is already running without a visible desktop. Stop the existing headless Jarvis process once, then relaunch Threadline so it can start the full desktop + voice + Orb experience.");
+        }
+
         var startInfo = new ProcessStartInfo
         {
             FileName = target.FileName,
             Arguments = target.Arguments,
             WorkingDirectory = target.WorkingDirectory,
             UseShellExecute = false,
-            CreateNoWindow = true,
-            WindowStyle = ProcessWindowStyle.Hidden
+            CreateNoWindow = false,
+            WindowStyle = ProcessWindowStyle.Normal
         };
 
         startInfo.Environment["THREADLINE_LAUNCHED_BY"] = "Threadline.Windows";
@@ -54,7 +65,7 @@ public static class PersonalJarvisRuntimeLauncher
             var process = Process.Start(startInfo);
             if (process is null)
             {
-                return new PersonalJarvisLaunchResult(false, true, false, null, "Jarvis: launch failed.");
+                return new PersonalJarvisLaunchResult(false, true, false, null, "Jarvis desktop launch failed.");
             }
 
             var healthy = await WaitForHealthAsync(process, cancellationToken);
@@ -65,18 +76,18 @@ public static class PersonalJarvisRuntimeLauncher
                     true,
                     true,
                     process.Id,
-                    $"Jarvis: started automatically (PID {process.Id}); MCP config: {DefaultMcpConfigPath}");
+                    $"Jarvis desktop started automatically (PID {process.Id}); voice/Orb UI enabled; MCP config: {DefaultMcpConfigPath}");
             }
 
             var message = process.HasExited
-                ? $"Jarvis: exited during startup with code {process.ExitCode}."
-                : "Jarvis: launched but did not become ready yet.";
+                ? $"Jarvis desktop exited during startup with code {process.ExitCode}."
+                : "Jarvis desktop launched but its local API did not become ready yet.";
 
             return new PersonalJarvisLaunchResult(false, true, true, process.HasExited ? null : process.Id, message);
         }
         catch (Exception ex)
         {
-            return new PersonalJarvisLaunchResult(false, true, true, null, "Jarvis: launch failed. " + ex.Message);
+            return new PersonalJarvisLaunchResult(false, true, true, null, "Jarvis desktop launch failed. " + ex.Message);
         }
     }
 
@@ -86,21 +97,44 @@ public static class PersonalJarvisRuntimeLauncher
         var executable = Path.Combine(runtimeRoot, ".venv", "Scripts", "jarvis.exe");
         if (File.Exists(executable))
         {
-            return new RuntimeLaunchTarget(executable, "serve", runtimeRoot);
+            // Bare `jarvis` is the product desktop entry point. `jarvis serve` is
+            // intentionally headless and should not be the foreground Threadline experience.
+            return new RuntimeLaunchTarget(executable, string.Empty, runtimeRoot);
         }
 
         var python = Path.Combine(runtimeRoot, ".venv", "Scripts", "python.exe");
         if (File.Exists(python))
         {
-            return new RuntimeLaunchTarget(python, "-m jarvis serve", runtimeRoot);
+            return new RuntimeLaunchTarget(python, "-m jarvis", runtimeRoot);
         }
 
         return null;
     }
 
+    private static bool IsDesktopUiVisible()
+    {
+        foreach (var process in Process.GetProcesses())
+        {
+            try
+            {
+                if (process.MainWindowHandle != IntPtr.Zero
+                    && process.MainWindowTitle.Contains("Jarvis", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // The process exited while being inspected.
+            }
+        }
+
+        return false;
+    }
+
     private static async Task<bool> WaitForHealthAsync(Process process, CancellationToken cancellationToken)
     {
-        for (var attempt = 0; attempt < 60; attempt++)
+        for (var attempt = 0; attempt < 90; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (process.HasExited) return false;
