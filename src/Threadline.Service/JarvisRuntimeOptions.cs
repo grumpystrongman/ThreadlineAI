@@ -32,7 +32,7 @@ public sealed record JarvisRuntimeOptions(
                 "Threadline:Jarvis:BaseAddress must be loopback unless Threadline:Jarvis:AllowRemoteRuntime is explicitly true.");
         }
 
-        if (!baseAddress.AbsoluteUri.EndsWith('/', StringComparison.Ordinal))
+        if (!baseAddress.AbsoluteUri.EndsWith("/", StringComparison.Ordinal))
         {
             baseAddress = new Uri(baseAddress.AbsoluteUri + "/", UriKind.Absolute);
         }
