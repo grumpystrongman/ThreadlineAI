@@ -98,6 +98,18 @@ function Test-WindowsAppSdkBuildTasks {
   throw 'Missing Visual Studio Windows App SDK packaging build tasks required for WinUI.'
 }
 
+function Build-DotNetProject {
+  param(
+    [Parameter(Mandatory = $true)] [string] $Project,
+    [Parameter(Mandatory = $true)] [string] $Label
+  )
+
+  Write-Host "Restoring $Label..."
+  Invoke-CheckedCommand dotnet restore $Project
+  Write-Host "Building $Label..."
+  Invoke-CheckedCommand dotnet build $Project --configuration Release --no-restore
+}
+
 Stop-ThreadlineWindowsCompanion
 Stop-ThreadlineService
 
@@ -120,11 +132,25 @@ Invoke-CheckedCommand $msbuild src/Threadline.Service/Threadline.Service.csproj 
 Write-Host 'Building Threadline local service...'
 Invoke-CheckedCommand $msbuild src/Threadline.Service/Threadline.Service.csproj /p:Configuration=Release /p:Restore=false
 
-Write-Host 'Restoring Threadline Windows Device MCP...'
-Invoke-CheckedCommand dotnet restore src/Threadline.DeviceMcp/Threadline.DeviceMcp.csproj
+Build-DotNetProject 'src/Threadline.DeviceMcp/Threadline.DeviceMcp.csproj' 'Threadline Windows Device MCP'
+Build-DotNetProject 'src/Threadline.BrowserMcp/Threadline.BrowserMcp.csproj' 'Threadline Browser MCP'
+Build-DotNetProject 'src/Threadline.PrivilegedBroker/Threadline.PrivilegedBroker.csproj' 'Threadline Privileged Broker'
+Build-DotNetProject 'src/Threadline.PrivilegedMcp/Threadline.PrivilegedMcp.csproj' 'Threadline Privileged MCP'
 
-Write-Host 'Building Threadline Windows Device MCP...'
-Invoke-CheckedCommand dotnet build src/Threadline.DeviceMcp/Threadline.DeviceMcp.csproj --configuration Release --no-restore
+if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+  throw 'npm was not found. Node.js/npm is required to validate the Threadline browser extension.'
+}
+
+Push-Location 'adapters/browser-extension'
+try {
+  Write-Host 'Installing locked browser-extension dependencies...'
+  Invoke-CheckedCommand npm ci
+  Write-Host 'Building Threadline browser extension...'
+  Invoke-CheckedCommand npm run build
+}
+finally {
+  Pop-Location
+}
 
 Write-Host 'Restoring Threadline Windows companion...'
 Invoke-CheckedCommand $msbuild src/Threadline.Windows/Threadline.Windows.csproj /t:Restore /p:Configuration=Release
@@ -132,7 +158,7 @@ Invoke-CheckedCommand $msbuild src/Threadline.Windows/Threadline.Windows.csproj 
 Write-Host 'Building Threadline Windows companion...'
 Invoke-CheckedCommand $msbuild src/Threadline.Windows/Threadline.Windows.csproj /p:Configuration=Release /p:Restore=false
 
-Write-Host 'Threadline service, Windows Device MCP, and Windows companion build complete.' -ForegroundColor Green
+Write-Host 'Threadline service, Device/Browser/Privileged agents, browser extension, and Windows companion build complete.' -ForegroundColor Green
 
 if ($Run) {
   Write-Host 'Launching local service and Windows companion because -Run was supplied...'
