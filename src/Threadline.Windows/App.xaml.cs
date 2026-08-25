@@ -43,13 +43,13 @@ public partial class App : Application
 
             var mainWindow = new MainWindow();
             _window = mainWindow;
-            LogMessage("Main window constructed.");
+            LogMessage("Main AI window constructed.");
 
             _window.Activate();
-            LogMessage("Main window activated.");
+            LogMessage("Main AI window activated.");
 
-            mainWindow.EnsureCollapsedEdgeHandleStartedAfterActivation();
-            LogMessage("Sidecar startup reveal requested after activation.");
+            mainWindow.EnsureJarvisFrontAndCenterStartedAfterActivation();
+            LogMessage("AIKA / JARVIS front-and-center startup requested after activation.");
 
             _ = StartLocalServiceAfterWindowIsVisibleAsync();
         }
