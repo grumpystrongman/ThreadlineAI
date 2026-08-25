@@ -1,111 +1,174 @@
-# ThreadlineAI + PersonalJarvis runtime bridge
+# ThreadlineAI + PersonalJarvis operating layer
 
-This integration keeps ThreadlineAI as the Windows-native context shell while using PersonalJarvis as an optional local agent runtime for Missions, worker/critic execution, computer-use, and future tool routing.
+ThreadlineAI is the Windows-native shell, context/memory/privacy engine, and owner-control surface. PersonalJarvis is the local agentic runtime for Missions, workers, critic review, tool approvals, and long-running execution. AIKA / JARVIS is the user-facing assistant surface.
 
-## Why this shape
-
-Threadline already owns Windows attachment, approved context capture, provider setup, Work Threads, artifacts, privacy rules, and the native sidecar. PersonalJarvis already owns a mature mission subsystem with isolated workers, critic review, destructive-action confirmation, tool approvals, and computer-use. The bridge joins those systems without replacing either one.
+## Architecture
 
 ```text
-Threadline.Windows
-      |
-      v
-Threadline.Service  -- local token / origin protection
-      |
-      +--> /sessions/{id}/agent  -- Direct Ask vs Mission router
-      |             |
-      |             +--> configured Threadline provider (fast conversational path)
-      |             |
-      |             +--> PersonalJarvis Mission (agentic execution path)
-      |
-      +--> /v1/jarvis/*  -- explicit Mission control surface
-                    |
-                    v
-          PersonalJarvis server
-          http://127.0.0.1:47821
-                    |
-                    +--> Missions / Workers / Critic / Computer Use
+AIKA / JARVIS (WinUI)
+        |
+        +--> Threadline Direct Ask
+        |
+        +--> PersonalJarvis Mission
+                  |
+                  +--> threadline-windows-device MCP
+                  |       +--> files / PowerShell
+                  |       +--> Win32 process + window control
+                  |       +--> Windows UI Automation
+                  |       +--> screenshot/OCR observation
+                  |       +--> keyboard/mouse fallback
+                  |
+                  +--> threadline-browser MCP
+                  |       +--> authenticated local WebSocket
+                  |       +--> Threadline browser extension
+                  |       +--> real logged-in tabs + DOM
+                  |
+                  +--> threadline-privileged MCP
+                          +--> Jarvis risk tier: ask
+                          +--> per-tool AIKA approval
+                          +--> normal Windows UAC
+                          +--> allowlisted elevated broker
 ```
 
-Threadline does not silently bypass PersonalJarvis safety gates. A destructive mission can return HTTP 409 and require the caller to resubmit with `confirmed: true`. Mission-level tool approvals are also proxied explicitly so the Threadline UI can present approve/deny controls.
+The system prefers direct, inspectable mechanisms over simulated clicks. Files and shell work use native file/PowerShell capabilities. Browser work uses the browser extension and semantic DOM operations. Generic Windows UI Automation remains the broad fallback for desktop apps; OCR and keyboard/mouse are later fallbacks.
 
-## Upstream
+## Upstream pin and local compatibility patch
 
-- Repository: https://github.com/PersonalJarvis/PersonalJarvis
+- Upstream: `PersonalJarvis/PersonalJarvis`
 - License: MIT
-- Pinned integration commit: `b85535a50a3cece8cd269325b6b3ea2cb900e43f`
+- Pinned revision: `b85535a50a3cece8cd269325b6b3ea2cb900e43f`
+- Threadline compatibility patch: `eng/patches/personal-jarvis-mcp-risk.patch`
 
-The bootstrap script clones the upstream repository directly rather than copying its full source into Threadline. This makes the upstream license boundary clear and allows us to advance the pin intentionally after compatibility testing.
+The pinned PersonalJarvis revision normalizes MCP tools without retaining MCP annotations and creates every MCP adapter at the `monitor` risk tier. Threadline's small local compatibility patch preserves MCP annotations and maps `destructiveHint=true` tools to PersonalJarvis's existing `ask` tier. This lets protected MCP tools flow through the normal Jarvis approval workflow rather than trusting a model-supplied confirmation argument.
 
-## Install the runtime
+The bootstrap always checks out/reset the managed runtime to the exact pin before applying the patch, making repeat installs deterministic.
 
-On Windows PowerShell:
+## Bootstrap
+
+Run from PowerShell:
 
 ```powershell
 ./eng/bootstrap-personal-jarvis.ps1 -Start
 ```
 
-This clones the pinned upstream revision under:
+The bootstrap:
+
+1. clones or resets the managed PersonalJarvis runtime to the pinned revision;
+2. verifies and applies the MCP risk patch;
+3. compiles the patched MCP modules;
+4. creates/updates the isolated PersonalJarvis Python environment;
+5. publishes self-contained Windows executables for Device MCP, Browser MCP, Privileged MCP, and the Privileged Broker;
+6. writes the Jarvis MCP configuration under `%LOCALAPPDATA%\ThreadlineAI\jarvis\mcp.json`;
+7. registers `threadline-windows-device`, `threadline-browser`, and `threadline-privileged`;
+8. optionally starts `jarvis serve`.
+
+Managed runtime locations:
 
 ```text
 %LOCALAPPDATA%\ThreadlineAI\runtimes\PersonalJarvis
+%LOCALAPPDATA%\ThreadlineAI\runtimes\DeviceMcp
+%LOCALAPPDATA%\ThreadlineAI\runtimes\BrowserMcp
+%LOCALAPPDATA%\ThreadlineAI\runtimes\PrivilegedMcp
+%LOCALAPPDATA%\ThreadlineAI\runtimes\PrivilegedBroker
 ```
 
-It creates an isolated Python virtual environment and installs the `full` PersonalJarvis extra. Use `-Headless` if you intentionally want the smaller server-only dependency set.
+## Direct Ask vs Mission routing
 
-## Threadline configuration
-
-Defaults are intentionally useful for a local install:
-
-```text
-Threadline:Jarvis:Enabled = true
-Threadline:Jarvis:BaseAddress = http://127.0.0.1:47821/
-Threadline:Jarvis:RequestTimeoutSeconds = 30
-Threadline:Jarvis:AllowRemoteRuntime = false
-```
-
-Environment-variable equivalents:
-
-```powershell
-$env:Threadline__Jarvis__Enabled = 'true'
-$env:Threadline__Jarvis__BaseAddress = 'http://127.0.0.1:47821/'
-$env:Threadline__Jarvis__RequestTimeoutSeconds = '30'
-$env:Threadline__Jarvis__AllowRemoteRuntime = 'false'
-```
-
-The runtime address is restricted to loopback by default. A non-loopback HTTP/HTTPS address is rejected unless `AllowRemoteRuntime` is explicitly enabled. That keeps the first version local-first and avoids turning Threadline into an accidental network proxy.
-
-## Unified Agent Ask
-
-The canonical future entry point is:
+The unified entry point is:
 
 ```text
 POST /sessions/{sessionId}/agent
 ```
 
-Example:
+`route` accepts `Auto`, `Direct`, or `Mission`. `Auto` uses an inspectable deterministic classifier. Ordinary conversational/explanatory requests stay on the direct provider path; operational, coding, research, install, computer-use, and multi-step requests route to a Mission.
 
-```json
-{
-  "question": "Fix this code and run the tests.",
-  "currentWindow": "approved resolved context",
-  "takeRecentEvents": 20,
-  "route": "Auto",
-  "confirmed": false
-}
+When a Mission is built, Threadline provides only approved/redacted context. Captured pages, documents, terminal output, OCR, and other external material are explicitly marked as evidence/data, not authority or hidden instructions.
+
+A meaningful action is expected to follow a closed loop:
+
+```text
+observe -> choose strongest capability -> act -> verify
+   ^                                           |
+   +-------- inspect/recover/re-plan <---------+
 ```
 
-`route` can be `Auto`, `Direct`, or `Mission`.
+Partial/failed verification is a signal to inspect current state and choose another capability, not blindly repeat the same interaction.
 
-`Auto` uses a small deterministic classifier rather than another LLM call. Conversational/explanatory requests stay on Threadline's configured provider path. Operational requests such as implementation, debugging, file changes, research jobs, installs, computer-use commands, or multi-step work are escalated to a Jarvis Mission. The response includes the selected route, reason, and confidence so the decision is inspectable.
+## Windows Device Agent
 
-If Auto selects a Mission but Jarvis is unavailable (502/503/504), Threadline falls back to the direct provider path and labels the route `DirectFallback`. It does **not** fall back around a Jarvis HTTP 409 destructive-action confirmation because doing so would bypass the safety gate.
+`threadline-windows-device` exposes bounded tools for:
 
-For Missions, Threadline packages the redacted current resolved context, session summary, and recent approved context events. Captured page/document content is explicitly marked as **evidence/data only** so prompt-like instructions inside external content do not gain authority over the Mission.
+- desktop/window observation;
+- UI Automation inspection;
+- screenshot/OCR observation;
+- application launch/focus;
+- UI control invocation and text setting;
+- direct file read/write;
+- PowerShell execution with captured output;
+- keyboard/mouse fallback.
 
-## Explicit Jarvis bridge endpoints
+Owner Authority is persisted locally and visible in the AIKA/JARVIS window. The model may read the active grant but cannot expand it. Protected operations remain outside normal Owner Authority.
 
-All endpoints live under Threadline's existing local-access guard.
+## Browser Agent
+
+`threadline-browser` controls the user's existing logged-in browser through the Threadline browser extension, rather than starting a separate automation browser.
+
+Semantic tools include:
+
+```text
+browser_state
+browser_navigate
+browser_new_tab
+browser_activate_tab
+browser_close_tab
+browser_inspect_dom
+browser_click
+browser_fill
+browser_read_text
+browser_scroll
+```
+
+There is intentionally no arbitrary JavaScript-execution tool. DOM/page content remains untrusted evidence.
+
+The service-to-extension command channel is local and authenticated: the extension obtains a short-lived socket ticket through Threadline's existing local API token boundary and then connects to the loopback WebSocket command hub.
+
+## Protected Windows operations
+
+`threadline-privileged` advertises only protected tools and marks every one with MCP `destructiveHint=true`:
+
+```text
+protected_install_package
+protected_service_start
+protected_service_stop
+protected_service_restart
+protected_registry_set_hklm_software
+```
+
+The approval chain is intentionally layered:
+
+```text
+Mission proposes protected tool
+        -> PersonalJarvis ask-tier approval gate
+        -> AIKA displays tool / risk / reason / secret-free args preview
+        -> owner approves exactly that trace ID
+        -> Windows UAC elevation
+        -> allowlisted broker executes
+        -> result returns to Mission for verification
+```
+
+Approval applies only to the paused trace ID. It does not expand Owner Authority or pre-authorize future protected actions.
+
+The elevated broker has **no arbitrary elevated shell**. It currently allows only:
+
+- exact `winget` package installation;
+- start/stop/restart of non-blocked Windows services;
+- string/DWORD writes beneath `HKLM\SOFTWARE`.
+
+The broker validates request/response paths, rejects expired requests, requires an elevated token, validates package/service identifiers, and blocks a set of security-critical services. UAC is never bypassed.
+
+## Jarvis Mission bridge
+
+Threadline proxies the Mission control surface behind its existing local-access guard:
 
 ```text
 GET  /v1/jarvis/status
@@ -119,27 +182,44 @@ POST /v1/jarvis/missions/{missionId}/tool-approvals/{traceId}/approve
 POST /v1/jarvis/missions/{missionId}/tool-approvals/{traceId}/deny
 ```
 
-Direct Mission dispatch example:
+Dispatch-level destructive confirmation and per-tool approval are separate gates and both remain active.
 
-```json
-{
-  "prompt": "Research the current project and produce a tested implementation plan.",
-  "language": "en",
-  "confirmed": false
-}
+## Runtime networking
+
+Default PersonalJarvis address:
+
+```text
+http://127.0.0.1:47821/
 ```
+
+Threadline rejects non-loopback Jarvis targets unless `Threadline:Jarvis:AllowRemoteRuntime=true` is explicitly configured.
+
+The browser command hub also remains loopback/local-token protected.
 
 ## Validation
 
-The integration branch contains `.github/workflows/jarvis-bridge-validation.yml`, scoped to `feature/jarvis-runtime-bridge`. It restores/builds the .NET service on `windows-latest` and runs the Threadline.Core test suite, including Ask-vs-Mission routing tests.
+The branch validation workflow (`.github/workflows/jarvis-bridge-validation.yml`) is designed to prove the non-interactive parts of the integration on `windows-latest`:
 
-## Next integration stages
+- parse the bootstrap PowerShell script;
+- clone the pinned PersonalJarvis revision and prove the risk patch applies cleanly;
+- Python-compile the patched MCP modules;
+- build Threadline.Service;
+- build Device MCP, Browser MCP, Privileged MCP, and Privileged Broker;
+- MCP protocol-smoke-test all three servers and require `destructiveHint=true` on every privileged tool;
+- publish the same self-contained runtime shapes used by bootstrap;
+- install/build the browser extension from its lockfile;
+- restore/build the WinUI application with Visual Studio MSBuild;
+- run Threadline.Core and Threadline.Service tests.
 
-1. Surface Mission progress, critic verdicts, artifacts, and destructive/tool approvals in the WinUI transcript.
-2. Register Jarvis Missions and computer-use as first-class Threadline capabilities/actions.
-3. Add PersonalJarvis lifecycle management to Threadline Doctor and the Windows service startup path.
-4. Connect MyAika as an optional companion/personality/memory provider behind the same capability interface.
-5. Add local creative-model and ComfyUI adapters as separate capabilities so fiction and image workflows do not depend on one hosted provider.
-6. Add scheduler/trigger routing for recurring personal automations.
+Local `./eng/build-windows.ps1` now builds the same Threadline agent stack plus browser extension before the WinUI application.
 
-The intended long-term product shape is one assistant surface with separate, replaceable subsystems: Threadline for native Windows context, PersonalJarvis for agentic execution, and AIKA for companion/personality workflows where desired.
+Hosted CI cannot prove real interactive UI Automation, a signed-in browser session, or the UAC consent desktop. `eng/test-device-agent.ps1` remains the interactive Windows smoke path for those device-level checks.
+
+## Product boundary
+
+The intended system is one assistant surface with replaceable subsystems:
+
+- **Threadline**: Windows context, memory, privacy, routing, owner controls, local service and capability bridges.
+- **PersonalJarvis**: Mission orchestration, workers, critic, tool execution and approval workflow.
+- **AIKA / JARVIS**: user-facing personal assistant experience and approval surface.
+- **Future adapters**: companion/personality memory, local creative models, ComfyUI, voice/wake word, and scheduled automations can attach behind the same capability boundaries without turning one model into an all-powerful monolith.
