@@ -12,6 +12,12 @@ public static class PersonalJarvisRuntimeLauncher
         "runtimes",
         "PersonalJarvis");
 
+    public static string DefaultMcpConfigPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "ThreadlineAI",
+        "jarvis",
+        "mcp.json");
+
     public static async Task<PersonalJarvisLaunchResult> EnsureStartedAsync(CancellationToken cancellationToken = default)
     {
         if (await IsHealthyAsync(cancellationToken))
@@ -41,6 +47,7 @@ public static class PersonalJarvisRuntimeLauncher
         };
 
         startInfo.Environment["THREADLINE_LAUNCHED_BY"] = "Threadline.Windows";
+        startInfo.Environment["JARVIS_MCP_CONFIG"] = DefaultMcpConfigPath;
 
         try
         {
@@ -58,7 +65,7 @@ public static class PersonalJarvisRuntimeLauncher
                     true,
                     true,
                     process.Id,
-                    $"Jarvis: started automatically (PID {process.Id})");
+                    $"Jarvis: started automatically (PID {process.Id}); MCP config: {DefaultMcpConfigPath}");
             }
 
             var message = process.HasExited
