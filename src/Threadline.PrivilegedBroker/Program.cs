@@ -4,9 +4,11 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
 
-var exitCode = await PrivilegedBroker.RunAsync(args);
+var exitCode = await Threadline.PrivilegedBroker.PrivilegedBroker.RunAsync(args);
 Environment.ExitCode = exitCode;
 
+namespace Threadline.PrivilegedBroker
+{
 internal static partial class PrivilegedBroker
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
@@ -48,7 +50,10 @@ internal static partial class PrivilegedBroker
             if (responsePath is not null)
             {
                 try { await WriteResponseAsync(responsePath, new BrokerResponse("unknown", false, null, ex.Message, DateTimeOffset.UtcNow)); }
-                catch { }
+                catch (IOException)
+                {
+                    // The broker is already on its error path; a failed response write cannot be recovered here.
+                }
             }
             if (requestPath is not null) TryDelete(requestPath);
             return 1;
@@ -136,7 +141,11 @@ internal static partial class PrivilegedBroker
         try { await process.WaitForExitAsync(timeout.Token); }
         catch (OperationCanceledException)
         {
-            try { process.Kill(entireProcessTree: true); } catch { }
+            try { process.Kill(entireProcessTree: true); }
+            catch (InvalidOperationException)
+            {
+                // The process exited between timeout detection and the kill request.
+            }
             throw new TimeoutException($"{file} timed out after {timeoutSeconds} seconds.");
         }
         var stdout = await stdoutTask;
@@ -156,7 +165,8 @@ internal static partial class PrivilegedBroker
 
     private static async Task WriteResponseAsync(string path, BrokerResponse response)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var directory = Path.GetDirectoryName(path) ?? throw new InvalidOperationException("Broker response path has no parent directory.");
+        Directory.CreateDirectory(directory);
         var temp = path + ".tmp";
         await File.WriteAllTextAsync(temp, JsonSerializer.Serialize(response, Json));
         File.Move(temp, path, overwrite: true);
@@ -170,9 +180,17 @@ internal static partial class PrivilegedBroker
     private static string Required(Dictionary<string, string> args, string name) => args.TryGetValue(name, out var value) && !string.IsNullOrWhiteSpace(value) ? value.Trim() : throw new ArgumentException($"'{name}' is required.");
     private static string? ValueAfter(string[] args, string flag) { var index = Array.FindIndex(args, item => string.Equals(item, flag, StringComparison.OrdinalIgnoreCase)); return index >= 0 && index + 1 < args.Length ? args[index + 1] : null; }
     private static string Trim(string value) => value.Length <= 12000 ? value.Trim() : value[..12000].Trim() + "...[truncated]";
-    private static void TryDelete(string path) { try { File.Delete(path); } catch { } }
+    private static void TryDelete(string path)
+    {
+        try { File.Delete(path); }
+        catch (IOException)
+        {
+            // Request cleanup is best effort after the operation has already completed.
+        }
+    }
 
     [GeneratedRegex("^[A-Za-z0-9._-]{1,200}$", RegexOptions.CultureInvariant)] private static partial Regex SafeIdentifier();
     private sealed record BrokerRequest(string RequestId, string Operation, Dictionary<string, string> Arguments, DateTimeOffset CreatedAt);
     private sealed record BrokerResponse(string RequestId, bool Success, Dictionary<string, string>? Details, string? Error, DateTimeOffset CompletedAt);
+}
 }
