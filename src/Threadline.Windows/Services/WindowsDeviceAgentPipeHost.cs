@@ -93,7 +93,7 @@ public sealed class WindowsDeviceAgentPipeHost : IAsyncDisposable
                 return new DevicePipeResponse(true, new { ready = true, pipe = PipeName, interactive = Environment.UserInteractive }, null);
 
             case "capabilities":
-                return new DevicePipeResponse(true, _agent.GetCapabilities(), null);
+                return new DevicePipeResponse(true, GetHostCapabilities(), null);
 
             case "observe":
                 return new DevicePipeResponse(true, _agent.ObserveDesktop(), null);
@@ -130,6 +130,29 @@ public sealed class WindowsDeviceAgentPipeHost : IAsyncDisposable
             default:
                 throw new ArgumentException($"Unsupported device method '{request.Method}'.");
         }
+    }
+
+    private IReadOnlyList<DeviceCapability> GetHostCapabilities()
+    {
+        var capabilities = _agent.GetCapabilities().ToList();
+        capabilities.Add(new DeviceCapability(
+            "windows.uia-inspection",
+            "Windows UI Automation inspection",
+            new HashSet<DeviceOperationKind> { DeviceOperationKind.InspectControls },
+            Priority: 95,
+            RequiresInteractiveDesktop: true,
+            "Enumerates real UI Automation controls and returns exact names, AutomationIds, types, enabled state, and keyboard-focusable state before mutation."));
+        capabilities.Add(new DeviceCapability(
+            "windows.screen-ocr",
+            "Windows screenshot + OCR observation",
+            new HashSet<DeviceOperationKind> { DeviceOperationKind.CaptureScreen },
+            Priority: 40,
+            RequiresInteractiveDesktop: true,
+            "Fallback visual evidence for custom/canvas/poorly exposed interfaces. It is observation, not the primary selector strategy."));
+        return capabilities
+            .OrderByDescending(capability => capability.Priority)
+            .ThenBy(capability => capability.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
