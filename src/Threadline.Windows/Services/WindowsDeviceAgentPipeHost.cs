@@ -35,7 +35,7 @@ public sealed class WindowsDeviceAgentPipeHost : IAsyncDisposable
     public void Start()
     {
         if (_acceptLoop is not null) return;
-        _acceptLoop = Task.Run(() => AcceptLoopAsync(_shutdown.Token));
+        _acceptLoop = Task.Run(() => AcceptLoopAsync(_shutdown.Token), _shutdown.Token);
     }
 
     public void UpdateOwnerAuthority(DeviceAuthorityGrant grant)
@@ -46,11 +46,14 @@ public sealed class WindowsDeviceAgentPipeHost : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        _shutdown.Cancel();
+        await _shutdown.CancelAsync();
         if (_acceptLoop is not null)
         {
             try { await _acceptLoop; }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException)
+            {
+                // Expected when disposal cancels the named-pipe accept loop.
+            }
         }
         _shutdown.Dispose();
     }
