@@ -23,6 +23,7 @@ public sealed partial class MainWindow
     public void EnsureJarvisFrontAndCenterStartedAfterActivation()
     {
         ApplyJarvisLaunchIdentity();
+        WireJarvisComposer();
         OpenJarvisAtStartup();
         QueueJarvisLaunchReveal();
         QueueJarvisLaunchReveal();
