@@ -4,6 +4,7 @@ public enum DeviceOperationKind
 {
     ObserveDesktop,
     CaptureScreen,
+    InspectControls,
     ListApplications,
     LaunchApplication,
     FocusWindow,
@@ -96,6 +97,23 @@ public sealed record DeviceScreenCaptureResult(
     int Top,
     int Width,
     int Height,
+    DateTimeOffset CapturedAt,
+    string? Error = null,
+    IReadOnlyDictionary<string, string>? Metadata = null);
+
+public sealed record DeviceUiControlObservation(
+    string Name,
+    string AutomationId,
+    string ControlType,
+    bool IsEnabled,
+    bool IsKeyboardFocusable);
+
+public sealed record DeviceUiInspectionResult(
+    bool Success,
+    string WindowTitle,
+    string ProcessName,
+    int ProcessId,
+    IReadOnlyList<DeviceUiControlObservation> Controls,
     DateTimeOffset CapturedAt,
     string? Error = null,
     IReadOnlyDictionary<string, string>? Metadata = null);
