@@ -28,18 +28,25 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Validate bootstrap PowerShell syntax
+      - name: Validate PowerShell tooling syntax
         shell: pwsh
         run: |
-          $tokens = $null
-          $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile(
-            (Resolve-Path 'eng/bootstrap-personal-jarvis.ps1'),
-            [ref]$tokens,
-            [ref]$errors) | Out-Null
-          if ($errors.Count -gt 0) {
-            $errors | ForEach-Object { Write-Error $_.Message }
-            throw "bootstrap-personal-jarvis.ps1 has $($errors.Count) PowerShell parse error(s)."
+          foreach ($path in @(
+            'eng/bootstrap-personal-jarvis.ps1',
+            'eng/build-windows.ps1',
+            'eng/test-device-agent.ps1',
+            'eng/test-jarvis-stack.ps1'
+          )) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $path),
+              [ref]$tokens,
+              [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error "$path: $($_.Message)" }
+              throw "$path has $($errors.Count) PowerShell parse error(s)."
+            }
           }
 
       - name: Validate pinned PersonalJarvis risk patch
