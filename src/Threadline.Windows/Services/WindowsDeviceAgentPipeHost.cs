@@ -11,12 +11,16 @@ public sealed class WindowsDeviceAgentPipeHost : IAsyncDisposable
     public const string PipeName = "Threadline.DeviceAgent.v1";
 
     private readonly WindowsDeviceAgent _agent;
+    private readonly WindowsDeviceScreenObserver _screenObserver;
     private readonly CancellationTokenSource _shutdown = new();
     private Task? _acceptLoop;
 
-    public WindowsDeviceAgentPipeHost(WindowsDeviceAgent? agent = null)
+    public WindowsDeviceAgentPipeHost(
+        WindowsDeviceAgent? agent = null,
+        WindowsDeviceScreenObserver? screenObserver = null)
     {
         _agent = agent ?? new WindowsDeviceAgent();
+        _screenObserver = screenObserver ?? new WindowsDeviceScreenObserver();
     }
 
     public void Start()
@@ -91,6 +95,12 @@ public sealed class WindowsDeviceAgentPipeHost : IAsyncDisposable
             case "observe":
                 return new DevicePipeResponse(true, _agent.ObserveDesktop(), null);
 
+            case "capture":
+            {
+                var result = await _screenObserver.CaptureAsync(request.Target, cancellationToken);
+                return new DevicePipeResponse(result.Success, result, result.Error);
+            }
+
             case "authority/get":
                 return new DevicePipeResponse(true, _agent.AuthorityGrant, null);
 
@@ -123,6 +133,7 @@ public sealed class WindowsDeviceAgentPipeHost : IAsyncDisposable
     private sealed record DevicePipeRequest(
         string? Method,
         DeviceCommand? Command = null,
+        DeviceTarget? Target = null,
         bool Confirmed = false,
         DeviceAuthorityGrant? Authority = null);
 
