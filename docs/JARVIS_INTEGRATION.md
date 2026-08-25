@@ -57,6 +57,7 @@ Defaults are intentionally useful for a local install:
 Threadline:Jarvis:Enabled = true
 Threadline:Jarvis:BaseAddress = http://127.0.0.1:47821/
 Threadline:Jarvis:RequestTimeoutSeconds = 30
+Threadline:Jarvis:AllowRemoteRuntime = false
 ```
 
 Environment-variable equivalents:
@@ -65,7 +66,10 @@ Environment-variable equivalents:
 $env:Threadline__Jarvis__Enabled = 'true'
 $env:Threadline__Jarvis__BaseAddress = 'http://127.0.0.1:47821/'
 $env:Threadline__Jarvis__RequestTimeoutSeconds = '30'
+$env:Threadline__Jarvis__AllowRemoteRuntime = 'false'
 ```
+
+The runtime address is restricted to loopback by default. A non-loopback HTTP/HTTPS address is rejected unless `AllowRemoteRuntime` is explicitly enabled. That keeps the first version local-first and avoids turning Threadline into an accidental network proxy.
 
 ## Bridge endpoints
 
