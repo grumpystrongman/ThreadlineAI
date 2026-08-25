@@ -6,8 +6,10 @@ using System.Text.Json.Serialization;
 using Threadline.Core;
 
 const string pipeName = "Threadline.DeviceAgent.v1";
-await new DeviceMcpServer(pipeName).RunAsync();
+await new Threadline.DeviceMcp.DeviceMcpServer(pipeName).RunAsync();
 
+namespace Threadline.DeviceMcp
+{
 internal sealed class DeviceMcpServer
 {
     private readonly string _pipeName;
@@ -299,10 +301,11 @@ internal sealed class DeviceMcpServer
             clone.Remove("_name");
             objectProperties[name] = clone;
         }
+        var requiredNodes = required.Select(item => (JsonNode?)JsonValue.Create(item)).ToArray();
         return new JsonObject
         {
             ["type"] = "object", ["properties"] = objectProperties,
-            ["required"] = new JsonArray(required.Select(item => JsonValue.Create(item)).ToArray()), ["additionalProperties"] = false
+            ["required"] = new JsonArray(requiredNodes), ["additionalProperties"] = false
         };
     }
 
@@ -340,4 +343,5 @@ internal sealed class DeviceMcpServer
     private static int? OptionalInt(JsonObject args, string name) => args[name] is null ? null : args[name]!.GetValue<int>();
     private static bool? OptionalBool(JsonObject args, string name) => args[name] is null ? null : args[name]!.GetValue<bool>();
     private static string Id(string prefix) => $"{prefix}-{Guid.NewGuid():N}";
+}
 }
