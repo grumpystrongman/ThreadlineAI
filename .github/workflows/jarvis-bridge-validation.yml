@@ -19,10 +19,13 @@ jobs:
           dotnet restore src/Threadline.Core/Threadline.Core.csproj
           dotnet restore src/Threadline.Infrastructure/Threadline.Infrastructure.csproj
           dotnet restore src/Threadline.Service/Threadline.Service.csproj
+          dotnet restore src/Threadline.Windows/Threadline.Windows.csproj
           dotnet restore tests/Threadline.Core.Tests/Threadline.Core.Tests.csproj
           dotnet restore tests/Threadline.Service.Tests/Threadline.Service.Tests.csproj
       - name: Build service
         run: dotnet build src/Threadline.Service/Threadline.Service.csproj --configuration Release --no-restore
+      - name: Build Windows app
+        run: dotnet build src/Threadline.Windows/Threadline.Windows.csproj --configuration Release --no-restore
       - name: Run core tests
         run: dotnet test tests/Threadline.Core.Tests/Threadline.Core.Tests.csproj --configuration Release --no-restore --logger trx
       - name: Run service tests
