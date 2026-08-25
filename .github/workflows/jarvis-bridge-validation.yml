@@ -53,10 +53,14 @@ jobs:
         shell: pwsh
         run: |
           $runtime = Join-Path $env:RUNNER_TEMP 'PersonalJarvis-risk-validation'
-          git clone --quiet https://github.com/PersonalJarvis/PersonalJarvis.git $runtime
+          New-Item -ItemType Directory -Force -Path $runtime | Out-Null
           Push-Location $runtime
           try {
-            git checkout --quiet --detach b85535a50a3cece8cd269325b6b3ea2cb900e43f
+            git init --quiet
+            git remote add origin https://github.com/PersonalJarvis/PersonalJarvis.git
+            git fetch --quiet --depth=1 origin b85535a50a3cece8cd269325b6b3ea2cb900e43f
+            if ($LASTEXITCODE -ne 0) { throw 'Could not fetch the pinned PersonalJarvis revision.' }
+            git checkout --quiet --detach FETCH_HEAD
             git apply --check "$env:GITHUB_WORKSPACE\eng\patches\personal-jarvis-mcp-risk.patch"
             if ($LASTEXITCODE -ne 0) { throw 'PersonalJarvis MCP risk patch no longer applies to the pinned revision.' }
             git apply --whitespace=error-all "$env:GITHUB_WORKSPACE\eng\patches\personal-jarvis-mcp-risk.patch"
