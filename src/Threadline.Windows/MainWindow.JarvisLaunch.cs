@@ -30,12 +30,57 @@ public sealed partial class MainWindow
         QueueStartupShuttleTabs();
     }
 
+    public void ReportAiRuntimeStartup(
+        bool threadlineReady,
+        string threadlineMessage,
+        bool jarvisReady,
+        bool jarvisInstalled,
+        string jarvisMessage)
+    {
+        if (jarvisReady && threadlineReady)
+        {
+            SidecarAttachmentText.Text = "Personal AI ready · Threadline context engine active";
+            TrustControlStatusText.Text = "Jarvis ready · Local-first · Governed";
+            AddTimeline("AIKA / JARVIS runtime and Threadline service are ready.");
+            return;
+        }
+
+        if (!jarvisInstalled)
+        {
+            SidecarAttachmentText.Text = "Personal AI ready for chat · Jarvis setup needed for Missions";
+            TrustControlStatusText.Text = "Direct AI available · Jarvis setup needed";
+            AppendTranscript(
+                "AIKA / JARVIS",
+                "My conversation and Threadline context layer are available, but the local Jarvis Mission runtime has not been installed yet. Once it is bootstrapped, future launches will start it automatically.");
+            AddTimeline(jarvisMessage);
+            return;
+        }
+
+        if (!jarvisReady)
+        {
+            SidecarAttachmentText.Text = "Personal AI available · Jarvis runtime needs attention";
+            TrustControlStatusText.Text = "Direct AI available · Jarvis unavailable";
+            AppendTranscript(
+                "AIKA / JARVIS",
+                $"The Jarvis Mission runtime did not become ready, so I can still use Threadline's direct AI path. Runtime detail: {jarvisMessage}");
+            AddTimeline(jarvisMessage);
+            return;
+        }
+
+        SidecarAttachmentText.Text = "Jarvis ready · Threadline service needs attention";
+        TrustControlStatusText.Text = "Jarvis ready · Context engine degraded";
+        AppendTranscript(
+            "AIKA / JARVIS",
+            $"Jarvis is ready, but Threadline's local context service needs attention. Service detail: {threadlineMessage}");
+        AddTimeline(threadlineMessage);
+    }
+
     private void ApplyJarvisLaunchIdentity()
     {
         Title = "AIKA / JARVIS";
         QuestionBox.PlaceholderText = "Ask AIKA / JARVIS... (Ctrl+Enter to send)";
-        SidecarAttachmentText.Text = "Personal AI online · Threadline context engine underneath";
-        TrustControlStatusText.Text = "Local-first · Governed";
+        SidecarAttachmentText.Text = "Personal AI · Threadline context engine underneath";
+        TrustControlStatusText.Text = "Starting local AI services…";
 
         ReplaceVisibleText(RootShell, "ThreadlineAI", "AIKA / JARVIS");
 
