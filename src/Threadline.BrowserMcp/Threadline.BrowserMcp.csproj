@@ -7,4 +7,7 @@
     <AssemblyName>Threadline.BrowserMcp</AssemblyName>
     <RootNamespace>Threadline.BrowserMcp</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Threadline.McpCommon/Threadline.McpCommon.csproj" />
+  </ItemGroup>
 </Project>
