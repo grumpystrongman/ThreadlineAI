@@ -70,7 +70,10 @@ function Install-ThreadlineDeviceMcp {
         description = 'Threadline interactive Windows Device Agent. Native UI/app control with closed-loop verification.'
     }
     $config.mcpServers | Add-Member -NotePropertyName 'threadline-windows-device' -NotePropertyValue $serverSpec -Force
-    $config | ConvertTo-Json -Depth 20 | Set-Content -Path $JarvisMcpConfig -Encoding UTF8
+
+    $json = $config | ConvertTo-Json -Depth 20
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($JarvisMcpConfig, $json, $utf8NoBom)
 
     Write-Host "Registered Jarvis MCP server: threadline-windows-device"
     Write-Host "MCP config: $JarvisMcpConfig"
