@@ -24,48 +24,8 @@ public sealed class PersonalJarvisClient
 
     public JarvisRuntimeOptions Options => _options;
 
-    public async Task<JarvisApiResponse> ProbeAsync(CancellationToken cancellationToken = default)
-    {
-        if (!_options.Enabled)
-        {
-            return JsonResponse(HttpStatusCode.ServiceUnavailable, new
-            {
-                enabled = false,
-                reachable = false,
-                status = "disabled",
-                detail = "The PersonalJarvis runtime bridge is disabled."
-            });
-        }
-
-        try
-        {
-            return await SendAsync(
-                new HttpRequestMessage(HttpMethod.Get, "api/missions?limit=1"),
-                cancellationToken);
-        }
-        catch (HttpRequestException ex)
-        {
-            return JsonResponse(HttpStatusCode.ServiceUnavailable, new
-            {
-                enabled = true,
-                reachable = false,
-                status = "unreachable",
-                detail = ex.Message,
-                baseAddress = _options.BaseAddress.ToString()
-            });
-        }
-        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            return JsonResponse(HttpStatusCode.GatewayTimeout, new
-            {
-                enabled = true,
-                reachable = false,
-                status = "timeout",
-                detail = $"PersonalJarvis did not respond within {_options.RequestTimeout.TotalSeconds:0} seconds.",
-                baseAddress = _options.BaseAddress.ToString()
-            });
-        }
-    }
+    public Task<JarvisApiResponse> ProbeAsync(CancellationToken cancellationToken = default) =>
+        SendAsync(new HttpRequestMessage(HttpMethod.Get, "api/missions?limit=1"), cancellationToken);
 
     public Task<JarvisApiResponse> DispatchMissionAsync(
         string prompt,
@@ -132,38 +92,69 @@ public sealed class PersonalJarvisClient
     {
         if (!_options.Enabled)
         {
+            request.Dispose();
             return JsonResponse(HttpStatusCode.ServiceUnavailable, new
             {
+                enabled = false,
+                reachable = false,
+                status = "disabled",
                 error = "PersonalJarvis runtime bridge is disabled."
             });
         }
 
-        using (request)
-        using (var response = await _httpClient.SendAsync(request, cancellationToken))
+        try
         {
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
-            JsonElement payload;
-            if (string.IsNullOrWhiteSpace(body))
+            using (request)
+            using (var response = await _httpClient.SendAsync(request, cancellationToken))
             {
-                payload = JsonSerializer.SerializeToElement(new { });
-            }
-            else
-            {
-                try
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                JsonElement payload;
+                if (string.IsNullOrWhiteSpace(body))
                 {
-                    payload = JsonSerializer.Deserialize<JsonElement>(body);
+                    payload = JsonSerializer.SerializeToElement(new { });
                 }
-                catch (JsonException)
+                else
                 {
-                    payload = JsonSerializer.SerializeToElement(new
+                    try
                     {
-                        error = "PersonalJarvis returned a non-JSON response.",
-                        detail = body.Length <= 2000 ? body : body[..2000]
-                    });
+                        payload = JsonSerializer.Deserialize<JsonElement>(body);
+                    }
+                    catch (JsonException)
+                    {
+                        payload = JsonSerializer.SerializeToElement(new
+                        {
+                            error = "PersonalJarvis returned a non-JSON response.",
+                            detail = body.Length <= 2000 ? body : body[..2000]
+                        });
+                    }
                 }
-            }
 
-            return new JarvisApiResponse(response.StatusCode, payload);
+                return new JarvisApiResponse(response.StatusCode, payload);
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            return JsonResponse(HttpStatusCode.ServiceUnavailable, new
+            {
+                enabled = true,
+                reachable = false,
+                status = "unreachable",
+                error = "PersonalJarvis is not reachable.",
+                detail = ex.Message,
+                baseAddress = _options.BaseAddress.ToString()
+            });
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return JsonResponse(HttpStatusCode.GatewayTimeout, new
+            {
+                enabled = true,
+                reachable = false,
+                status = "timeout",
+                error = "PersonalJarvis timed out.",
+                detail = $"No response within {_options.RequestTimeout.TotalSeconds:0} seconds.",
+                baseAddress = _options.BaseAddress.ToString()
+            });
         }
     }
 
