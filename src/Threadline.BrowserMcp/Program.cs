@@ -149,7 +149,7 @@ internal sealed class BrowserMcpServer
             clone.Remove("_name");
             props[name] = clone;
         }
-        return new JsonObject { ["type"] = "object", ["properties"] = props, ["required"] = new JsonArray(required.Select(JsonValue.Create).ToArray()), ["additionalProperties"] = false };
+        return new JsonObject { ["type"] = "object", ["properties"] = props, ["required"] = new JsonArray(required.Select(item => JsonValue.Create(item)).ToArray()), ["additionalProperties"] = false };
     }
     private static JsonObject ToolResult(string text, bool isError) => new() { ["content"] = new JsonArray { new JsonObject { ["type"] = "text", ["text"] = text } }, ["isError"] = isError };
     private async Task WriteResultAsync(JsonNode id, JsonNode result)
