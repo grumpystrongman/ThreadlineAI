@@ -21,6 +21,9 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 var serviceOptions = ThreadlineServiceOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(serviceOptions);
 
+var jarvisRuntimeOptions = JarvisRuntimeOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(jarvisRuntimeOptions);
+
 if (serviceOptions.CorsAllowedOrigins.Count > 0)
 {
     builder.Services.AddCors(options =>
@@ -58,6 +61,7 @@ builder.Services.AddSingleton(sp => new DpapiProtectedSecretStore(builder.Config
 builder.Services.AddSingleton<ISecretStore>(sp => sp.GetRequiredService<DpapiProtectedSecretStore>());
 
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient<PersonalJarvisClient>();
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddSingleton<SecretRedactor>();
 builder.Services.AddSingleton<PrivacyRuntimeState>();
@@ -105,6 +109,7 @@ app.MapThreadlineReliabilityApi();
 app.MapThreadlineSecurityPrivacyApi();
 app.MapThreadlineProviderAuditApi();
 app.MapThreadlineWorkThreadApi();
+app.MapThreadlineJarvisApi();
 app.MapThreadlineApi();
 
 app.Run();
