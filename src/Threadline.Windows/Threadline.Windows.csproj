@@ -21,8 +21,4 @@
     <PackageReference Include="System.Management" Version="9.0.0" />
     <ProjectReference Include="..\Threadline.Core\Threadline.Core.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <!-- V2 replaces the first experimental implementation while preserving the public types. -->
-    <Compile Remove="Services\WindowsDeviceAgent.cs" />
-  </ItemGroup>
 </Project>
