@@ -51,7 +51,11 @@ jobs:
 
           $toolResponse = $output[-1] | ConvertFrom-Json
           $names = @($toolResponse.result.tools | ForEach-Object { $_.name })
-          $required = @('observe_desktop','inspect_controls','capture_window','open_application','focus_window','invoke_control','set_control_text','send_keys','click_at')
+          $required = @(
+            'observe_desktop','inspect_controls','capture_window',
+            'open_application','focus_window','invoke_control','set_control_text',
+            'read_file','write_file','run_powershell','send_keys','click_at'
+          )
           foreach ($name in $required) {
             if ($names -notcontains $name) { throw "Device MCP tool '$name' was not advertised." }
           }
