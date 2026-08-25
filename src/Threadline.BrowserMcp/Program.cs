@@ -2,8 +2,10 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-await new BrowserMcpServer().RunAsync();
+await new Threadline.BrowserMcp.BrowserMcpServer().RunAsync();
 
+namespace Threadline.BrowserMcp
+{
 internal sealed class BrowserMcpServer
 {
     private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
@@ -149,7 +151,8 @@ internal sealed class BrowserMcpServer
             clone.Remove("_name");
             props[name] = clone;
         }
-        return new JsonObject { ["type"] = "object", ["properties"] = props, ["required"] = new JsonArray(required.Select(item => JsonValue.Create(item)).ToArray()), ["additionalProperties"] = false };
+        var requiredNodes = required.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray();
+        return new JsonObject { ["type"] = "object", ["properties"] = props, ["required"] = new JsonArray(requiredNodes), ["additionalProperties"] = false };
     }
     private static JsonObject ToolResult(string text, bool isError) => new() { ["content"] = new JsonArray { new JsonObject { ["type"] = "text", ["text"] = text } }, ["isError"] = isError };
     private async Task WriteResultAsync(JsonNode id, JsonNode result)
@@ -171,4 +174,5 @@ internal sealed class BrowserMcpServer
         try { return File.Exists(path) ? File.ReadAllText(path).Trim() : null; }
         catch (IOException) { return null; }
     }
+}
 }
