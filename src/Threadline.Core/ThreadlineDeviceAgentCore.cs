@@ -3,6 +3,7 @@ namespace Threadline.Core;
 public enum DeviceOperationKind
 {
     ObserveDesktop,
+    CaptureScreen,
     ListApplications,
     LaunchApplication,
     FocusWindow,
@@ -85,6 +86,18 @@ public sealed record DeviceObservation(
     DeviceWindowObservation? ForegroundWindow,
     IReadOnlyList<DeviceWindowObservation> Windows,
     string? AccessibleText = null,
+    IReadOnlyDictionary<string, string>? Metadata = null);
+
+public sealed record DeviceScreenCaptureResult(
+    bool Success,
+    string? ImagePath,
+    string OcrText,
+    int Left,
+    int Top,
+    int Width,
+    int Height,
+    DateTimeOffset CapturedAt,
+    string? Error = null,
     IReadOnlyDictionary<string, string>? Metadata = null);
 
 public sealed record DeviceVerificationResult(
