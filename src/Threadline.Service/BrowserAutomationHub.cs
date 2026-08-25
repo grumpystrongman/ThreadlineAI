@@ -190,22 +190,27 @@ public static class BrowserAutomationEndpointMappings
 {
     public static void MapThreadlineBrowserAutomation(this WebApplication app)
     {
-        app.MapPost("/v1/browser-agent/socket-ticket", (BrowserAutomationHub hub, HttpContext context) =>
+        var secured = app.MapGroup("/v1/browser-agent")
+            .RequireThreadlineLocalAccess();
+
+        secured.MapPost("/socket-ticket", (BrowserAutomationHub hub, HttpContext context) =>
         {
             var ticket = hub.CreateTicket();
             var scheme = context.Request.IsHttps ? "wss" : "ws";
             return Results.Ok(new { ticket, websocketUrl = $"{scheme}://{context.Request.Host}/v1/browser-agent/ws?ticket={Uri.EscapeDataString(ticket)}", expiresInSeconds = 30 });
-        }).RequireThreadlineLocalAccess();
+        });
 
-        app.MapGet("/v1/browser-agent/status", (BrowserAutomationHub hub) => Results.Ok(hub.GetStatus()))
-            .RequireThreadlineLocalAccess();
+        secured.MapGet("/status", (BrowserAutomationHub hub) => Results.Ok(hub.GetStatus()));
 
-        app.MapPost("/v1/browser-agent/execute", async (BrowserAutomationRequest request, BrowserAutomationHub hub, CancellationToken ct) =>
+        secured.MapPost("/execute", async (BrowserAutomationRequest request, BrowserAutomationHub hub, CancellationToken ct) =>
         {
             var result = await hub.ExecuteAsync(request, ct);
             return result.Success ? Results.Ok(result) : Results.Json(result, statusCode: StatusCodes.Status503ServiceUnavailable);
-        }).RequireThreadlineLocalAccess();
+        });
 
+        // The WebSocket itself is authorized by the one-time, 30-second ticket minted only
+        // through the secured local-token endpoint above. Keeping the service token out of the
+        // WebSocket URL avoids leaking it through browser/network diagnostics.
         app.MapGet("/v1/browser-agent/ws", async (HttpContext context, BrowserAutomationHub hub, CancellationToken ct) =>
         {
             if (!context.WebSockets.IsWebSocketRequest)
