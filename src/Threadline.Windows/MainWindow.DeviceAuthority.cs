@@ -27,9 +27,9 @@ public sealed partial class MainWindow
         var button = new Button
         {
             MinWidth = 82,
-            Padding = new Thickness(9, 4, 9, 4),
-            ToolTipService = { ToolTip = "Owner Authority controls what AIKA/JARVIS may do on this computer without asking each step." }
+            Padding = new Thickness(9, 4, 9, 4)
         };
+        ToolTipService.SetToolTip(button, "Owner Authority controls what AIKA/JARVIS may do on this computer without asking each step.");
         if (Resources.TryGetValue("SidecarButtonStyle", out var style) && style is Style buttonStyle) button.Style = buttonStyle;
         button.Click += OwnerAuthorityButton_Click;
         var insertAt = Math.Max(0, headerButtons.Children.IndexOf(AttachSidecarButton));
