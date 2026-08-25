@@ -9,11 +9,7 @@ let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
 let stopped = false;
 
-export function startBrowserAgent(): void {
-  stopped = false;
-  void connect();
-}
-
+export function startBrowserAgent(): void { stopped = false; void connect(); }
 export function stopBrowserAgent(): void {
   stopped = true;
   if (reconnectTimer) clearTimeout(reconnectTimer);
@@ -31,18 +27,14 @@ async function connect(): Promise<void> {
     const ws = new WebSocket(ticket.websocketUrl);
     socket = ws;
     ws.onopen = () => {
-      sendState('hello');
+      void sendState('hello');
       if (heartbeatTimer) clearInterval(heartbeatTimer);
-      heartbeatTimer = setInterval(() => sendState('state'), 20_000);
+      heartbeatTimer = setInterval(() => void sendState('state'), 20_000);
     };
     ws.onmessage = event => void handleMessage(event.data);
     ws.onclose = () => scheduleReconnect();
-    ws.onerror = () => {
-      try { ws.close(); } catch { /* ignored */ }
-    };
-  } catch {
-    scheduleReconnect();
-  }
+    ws.onerror = () => { try { ws.close(); } catch { /* ignored */ } };
+  } catch { scheduleReconnect(); }
 }
 
 function scheduleReconnect(): void {
@@ -50,59 +42,39 @@ function scheduleReconnect(): void {
   heartbeatTimer = undefined;
   socket = undefined;
   if (stopped || reconnectTimer) return;
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = undefined;
-    void connect();
-  }, 3_000);
+  reconnectTimer = setTimeout(() => { reconnectTimer = undefined; void connect(); }, 3_000);
 }
 
 async function sendState(type: 'hello' | 'state'): Promise<void> {
   const ws = socket;
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  ws.send(JSON.stringify({
-    type,
-    extensionVersion,
-    tabId: tab?.id,
-    windowId: tab?.windowId,
-    title: tab?.title,
-    url: tab?.url,
-    status: tab?.status
-  }));
+  ws.send(JSON.stringify({ type, extensionVersion, tabId: tab?.id, windowId: tab?.windowId, title: tab?.title, url: tab?.url, status: tab?.status }));
 }
 
 async function handleMessage(raw: unknown): Promise<void> {
   const ws = socket;
   if (!ws || ws.readyState !== WebSocket.OPEN || typeof raw !== 'string') return;
   let command: AgentCommand;
-  try { command = JSON.parse(raw) as AgentCommand; }
-  catch { return; }
+  try { command = JSON.parse(raw) as AgentCommand; } catch { return; }
   if (command.type !== 'command' || !command.commandId || !command.action) return;
 
   let response: AgentResult;
-  try {
-    response = { type: 'result', commandId: command.commandId, success: true, result: await execute(command.action, command.arguments ?? {}) };
-  } catch (error) {
-    response = { type: 'result', commandId: command.commandId, success: false, error: error instanceof Error ? error.message : String(error) };
-  }
+  try { response = { type: 'result', commandId: command.commandId, success: true, result: await execute(command.action, command.arguments ?? {}) }; }
+  catch (error) { response = { type: 'result', commandId: command.commandId, success: false, error: error instanceof Error ? error.message : String(error) }; }
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(response));
   void sendState('state');
 }
 
 async function execute(action: string, args: Record<string, unknown>): Promise<unknown> {
   switch (action) {
-    case 'get_state':
-      return await getState();
+    case 'get_state': return await getState();
     case 'navigate': {
       const tab = await resolveTab(args);
-      const url = requiredString(args, 'url');
-      const updated = await chrome.tabs.update(tab.id!, { url });
+      const updated = await chrome.tabs.update(tab.id!, { url: requiredString(args, 'url') });
       return tabSummary(updated);
     }
-    case 'new_tab': {
-      const created = await chrome.tabs.create({ url: optionalString(args, 'url') ?? 'about:blank', active: optionalBoolean(args, 'active') ?? true });
-      return tabSummary(created);
-    }
+    case 'new_tab': return tabSummary(await chrome.tabs.create({ url: optionalString(args, 'url') ?? 'about:blank', active: optionalBoolean(args, 'active') ?? true }));
     case 'activate_tab': {
       const tab = await resolveTab(args, true);
       const updated = await chrome.tabs.update(tab.id!, { active: true });
@@ -122,27 +94,24 @@ async function execute(action: string, args: Record<string, unknown>): Promise<u
       const tab = await resolveTab(args);
       return await sendContentCommand(tab.id!, action, args);
     }
-    default:
-      throw new Error(`Unsupported browser action '${action}'.`);
+    default: throw new Error(`Unsupported browser action '${action}'.`);
   }
 }
 
 async function getState(): Promise<unknown> {
   const tabs = await chrome.tabs.query({ currentWindow: true });
-  return {
-    tabs: tabs.map(tabSummary),
-    active: tabs.find(tab => tab.active) ? tabSummary(tabs.find(tab => tab.active)!) : undefined
-  };
+  const active = tabs.find(tab => tab.active);
+  return { tabs: tabs.map(tabSummary), active: active ? tabSummary(active) : undefined };
 }
 
-async function resolveTab(args: Record<string, unknown>, requireId = false): Promise<chrome.tabs.Tab> {
+async function resolveTab(args: Record<string, unknown>, allowUrlSearch = false): Promise<chrome.tabs.Tab> {
   const requestedId = typeof args.tab_id === 'number' ? args.tab_id : undefined;
   if (requestedId !== undefined) {
     const tab = await chrome.tabs.get(requestedId);
     if (!tab.id) throw new Error('Requested tab has no id.');
     return tab;
   }
-  if (requireId && typeof args.url_contains === 'string') {
+  if (allowUrlSearch && typeof args.url_contains === 'string') {
     const tabs = await chrome.tabs.query({});
     const match = tabs.find(tab => (tab.url ?? '').includes(String(args.url_contains)));
     if (match?.id) return match;
@@ -154,16 +123,19 @@ async function resolveTab(args: Record<string, unknown>, requireId = false): Pro
 
 async function sendContentCommand(tabId: number, action: string, args: Record<string, unknown>): Promise<unknown> {
   try {
-    return await chrome.tabs.sendMessage(tabId, { type: 'THREADLINE_BROWSER_AGENT_COMMAND', action, arguments: args });
+    const result = await chrome.tabs.sendMessage(tabId, { type: 'THREADLINE_BROWSER_AGENT_COMMAND', action, arguments: args }) as { __threadlineError?: boolean; error?: string } | unknown;
+    if (result && typeof result === 'object' && '__threadlineError' in result && (result as { __threadlineError?: boolean }).__threadlineError) {
+      throw new Error((result as { error?: string }).error ?? 'Browser DOM action failed.');
+    }
+    return result;
   } catch (error) {
-    throw new Error(`Browser content agent is unavailable for this page. Internal/browser-store pages intentionally block DOM control. ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Browser content agent could not complete '${action}'. Internal/browser-store pages intentionally block DOM control. ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
 function tabSummary(tab: chrome.tabs.Tab): Record<string, unknown> {
   return { tabId: tab.id, windowId: tab.windowId, title: tab.title, url: tab.url, active: tab.active, status: tab.status, incognito: tab.incognito };
 }
-
 function requiredString(args: Record<string, unknown>, name: string): string {
   const value = optionalString(args, name);
   if (!value) throw new Error(`'${name}' is required.`);
@@ -173,6 +145,4 @@ function optionalString(args: Record<string, unknown>, name: string): string | u
   const value = args[name];
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
-function optionalBoolean(args: Record<string, unknown>, name: string): boolean | undefined {
-  return typeof args[name] === 'boolean' ? args[name] as boolean : undefined;
-}
+function optionalBoolean(args: Record<string, unknown>, name: string): boolean | undefined { return typeof args[name] === 'boolean' ? args[name] as boolean : undefined; }
