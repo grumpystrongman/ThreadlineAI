@@ -16,16 +16,20 @@ jobs:
           dotnet-version: '8.0.x'
       - uses: microsoft/setup-msbuild@v2
 
-      - name: Restore .NET service and tests
+      - name: Restore .NET service, device MCP, and tests
         run: |
           dotnet restore src/Threadline.Core/Threadline.Core.csproj
           dotnet restore src/Threadline.Infrastructure/Threadline.Infrastructure.csproj
           dotnet restore src/Threadline.Service/Threadline.Service.csproj
+          dotnet restore src/Threadline.DeviceMcp/Threadline.DeviceMcp.csproj
           dotnet restore tests/Threadline.Core.Tests/Threadline.Core.Tests.csproj
           dotnet restore tests/Threadline.Service.Tests/Threadline.Service.Tests.csproj
 
       - name: Build service
         run: dotnet build src/Threadline.Service/Threadline.Service.csproj --configuration Release --no-restore
+
+      - name: Build Windows Device MCP
+        run: dotnet build src/Threadline.DeviceMcp/Threadline.DeviceMcp.csproj --configuration Release --no-restore
 
       - name: Restore and build Windows app with Visual Studio MSBuild
         shell: pwsh
