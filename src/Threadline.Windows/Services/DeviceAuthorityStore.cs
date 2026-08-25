@@ -15,7 +15,7 @@ public sealed class DeviceAuthorityStore
 
     public DeviceAuthorityStore(string? path = null)
     {
-        _path = path ?? Path.Combine(
+        _path = path ?? System.IO.Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "ThreadlineAI",
             "device-authority.json");
