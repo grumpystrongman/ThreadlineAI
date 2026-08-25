@@ -3,76 +3,25 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Threadline.McpCommon;
 
 await new Threadline.PrivilegedMcp.PrivilegedMcpServer().RunAsync();
 
 namespace Threadline.PrivilegedMcp
 {
-internal sealed class PrivilegedMcpServer
+internal sealed class PrivilegedMcpServer : McpStdioServer
 {
-    private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web) { WriteIndented = false };
     private readonly string _brokerExe = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "ThreadlineAI", "runtimes", "PrivilegedBroker", "Threadline.PrivilegedBroker.exe");
 
-    public async Task RunAsync(CancellationToken cancellationToken = default)
-    {
-        string? line;
-        while ((line = await Console.In.ReadLineAsync(cancellationToken)) is not null)
-        {
-            if (string.IsNullOrWhiteSpace(line)) continue;
-            JsonObject? request;
-            try { request = JsonNode.Parse(line) as JsonObject; }
-            catch (JsonException ex) { await WriteErrorAsync(null, -32700, ex.Message); continue; }
-            if (request is null) continue;
+    protected override string ServerName => "threadline-privileged";
+    protected override string ServerVersion => "0.1.0";
+    protected override string ToolFailurePrefix => "Protected Windows operation failed";
+    protected override string Instructions =>
+        "Every tool in this server is protected and destructiveHint=true. Jarvis must obtain user approval through its normal tool-approval workflow before invocation. Execution then crosses Windows' normal UAC elevation boundary; never bypass UAC or credentials. Only allowlisted broker operations exist; there is no arbitrary elevated shell.";
 
-            var id = request["id"]?.DeepClone();
-            var method = request["method"]?.GetValue<string>();
-            if (string.IsNullOrWhiteSpace(method)) continue;
-            try
-            {
-                switch (method)
-                {
-                    case "initialize":
-                        if (id is not null) await WriteResultAsync(id, Initialize(request["params"] as JsonObject));
-                        break;
-                    case "notifications/initialized":
-                    case "notifications/cancelled":
-                        break;
-                    case "ping":
-                        if (id is not null) await WriteResultAsync(id, new JsonObject());
-                        break;
-                    case "tools/list":
-                        if (id is not null) await WriteResultAsync(id, ToolList());
-                        break;
-                    case "tools/call":
-                        if (id is not null) await CallToolAsync(id, request["params"] as JsonObject, cancellationToken);
-                        break;
-                    default:
-                        if (id is not null) await WriteErrorAsync(id, -32601, $"Method not found: {method}");
-                        break;
-                }
-            }
-            catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException or UnauthorizedAccessException or TaskCanceledException)
-            {
-                if (id is not null) await WriteResultAsync(id, ToolResult($"Protected Windows operation failed: {ex.Message}", true));
-            }
-        }
-    }
-
-    private static JsonObject Initialize(JsonObject? parameters)
-    {
-        var requested = parameters?["protocolVersion"]?.GetValue<string>();
-        return new JsonObject
-        {
-            ["protocolVersion"] = string.IsNullOrWhiteSpace(requested) ? "2025-06-18" : requested,
-            ["capabilities"] = new JsonObject { ["tools"] = new JsonObject { ["listChanged"] = false } },
-            ["serverInfo"] = new JsonObject { ["name"] = "threadline-privileged", ["version"] = "0.1.0" },
-            ["instructions"] = "Every tool in this server is protected and destructiveHint=true. Jarvis must obtain user approval through its normal tool-approval workflow before invocation. Execution then crosses Windows' normal UAC elevation boundary; never bypass UAC or credentials. Only allowlisted broker operations exist; there is no arbitrary elevated shell."
-        };
-    }
-
-    private async Task CallToolAsync(JsonNode id, JsonObject? parameters, CancellationToken cancellationToken)
+    protected override async Task<JsonObject> ExecuteToolAsync(JsonObject? parameters, CancellationToken cancellationToken)
     {
         var name = parameters?["name"]?.GetValue<string>() ?? throw new ArgumentException("Tool name is required.");
         var args = parameters?["arguments"] as JsonObject ?? new JsonObject();
@@ -93,7 +42,7 @@ internal sealed class PrivilegedMcpServer
         };
 
         var result = await InvokeBrokerAsync(operation, values, cancellationToken);
-        await WriteResultAsync(id, ToolResult(JsonSerializer.Serialize(result, _json), !result.Success));
+        return ToolResult(JsonSerializer.Serialize(result, JsonOptions), !result.Success);
     }
 
     private async Task<BrokerResult> InvokeBrokerAsync(string operation, Dictionary<string, string> arguments, CancellationToken cancellationToken)
@@ -107,43 +56,59 @@ internal sealed class PrivilegedMcpServer
         var requestPath = Path.Combine(root, requestId + ".request.json");
         var responsePath = Path.Combine(root, requestId + ".response.json");
         var request = new { requestId, operation, arguments, createdAt = DateTimeOffset.UtcNow };
-        await File.WriteAllTextAsync(requestPath, JsonSerializer.Serialize(request, _json), new UTF8Encoding(false), cancellationToken);
+        await File.WriteAllTextAsync(requestPath, JsonSerializer.Serialize(request, JsonOptions), new UTF8Encoding(false), cancellationToken);
 
         try
         {
+            var brokerDirectory = Path.GetDirectoryName(_brokerExe)
+                ?? throw new InvalidOperationException("Privileged broker path has no parent directory.");
             var psi = new ProcessStartInfo
             {
                 FileName = _brokerExe,
                 UseShellExecute = true,
                 Verb = "runas",
-                WorkingDirectory = Path.GetDirectoryName(_brokerExe)!,
+                WorkingDirectory = brokerDirectory,
                 Arguments = $"--request \"{requestPath}\" --response \"{responsePath}\""
             };
+
             Process? process;
-            try { process = Process.Start(psi); }
+            try
+            {
+                process = Process.Start(psi);
+            }
             catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
             {
                 return new BrokerResult(false, null, "The owner cancelled the Windows elevation prompt.", true);
             }
-            if (process is null) return new BrokerResult(false, null, "Windows did not start the privileged broker.", false);
+
+            if (process is null)
+                return new BrokerResult(false, null, "Windows did not start the privileged broker.", false);
 
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromMinutes(15));
-            try { await process.WaitForExitAsync(timeout.Token); }
+            try
+            {
+                await process.WaitForExitAsync(timeout.Token);
+            }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 return new BrokerResult(false, null, "Privileged broker did not finish within 15 minutes.", false);
             }
-            if (!File.Exists(responsePath)) return new BrokerResult(false, null, $"Privileged broker exited with code {process.ExitCode} without a response.", false);
+
+            if (!File.Exists(responsePath))
+                return new BrokerResult(false, null, $"Privileged broker exited with code {process.ExitCode} without a response.", false);
 
             using var document = JsonDocument.Parse(await File.ReadAllTextAsync(responsePath, cancellationToken));
             var rootElement = document.RootElement;
             var success = rootElement.TryGetProperty("success", out var successElement) && successElement.ValueKind == JsonValueKind.True;
-            var error = rootElement.TryGetProperty("error", out var errorElement) && errorElement.ValueKind == JsonValueKind.String ? errorElement.GetString() : null;
+            var error = rootElement.TryGetProperty("error", out var errorElement) && errorElement.ValueKind == JsonValueKind.String
+                ? errorElement.GetString()
+                : null;
             Dictionary<string, string>? details = null;
             if (rootElement.TryGetProperty("details", out var detailsElement) && detailsElement.ValueKind == JsonValueKind.Object)
             {
-                details = detailsElement.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.ToString(), StringComparer.OrdinalIgnoreCase);
+                details = detailsElement.EnumerateObject()
+                    .ToDictionary(p => p.Name, p => p.Value.ToString(), StringComparer.OrdinalIgnoreCase);
             }
             return new BrokerResult(success, details, error, false);
         }
@@ -154,7 +119,7 @@ internal sealed class PrivilegedMcpServer
         }
     }
 
-    private static JsonObject ToolList() => new()
+    protected override JsonObject BuildToolList() => new()
     {
         ["tools"] = new JsonArray
         {
@@ -184,46 +149,36 @@ internal sealed class PrivilegedMcpServer
         }
     };
 
-    private static JsonObject Prop(string name, string type, string description) => new() { ["_name"] = name, ["type"] = type, ["description"] = description };
-    private static JsonObject Schema(IEnumerable<JsonObject> properties, IEnumerable<string> required)
-    {
-        var props = new JsonObject();
-        foreach (var property in properties)
-        {
-            var clone = (JsonObject)property.DeepClone();
-            var name = clone["_name"]!.GetValue<string>();
-            clone.Remove("_name");
-            props[name] = clone;
-        }
-        var requiredNodes = required.Select(item => (JsonNode?)JsonValue.Create(item)).ToArray();
-        return new JsonObject { ["type"] = "object", ["properties"] = props, ["required"] = new JsonArray(requiredNodes), ["additionalProperties"] = false };
-    }
-    private static JsonObject ToolResult(string text, bool isError) => new() { ["content"] = new JsonArray { new JsonObject { ["type"] = "text", ["text"] = text } }, ["isError"] = isError };
-    private async Task WriteResultAsync(JsonNode id, JsonNode result)
-    {
-        var response = new JsonObject { ["jsonrpc"] = "2.0", ["id"] = id.DeepClone(), ["result"] = result };
-        await Console.Out.WriteLineAsync(response.ToJsonString(_json));
-        await Console.Out.FlushAsync();
-    }
-    private async Task WriteErrorAsync(JsonNode? id, int code, string message)
-    {
-        var response = new JsonObject { ["jsonrpc"] = "2.0", ["id"] = id?.DeepClone(), ["error"] = new JsonObject { ["code"] = code, ["message"] = message } };
-        await Console.Out.WriteLineAsync(response.ToJsonString(_json));
-        await Console.Out.FlushAsync();
-    }
+    private static Dictionary<string, string> Dict(params (string Key, string Value)[] values) =>
+        values.ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);
 
-    private static Dictionary<string, string> Dict(params (string Key, string Value)[] values) => values.ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);
-    private static string RequiredString(JsonObject args, string name) => OptionalString(args, name) is { Length: > 0 } value ? value : throw new ArgumentException($"'{name}' is required.");
-    private static string? OptionalString(JsonObject args, string name) => args[name] is null ? null : args[name]!.GetValue<string>().Trim();
-    private static string? OptionalStringAllowEmpty(JsonObject args, string name) => args[name] is null ? null : args[name]!.GetValue<string>();
+    private static string RequiredString(JsonObject args, string name) =>
+        OptionalString(args, name) is { Length: > 0 } value
+            ? value
+            : throw new ArgumentException($"'{name}' is required.");
+
+    private static string? OptionalString(JsonObject args, string name) =>
+        args[name] is null ? null : args[name]!.GetValue<string>().Trim();
+
+    private static string? OptionalStringAllowEmpty(JsonObject args, string name) =>
+        args[name] is null ? null : args[name]!.GetValue<string>();
+
     private static void TryDelete(string path)
     {
-        try { if (File.Exists(path)) File.Delete(path); }
+        try
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
         catch (IOException)
         {
-            // Best-effort cleanup; stale broker request files are non-executable without a fresh UAC launch.
+            // Best-effort cleanup; stale broker requests cannot execute without a fresh UAC launch.
         }
     }
-    private sealed record BrokerResult(bool Success, IReadOnlyDictionary<string, string>? Details, string? Error, bool UserCancelled);
+
+    private sealed record BrokerResult(
+        bool Success,
+        IReadOnlyDictionary<string, string>? Details,
+        string? Error,
+        bool UserCancelled);
 }
 }
