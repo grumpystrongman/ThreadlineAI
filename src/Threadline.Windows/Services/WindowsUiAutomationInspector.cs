@@ -20,7 +20,7 @@ public sealed class WindowsUiAutomationInspector
             return Failed("No matching visible window was available for UI Automation inspection.");
         }
 
-        _ = GetWindowThreadProcessId(handle, out var processIdRaw);
+        GetWindowThreadProcessId(handle, out var processIdRaw);
         var processId = (int)processIdRaw;
         var processName = ReadProcessName(processId);
         var windowTitle = ReadWindowTitle(handle);
@@ -108,11 +108,11 @@ public sealed class WindowsUiAutomationInspector
         if (target is null || IsEmptyTarget(target)) return GetForegroundWindow();
 
         nint found = nint.Zero;
-        _ = EnumWindows((handle, _) =>
+        _ = EnumWindows((handle, lParam) =>
         {
             if (!IsWindowVisible(handle)) return true;
             var title = ReadWindowTitle(handle);
-            _ = GetWindowThreadProcessId(handle, out var processId);
+            GetWindowThreadProcessId(handle, out var processId);
             if (processId == 0) return true;
 
             if (target.ProcessId is int expectedPid && expectedPid != processId) return true;
