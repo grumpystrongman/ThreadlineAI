@@ -89,11 +89,11 @@ public sealed class WindowsDeviceScreenObserver
         if (target is null || IsEmptyTarget(target)) return GetForegroundWindow();
 
         nint found = nint.Zero;
-        _ = EnumWindows((handle, _) =>
+        _ = EnumWindows((handle, lParam) =>
         {
             if (!IsWindowVisible(handle)) return true;
             var title = ReadWindowTitle(handle);
-            _ = GetWindowThreadProcessId(handle, out var processId);
+            GetWindowThreadProcessId(handle, out var processId);
             if (processId == 0) return true;
 
             if (target.ProcessId is int expectedPid && expectedPid != processId) return true;
@@ -221,7 +221,7 @@ public sealed class WindowsDeviceScreenObserver
 
     private static string ReadProcessName(nint handle)
     {
-        _ = GetWindowThreadProcessId(handle, out var processId);
+        GetWindowThreadProcessId(handle, out var processId);
         if (processId == 0) return "unknown";
         try
         {
