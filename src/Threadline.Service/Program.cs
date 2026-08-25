@@ -20,7 +20,6 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 var serviceOptions = ThreadlineServiceOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(serviceOptions);
-
 var jarvisRuntimeOptions = JarvisRuntimeOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(jarvisRuntimeOptions);
 
@@ -82,8 +81,10 @@ builder.Services.AddSingleton<ThreadlineTranscriptionService>();
 builder.Services.AddSingleton<ThreadlineActionExecutionService>();
 builder.Services.AddSingleton<ThreadlineDoctorService>();
 builder.Services.AddSingleton<ThreadlineCommercialLifecycleService>();
+builder.Services.AddSingleton<BrowserAutomationHub>();
 
 var app = builder.Build();
+app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(20) });
 
 if (serviceOptions.CorsAllowedOrigins.Count > 0)
 {
@@ -113,6 +114,7 @@ app.MapThreadlineProviderAuditApi();
 app.MapThreadlineWorkThreadApi();
 app.MapThreadlineJarvisApi();
 app.MapThreadlineAgentApi();
+app.MapThreadlineBrowserAutomation();
 app.MapThreadlineApi();
 
 app.Run();
