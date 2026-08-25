@@ -181,7 +181,7 @@ public sealed partial class MainWindow
         var missionId = response.MissionId;
         UpdateTranscript(
             pendingMessage,
-            $"Mission started: {missionId}\n\n{response.Reason}\n\nI’ll keep this conversation entry updated as the worker and critic finish the job.");
+            $"Mission started: {missionId}\n\n{response.Reason}\n\nI’ll keep this conversation entry updated as the worker and critic finish the job. If a protected tool needs approval, I’ll show the exact action here before it runs.");
         AddTimeline($"Jarvis mission {missionId} started.");
 
         _ = MonitorJarvisMissionAsync(missionId, pendingMessage, contextReceipt);
@@ -216,6 +216,11 @@ public sealed partial class MainWindow
             for (var attempt = 0; attempt < 1800; attempt++)
             {
                 await Task.Delay(TimeSpan.FromSeconds(2));
+
+                // Tool approvals are mission-scoped and secret-free. Poll them alongside
+                // mission state so AIKA can pause the exact protected call in the foreground.
+                await HandlePendingJarvisToolApprovalsAsync(missionId);
+
                 var detail = await _agentClient.GetMissionAsync(missionId);
                 var state = detail.Mission.State ?? "UNKNOWN";
 
