@@ -1,0 +1,176 @@
+name: Jarvis Bridge Validation
+
+on:
+  push:
+    branches:
+      - feature/jarvis-runtime-bridge
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: adapters/browser-extension/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate PowerShell tooling syntax
+        shell: pwsh
+        run: |
+          foreach ($path in @(
+            'eng/bootstrap-personal-jarvis.ps1',
+            'eng/build-windows.ps1',
+            'eng/test-device-agent.ps1',
+            'eng/test-jarvis-stack.ps1'
+          )) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $path),
+              [ref]$tokens,
+              [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error "${path}: $($_.Message)" }
+              throw "$path has $($errors.Count) PowerShell parse error(s)."
+            }
+          }
+
+      - name: Validate pinned PersonalJarvis risk patch
+        shell: pwsh
+        run: |
+          $runtime = Join-Path $env:RUNNER_TEMP 'PersonalJarvis-risk-validation'
+          New-Item -ItemType Directory -Force -Path $runtime | Out-Null
+          Push-Location $runtime
+          try {
+            git init --quiet
+            git remote add origin https://github.com/PersonalJarvis/PersonalJarvis.git
+            git fetch --quiet --depth=1 origin b85535a50a3cece8cd269325b6b3ea2cb900e43f
+            if ($LASTEXITCODE -ne 0) { throw 'Could not fetch the pinned PersonalJarvis revision.' }
+            git checkout --quiet --detach FETCH_HEAD
+            git apply --check "$env:GITHUB_WORKSPACE\eng\patches\personal-jarvis-mcp-risk.patch"
+            if ($LASTEXITCODE -ne 0) { throw 'PersonalJarvis MCP risk patch no longer applies to the pinned revision.' }
+            git apply --whitespace=error-all "$env:GITHUB_WORKSPACE\eng\patches\personal-jarvis-mcp-risk.patch"
+            if ($LASTEXITCODE -ne 0) { throw 'PersonalJarvis MCP risk patch failed to apply.' }
+            git diff --check
+            if ($LASTEXITCODE -ne 0) { throw 'Patched PersonalJarvis tree failed git diff --check.' }
+            python -m compileall -q jarvis/mcp/client.py jarvis/mcp/loader.py
+            if ($LASTEXITCODE -ne 0) { throw 'Patched PersonalJarvis MCP modules did not compile.' }
+            $changed = @(git diff --name-only)
+            foreach ($required in @('jarvis/mcp/client.py','jarvis/mcp/loader.py')) {
+              if ($changed -notcontains $required) { throw "Risk patch did not change expected file $required" }
+            }
+          }
+          finally {
+            Pop-Location
+          }
+
+      - name: Restore .NET stack and tests
+        run: |
+          dotnet restore src/Threadline.Core/Threadline.Core.csproj
+          dotnet restore src/Threadline.Infrastructure/Threadline.Infrastructure.csproj
+          dotnet restore src/Threadline.Service/Threadline.Service.csproj
+          dotnet restore src/Threadline.DeviceMcp/Threadline.DeviceMcp.csproj
+          dotnet restore src/Threadline.BrowserMcp/Threadline.BrowserMcp.csproj
+          dotnet restore src/Threadline.PrivilegedBroker/Threadline.PrivilegedBroker.csproj
+          dotnet restore src/Threadline.PrivilegedMcp/Threadline.PrivilegedMcp.csproj
+          dotnet restore tests/Threadline.Core.Tests/Threadline.Core.Tests.csproj
+          dotnet restore tests/Threadline.Service.Tests/Threadline.Service.Tests.csproj
+
+      - name: Build service and agent runtimes
+        run: |
+          dotnet build src/Threadline.Service/Threadline.Service.csproj --configuration Release --no-restore
+          dotnet build src/Threadline.DeviceMcp/Threadline.DeviceMcp.csproj --configuration Release --no-restore
+          dotnet build src/Threadline.BrowserMcp/Threadline.BrowserMcp.csproj --configuration Release --no-restore
+          dotnet build src/Threadline.PrivilegedBroker/Threadline.PrivilegedBroker.csproj --configuration Release --no-restore
+          dotnet build src/Threadline.PrivilegedMcp/Threadline.PrivilegedMcp.csproj --configuration Release --no-restore
+
+      - name: Smoke test MCP tool surfaces and protected annotations
+        shell: pwsh
+        run: |
+          function Invoke-McpList([string]$Dll, [string[]]$Required, [bool]$RequireDestructive = $false) {
+            $requests = @(
+              '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"threadline-ci","version":"1.0"}}}',
+              '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}',
+              '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+            )
+            $output = @($requests | & dotnet (Resolve-Path $Dll))
+            if ($LASTEXITCODE -ne 0) { throw "$Dll exited with code $LASTEXITCODE" }
+            if ($output.Count -lt 2) { throw "$Dll did not return initialize and tools/list responses." }
+            $initialize = $output[0] | ConvertFrom-Json
+            if ($initialize.id -ne 1 -or -not $initialize.result.serverInfo.name) { throw "$Dll initialize response was invalid." }
+            $toolResponse = $output[-1] | ConvertFrom-Json
+            $tools = @($toolResponse.result.tools)
+            $names = @($tools | ForEach-Object { $_.name })
+            foreach ($name in $Required) {
+              if ($names -notcontains $name) { throw "$Dll did not advertise required tool '$name'." }
+            }
+            if ($RequireDestructive) {
+              foreach ($tool in $tools) {
+                if ($tool.annotations.destructiveHint -ne $true) {
+                  throw "Protected MCP tool '$($tool.name)' is missing destructiveHint=true."
+                }
+              }
+            }
+            Write-Host "$($initialize.result.serverInfo.name) advertised $($names.Count) tools: $($names -join ', ')"
+          }
+
+          Invoke-McpList `
+            'src/Threadline.DeviceMcp/bin/Release/net8.0-windows10.0.19041.0/Threadline.DeviceMcp.dll' `
+            @('observe_desktop','inspect_controls','capture_window','open_application','focus_window','invoke_control','set_control_text','read_file','write_file','run_powershell','send_keys','click_at')
+
+          Invoke-McpList `
+            'src/Threadline.BrowserMcp/bin/Release/net8.0/Threadline.BrowserMcp.dll' `
+            @('browser_state','browser_navigate','browser_new_tab','browser_activate_tab','browser_close_tab','browser_inspect_dom','browser_click','browser_fill','browser_read_text','browser_scroll')
+
+          Invoke-McpList `
+            'src/Threadline.PrivilegedMcp/bin/Release/net8.0-windows10.0.19041.0/Threadline.PrivilegedMcp.dll' `
+            @('protected_install_package','protected_service_start','protected_service_stop','protected_service_restart','protected_registry_set_hklm_software') `
+            $true
+
+      - name: Publish exact bootstrap agent runtimes
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'threadline-agent-publish'
+          $targets = @(
+            @{ Project='src/Threadline.DeviceMcp/Threadline.DeviceMcp.csproj'; Name='DeviceMcp'; Exe='Threadline.DeviceMcp.exe' },
+            @{ Project='src/Threadline.BrowserMcp/Threadline.BrowserMcp.csproj'; Name='BrowserMcp'; Exe='Threadline.BrowserMcp.exe' },
+            @{ Project='src/Threadline.PrivilegedBroker/Threadline.PrivilegedBroker.csproj'; Name='PrivilegedBroker'; Exe='Threadline.PrivilegedBroker.exe' },
+            @{ Project='src/Threadline.PrivilegedMcp/Threadline.PrivilegedMcp.csproj'; Name='PrivilegedMcp'; Exe='Threadline.PrivilegedMcp.exe' }
+          )
+          foreach ($target in $targets) {
+            $output = Join-Path $root $target.Name
+            dotnet publish $target.Project --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false --output $output
+            if ($LASTEXITCODE -ne 0) { throw "Publish failed for $($target.Name)." }
+            if (-not (Test-Path (Join-Path $output $target.Exe))) { throw "Published executable missing for $($target.Name)." }
+          }
+
+      - name: Build browser extension
+        working-directory: adapters/browser-extension
+        run: |
+          npm ci
+          npm run build
+
+      - name: Restore and build Windows app with Visual Studio MSBuild
+        shell: pwsh
+        run: |
+          msbuild src/Threadline.Windows/Threadline.Windows.csproj /restore /m /p:Configuration=Release /p:Platform=x64
+
+      - name: Run core tests
+        run: dotnet test tests/Threadline.Core.Tests/Threadline.Core.Tests.csproj --configuration Release --no-restore --logger trx
+
+      - name: Run service tests
+        run: dotnet test tests/Threadline.Service.Tests/Threadline.Service.Tests.csproj --configuration Release --no-restore --logger trx

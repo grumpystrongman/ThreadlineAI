@@ -1,0 +1,47 @@
+diff --git a/jarvis/mcp/client.py b/jarvis/mcp/client.py
+index 2884c85..1111111 100644
+--- a/jarvis/mcp/client.py
++++ b/jarvis/mcp/client.py
+@@ -437,10 +437,18 @@ def _tool_to_dict(tool: Any) -> dict[str, Any]:
+     deliberately map only the fields we use — this decouples us from
+     SDK changes.
+     """
+     if isinstance(tool, dict):
+         return dict(tool)
++    annotations = getattr(tool, "annotations", None)
++    if annotations is not None:
++        dump = getattr(annotations, "model_dump", None)
++        if callable(dump):
++            annotations = dump()
++        elif not isinstance(annotations, dict):
++            annotations = {}
+     return {
+         "name": getattr(tool, "name", ""),
+         "description": getattr(tool, "description", "") or "",
+         "inputSchema": getattr(tool, "inputSchema", None) or {},
++        "annotations": annotations or {},
+     }
+diff --git a/jarvis/mcp/loader.py b/jarvis/mcp/loader.py
+index fe8d1ca..2222222 100644
+--- a/jarvis/mcp/loader.py
++++ b/jarvis/mcp/loader.py
+@@ -72,10 +72,18 @@ class McpToolLoader:
+             tool_defs: list[dict[str, Any]] = getattr(client, "_tools_cache", [])
+             for tool_def in tool_defs:
+                 try:
+                     from jarvis.mcp.adapter import MCPToolAdapter
+ 
+-                    adapter = MCPToolAdapter(client, tool_def, risk_tier="monitor")
++                    # MCP destructiveHint is server-authored metadata, not a
++                    # model argument. Preserve Jarvis' approval workflow by
++                    # mapping destructive MCP tools to the existing ask tier.
++                    annotations = tool_def.get("annotations") or {}
++                    risk_tier = (
++                        "ask" if annotations.get("destructiveHint") is True
++                        else "monitor"
++                    )
++                    adapter = MCPToolAdapter(client, tool_def, risk_tier=risk_tier)
+                     adapters.append(adapter)
+                 except Exception as exc:  # noqa: BLE001
+                     log.debug(
+                         "mcp-loader: failed to build adapter for %s/%s: %s",

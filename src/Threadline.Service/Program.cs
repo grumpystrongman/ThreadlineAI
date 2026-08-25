@@ -20,6 +20,8 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 var serviceOptions = ThreadlineServiceOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(serviceOptions);
+var jarvisRuntimeOptions = JarvisRuntimeOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(jarvisRuntimeOptions);
 
 if (serviceOptions.CorsAllowedOrigins.Count > 0)
 {
@@ -58,6 +60,7 @@ builder.Services.AddSingleton(sp => new DpapiProtectedSecretStore(builder.Config
 builder.Services.AddSingleton<ISecretStore>(sp => sp.GetRequiredService<DpapiProtectedSecretStore>());
 
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient<PersonalJarvisClient>();
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddSingleton<SecretRedactor>();
 builder.Services.AddSingleton<PrivacyRuntimeState>();
@@ -65,19 +68,23 @@ builder.Services.AddSingleton(sp => new CapturePolicy(() => sp.GetRequiredServic
 builder.Services.AddSingleton<ContextPreviewBuilder>();
 builder.Services.AddSingleton<CapabilityRegistry>();
 builder.Services.AddSingleton<ThreadlineActionCatalog>();
+builder.Services.AddSingleton<AgentIntentClassifier>();
 builder.Services.AddSingleton<SessionService>();
 builder.Services.AddSingleton<ProviderConnectionService>();
 builder.Services.AddSingleton<SecretService>();
 builder.Services.AddSingleton<WindowAttachmentService>();
 builder.Services.AddSingleton<PromptComposer>();
 builder.Services.AddSingleton<ThreadlineAskService>();
+builder.Services.AddTransient<ThreadlineAgentRouterService>();
 builder.Services.AddSingleton<ThreadlineProviderProbeService>();
 builder.Services.AddSingleton<ThreadlineTranscriptionService>();
 builder.Services.AddSingleton<ThreadlineActionExecutionService>();
 builder.Services.AddSingleton<ThreadlineDoctorService>();
 builder.Services.AddSingleton<ThreadlineCommercialLifecycleService>();
+builder.Services.AddSingleton<BrowserAutomationHub>();
 
 var app = builder.Build();
+app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(20) });
 
 if (serviceOptions.CorsAllowedOrigins.Count > 0)
 {
@@ -105,6 +112,9 @@ app.MapThreadlineReliabilityApi();
 app.MapThreadlineSecurityPrivacyApi();
 app.MapThreadlineProviderAuditApi();
 app.MapThreadlineWorkThreadApi();
+app.MapThreadlineJarvisApi();
+app.MapThreadlineAgentApi();
+app.MapThreadlineBrowserAutomation();
 app.MapThreadlineApi();
 
 app.Run();

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Threadline.Core;
 
 namespace Threadline.Service;
@@ -48,12 +49,29 @@ public sealed record CompleteWindowActionRequest(string? ResultMessage = null, b
 
 public sealed record ComposePromptRequest(string Question, string? CurrentWindow = null, int? TakeRecentEvents = 20);
 
+public sealed record AgentAskRequest(
+    string Question,
+    string? CurrentWindow = null,
+    int? TakeRecentEvents = 20,
+    ThreadlineAgentRoutePreference Route = ThreadlineAgentRoutePreference.Auto,
+    bool Confirmed = false);
+
 public sealed record AskResponse(
     string Answer,
     IReadOnlyList<LlmMessage> Messages,
     string? ProviderName = null,
     string? Model = null,
     long DurationMs = 0);
+
+public sealed record AgentAskResponse(
+    string Route,
+    string Reason,
+    string Confidence,
+    AskResponse? DirectResponse = null,
+    string? MissionId = null,
+    bool RequiresConfirmation = false,
+    JsonElement? MissionPayload = null,
+    int? UpstreamStatusCode = null);
 
 public sealed record SaveSummaryRequest(string Summary);
 

@@ -6,6 +6,7 @@ namespace Threadline.Windows;
 public partial class App : Application
 {
     private Window? _window;
+    private WindowsDeviceAgentPipeHost? _deviceAgentHost;
 
     public App()
     {
@@ -44,18 +45,17 @@ public partial class App : Application
         try
         {
             LogMessage("Application launch started.");
-
             var mainWindow = new MainWindow();
             _window = mainWindow;
-            LogMessage("Main window constructed.");
-
+            LogMessage("Main AI window constructed.");
             _window.Activate();
-            LogMessage("Main window activated.");
+            LogMessage("Main AI window activated.");
 
-            mainWindow.EnsureCollapsedEdgeHandleStartedAfterActivation();
-            LogMessage("Sidecar startup reveal requested after activation.");
+            mainWindow.EnsureJarvisFrontAndCenterStartedAfterActivation();
+            LogMessage("AIKA / JARVIS front-and-center startup requested after activation.");
 
-            _ = StartLocalServiceAfterWindowIsVisibleAsync();
+            StartInteractiveDeviceAgent(mainWindow);
+            _ = StartLocalAiRuntimeAfterWindowIsVisibleAsync(mainWindow);
         }
         catch (Exception ex)
         {
@@ -64,16 +64,50 @@ public partial class App : Application
         }
     }
 
-    private static async Task StartLocalServiceAfterWindowIsVisibleAsync()
+    private void StartInteractiveDeviceAgent(MainWindow mainWindow)
     {
         try
         {
-            var serviceStartup = await ThreadlineServiceLauncher.EnsureStartedAsync();
-            LogMessage(serviceStartup.Message);
+            _deviceAgentHost ??= new WindowsDeviceAgentPipeHost();
+            _deviceAgentHost.Start();
+            mainWindow.ConfigureOwnerAuthority(_deviceAgentHost.AuthorityGrant, _deviceAgentHost.UpdateOwnerAuthority);
+            LogMessage($"Windows Device Agent host started on current-user pipe '{WindowsDeviceAgentPipeHost.PipeName}'. Owner authority: {_deviceAgentHost.AuthorityGrant.Enabled}. Authority file: {_deviceAgentHost.AuthorityPath}");
         }
         catch (Exception ex)
         {
             LogException(ex);
+        }
+    }
+
+    private static async Task StartLocalAiRuntimeAfterWindowIsVisibleAsync(MainWindow mainWindow)
+    {
+        try
+        {
+            var serviceTask = ThreadlineServiceLauncher.EnsureStartedAsync();
+            var jarvisTask = PersonalJarvisRuntimeLauncher.EnsureStartedAsync();
+            await Task.WhenAll(serviceTask, jarvisTask);
+
+            var serviceResult = serviceTask.Result;
+            var jarvisResult = jarvisTask.Result;
+            LogMessage(serviceResult.Message);
+            LogMessage(jarvisResult.Message);
+
+            mainWindow.ReportAiRuntimeStartup(
+                serviceResult.Success,
+                serviceResult.Message,
+                jarvisResult.Success,
+                jarvisResult.Installed,
+                jarvisResult.Message);
+        }
+        catch (Exception ex)
+        {
+            LogException(ex);
+            mainWindow.ReportAiRuntimeStartup(
+                threadlineReady: false,
+                threadlineMessage: "Local AI startup encountered an unexpected error.",
+                jarvisReady: false,
+                jarvisInstalled: true,
+                jarvisMessage: ex.Message);
         }
     }
 

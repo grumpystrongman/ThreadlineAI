@@ -1,0 +1,115 @@
+name: Sonar Diagnostics
+
+on:
+  push:
+    branches:
+      - feature/jarvis-runtime-bridge
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Allow automatic Sonar analysis to settle
+        run: sleep 45
+
+      - name: Report Sonar gate-driving issues for PR 40
+        shell: python
+        run: |
+          import json
+          import urllib.parse
+          import urllib.request
+
+          base = "https://sonarcloud.io/api/issues/search"
+          params = urllib.parse.urlencode({
+              "componentKeys": "grumpystrongman_ThreadlineAI",
+              "pullRequest": "40",
+              "resolved": "false",
+              "ps": "500",
+          })
+          with urllib.request.urlopen(f"{base}?{params}", timeout=30) as response:
+              payload = json.load(response)
+
+          issues = payload.get("issues", [])
+          gate_types = {"BUG", "VULNERABILITY"}
+          gate_issues = [issue for issue in issues if issue.get("type") in gate_types]
+          print(f"OPEN_ISSUES={len(issues)} GATE_ISSUES={len(gate_issues)}")
+          for issue in gate_issues:
+              component = issue.get("component", "")
+              path = component.split(":", 1)[-1]
+              print("SONAR_GATE|{type}|{severity}|{rule}|{path}|{line}|{message}".format(
+                  type=issue.get("type", ""),
+                  severity=issue.get("severity", ""),
+                  rule=issue.get("rule", ""),
+                  path=path,
+                  line=issue.get("line", ""),
+                  message=issue.get("message", "").replace("\n", " "),
+              ))
+
+      - name: Report new-code duplication by file
+        shell: python
+        run: |
+          import json
+          import urllib.parse
+          import urllib.request
+
+          def request_json(path, params):
+              query = urllib.parse.urlencode(params)
+              with urllib.request.urlopen(f"https://sonarcloud.io{path}?{query}", timeout=30) as response:
+                  return json.load(response)
+
+          metrics = "new_duplicated_lines_density,new_duplicated_lines,new_lines,duplicated_lines_density,duplicated_lines"
+          project = request_json("/api/measures/component", {
+              "component": "grumpystrongman_ThreadlineAI",
+              "pullRequest": "40",
+              "metricKeys": metrics,
+              "additionalFields": "periods",
+          })
+          print("SONAR_PROJECT_MEASURES=" + json.dumps(project.get("component", {}).get("measures", []), sort_keys=True))
+
+          payload = request_json("/api/measures/component_tree", {
+              "component": "grumpystrongman_ThreadlineAI",
+              "pullRequest": "40",
+              "metricKeys": metrics,
+              "qualifiers": "FIL",
+              "strategy": "leaves",
+              "additionalFields": "periods",
+              "ps": "500",
+          })
+
+          def numeric(measure):
+              candidates = []
+              if measure.get("value") is not None:
+                  candidates.append(measure.get("value"))
+              if isinstance(measure.get("period"), dict):
+                  candidates.append(measure["period"].get("value"))
+              for period in measure.get("periods", []) or []:
+                  candidates.append(period.get("value"))
+              for value in candidates:
+                  try:
+                      return float(value)
+                  except (TypeError, ValueError):
+                      pass
+              return 0.0
+
+          duplicate_paths = []
+          for component in payload.get("components", []):
+              measures = {m.get("metric"): numeric(m) for m in component.get("measures", [])}
+              density = measures.get("new_duplicated_lines_density", 0.0)
+              duplicated = measures.get("new_duplicated_lines", 0.0)
+              if density > 0 or duplicated > 0:
+                  duplicate_paths.append(component.get("path", ""))
+                  print("SONAR_DUP|{path}|new_density={density}|new_duplicated={duplicated}|new_lines={new_lines}|overall_density={overall_density}|overall_duplicated={overall_duplicated}".format(
+                      path=component.get("path", ""),
+                      density=density,
+                      duplicated=duplicated,
+                      new_lines=measures.get("new_lines", 0.0),
+                      overall_density=measures.get("duplicated_lines_density", 0.0),
+                      overall_duplicated=measures.get("duplicated_lines", 0.0),
+                  ))
+
+          if not duplicate_paths:
+              print("SONAR_DUP_NONE_FROM_COMPONENT_TREE")
+              for component in payload.get("components", []):
+                  path = component.get("path", "")
+                  if "Mcp" in path or "mcp" in path or "Agent" in path:
+                      print("SONAR_RAW|" + path + "|" + json.dumps(component.get("measures", []), sort_keys=True))
