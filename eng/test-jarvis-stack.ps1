@@ -35,7 +35,7 @@ function Invoke-McpExchange {
 
     $output = @(@($initialize, $initialized, $requestJson) | & dotnet $Dll)
     if ($LASTEXITCODE -ne 0) {
-        throw "MCP process exited with code $LASTEXITCODE: $Dll"
+        throw "MCP process exited with code ${LASTEXITCODE}: $Dll"
     }
 
     $expectedId = $Request.id
@@ -45,7 +45,7 @@ function Invoke-McpExchange {
         Select-Object -Last 1
 
     if ($null -eq $response) {
-        throw "MCP server returned no response for id $expectedId: $Dll"
+        throw "MCP server returned no response for id ${expectedId}: $Dll"
     }
     if ($response.error) {
         throw "MCP JSON-RPC error: $($response.error.message)"
