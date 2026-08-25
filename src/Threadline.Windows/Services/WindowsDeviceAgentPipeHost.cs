@@ -12,15 +12,18 @@ public sealed class WindowsDeviceAgentPipeHost : IAsyncDisposable
 
     private readonly WindowsDeviceAgent _agent;
     private readonly WindowsDeviceScreenObserver _screenObserver;
+    private readonly WindowsUiAutomationInspector _uiaInspector;
     private readonly CancellationTokenSource _shutdown = new();
     private Task? _acceptLoop;
 
     public WindowsDeviceAgentPipeHost(
         WindowsDeviceAgent? agent = null,
-        WindowsDeviceScreenObserver? screenObserver = null)
+        WindowsDeviceScreenObserver? screenObserver = null,
+        WindowsUiAutomationInspector? uiaInspector = null)
     {
         _agent = agent ?? new WindowsDeviceAgent();
         _screenObserver = screenObserver ?? new WindowsDeviceScreenObserver();
+        _uiaInspector = uiaInspector ?? new WindowsUiAutomationInspector();
     }
 
     public void Start()
@@ -98,6 +101,12 @@ public sealed class WindowsDeviceAgentPipeHost : IAsyncDisposable
             case "capture":
             {
                 var result = await _screenObserver.CaptureAsync(request.Target, cancellationToken);
+                return new DevicePipeResponse(result.Success, result, result.Error);
+            }
+
+            case "inspect":
+            {
+                var result = _uiaInspector.Inspect(request.Target);
                 return new DevicePipeResponse(result.Success, result, result.Error);
             }
 
