@@ -1,0 +1,26 @@
+name: Jarvis Bridge Validation
+
+on:
+  push:
+    branches:
+      - feature/jarvis-runtime-bridge
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        run: |
+          dotnet restore src/Threadline.Core/Threadline.Core.csproj
+          dotnet restore src/Threadline.Infrastructure/Threadline.Infrastructure.csproj
+          dotnet restore src/Threadline.Service/Threadline.Service.csproj
+          dotnet restore tests/Threadline.Core.Tests/Threadline.Core.Tests.csproj
+      - name: Build service
+        run: dotnet build src/Threadline.Service/Threadline.Service.csproj --configuration Release --no-restore
+      - name: Run core tests
+        run: dotnet test tests/Threadline.Core.Tests/Threadline.Core.Tests.csproj --configuration Release --no-restore --logger trx
