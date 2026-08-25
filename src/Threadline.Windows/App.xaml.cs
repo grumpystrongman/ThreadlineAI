@@ -41,18 +41,16 @@ public partial class App : Application
         try
         {
             LogMessage("Application launch started.");
-
             var mainWindow = new MainWindow();
             _window = mainWindow;
             LogMessage("Main AI window constructed.");
-
             _window.Activate();
             LogMessage("Main AI window activated.");
 
             mainWindow.EnsureJarvisFrontAndCenterStartedAfterActivation();
             LogMessage("AIKA / JARVIS front-and-center startup requested after activation.");
 
-            StartInteractiveDeviceAgent();
+            StartInteractiveDeviceAgent(mainWindow);
             _ = StartLocalAiRuntimeAfterWindowIsVisibleAsync(mainWindow);
         }
         catch (Exception ex)
@@ -62,13 +60,14 @@ public partial class App : Application
         }
     }
 
-    private void StartInteractiveDeviceAgent()
+    private void StartInteractiveDeviceAgent(MainWindow mainWindow)
     {
         try
         {
             _deviceAgentHost ??= new WindowsDeviceAgentPipeHost();
             _deviceAgentHost.Start();
-            LogMessage($"Windows Device Agent host started on current-user pipe '{WindowsDeviceAgentPipeHost.PipeName}'.");
+            mainWindow.ConfigureOwnerAuthority(_deviceAgentHost.AuthorityGrant, _deviceAgentHost.UpdateOwnerAuthority);
+            LogMessage($"Windows Device Agent host started on current-user pipe '{WindowsDeviceAgentPipeHost.PipeName}'. Owner authority: {_deviceAgentHost.AuthorityGrant.Enabled}. Authority file: {_deviceAgentHost.AuthorityPath}");
         }
         catch (Exception ex)
         {
@@ -82,7 +81,6 @@ public partial class App : Application
         {
             var serviceTask = ThreadlineServiceLauncher.EnsureStartedAsync();
             var jarvisTask = PersonalJarvisRuntimeLauncher.EnsureStartedAsync();
-
             await Task.WhenAll(serviceTask, jarvisTask);
 
             var serviceResult = serviceTask.Result;
@@ -99,8 +97,6 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            // The assistant window is intentionally independent of runtime startup.
-            // A provider/runtime can be repaired without making the visible app disappear.
             LogException(ex);
             mainWindow.ReportAiRuntimeStartup(
                 threadlineReady: false,
