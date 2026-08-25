@@ -94,13 +94,7 @@ function Test-WindowsAppSdkBuildTasks {
     Write-Host 'No Visual Studio / Build Tools MSBuild installation was found by vswhere.' -ForegroundColor Yellow
   }
   Write-Host ''
-  Write-Host 'Install or modify Visual Studio 2022 / Build Tools with these workloads/components:' -ForegroundColor Yellow
-  Write-Host '  - .NET desktop development' -ForegroundColor Yellow
-  Write-Host '  - Universal Windows Platform development / Windows application development tools' -ForegroundColor Yellow
-  Write-Host '  - Windows 10/11 SDK and MSIX packaging tools' -ForegroundColor Yellow
-  Write-Host ''
-  Write-Host 'VS Code is fine as the editor, but WinUI still needs these Visual Studio build tools.' -ForegroundColor Yellow
-  Write-Host 'After install, reopen PowerShell and rerun ./eng/build-windows.ps1.' -ForegroundColor Yellow
+  Write-Host 'Threadline requires Visual Studio 2022 / Build Tools with Windows app development components for the WinUI executable.' -ForegroundColor Yellow
   throw 'Missing Visual Studio Windows App SDK packaging build tasks required for WinUI.'
 }
 
@@ -126,13 +120,19 @@ Invoke-CheckedCommand $msbuild src/Threadline.Service/Threadline.Service.csproj 
 Write-Host 'Building Threadline local service...'
 Invoke-CheckedCommand $msbuild src/Threadline.Service/Threadline.Service.csproj /p:Configuration=Release /p:Restore=false
 
+Write-Host 'Restoring Threadline Windows Device MCP...'
+Invoke-CheckedCommand dotnet restore src/Threadline.DeviceMcp/Threadline.DeviceMcp.csproj
+
+Write-Host 'Building Threadline Windows Device MCP...'
+Invoke-CheckedCommand dotnet build src/Threadline.DeviceMcp/Threadline.DeviceMcp.csproj --configuration Release --no-restore
+
 Write-Host 'Restoring Threadline Windows companion...'
 Invoke-CheckedCommand $msbuild src/Threadline.Windows/Threadline.Windows.csproj /t:Restore /p:Configuration=Release
 
 Write-Host 'Building Threadline Windows companion...'
 Invoke-CheckedCommand $msbuild src/Threadline.Windows/Threadline.Windows.csproj /p:Configuration=Release /p:Restore=false
 
-Write-Host 'Threadline service and Windows companion build complete.' -ForegroundColor Green
+Write-Host 'Threadline service, Windows Device MCP, and Windows companion build complete.' -ForegroundColor Green
 
 if ($Run) {
   Write-Host 'Launching local service and Windows companion because -Run was supplied...'
