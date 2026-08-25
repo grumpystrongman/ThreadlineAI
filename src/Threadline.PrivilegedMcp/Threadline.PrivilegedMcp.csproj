@@ -7,4 +7,7 @@
     <AssemblyName>Threadline.PrivilegedMcp</AssemblyName>
     <RootNamespace>Threadline.PrivilegedMcp</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Threadline.McpCommon/Threadline.McpCommon.csproj" />
+  </ItemGroup>
 </Project>
