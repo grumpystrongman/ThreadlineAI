@@ -4,8 +4,10 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-await new PrivilegedMcpServer().RunAsync();
+await new Threadline.PrivilegedMcp.PrivilegedMcpServer().RunAsync();
 
+namespace Threadline.PrivilegedMcp
+{
 internal sealed class PrivilegedMcpServer
 {
     private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web) { WriteIndented = false };
@@ -105,7 +107,7 @@ internal sealed class PrivilegedMcpServer
         var requestPath = Path.Combine(root, requestId + ".request.json");
         var responsePath = Path.Combine(root, requestId + ".response.json");
         var request = new { requestId, operation, arguments, createdAt = DateTimeOffset.UtcNow };
-        File.WriteAllText(requestPath, JsonSerializer.Serialize(request, _json), new UTF8Encoding(false));
+        await File.WriteAllTextAsync(requestPath, JsonSerializer.Serialize(request, _json), new UTF8Encoding(false), cancellationToken);
 
         try
         {
@@ -193,7 +195,8 @@ internal sealed class PrivilegedMcpServer
             clone.Remove("_name");
             props[name] = clone;
         }
-        return new JsonObject { ["type"] = "object", ["properties"] = props, ["required"] = new JsonArray(required.Select(item => JsonValue.Create(item)).ToArray()), ["additionalProperties"] = false };
+        var requiredNodes = required.Select(item => (JsonNode?)JsonValue.Create(item)).ToArray();
+        return new JsonObject { ["type"] = "object", ["properties"] = props, ["required"] = new JsonArray(requiredNodes), ["additionalProperties"] = false };
     }
     private static JsonObject ToolResult(string text, bool isError) => new() { ["content"] = new JsonArray { new JsonObject { ["type"] = "text", ["text"] = text } }, ["isError"] = isError };
     private async Task WriteResultAsync(JsonNode id, JsonNode result)
@@ -213,6 +216,14 @@ internal sealed class PrivilegedMcpServer
     private static string RequiredString(JsonObject args, string name) => OptionalString(args, name) is { Length: > 0 } value ? value : throw new ArgumentException($"'{name}' is required.");
     private static string? OptionalString(JsonObject args, string name) => args[name] is null ? null : args[name]!.GetValue<string>().Trim();
     private static string? OptionalStringAllowEmpty(JsonObject args, string name) => args[name] is null ? null : args[name]!.GetValue<string>();
-    private static void TryDelete(string path) { try { if (File.Exists(path)) File.Delete(path); } catch (IOException) { } }
+    private static void TryDelete(string path)
+    {
+        try { if (File.Exists(path)) File.Delete(path); }
+        catch (IOException)
+        {
+            // Best-effort cleanup; stale broker request files are non-executable without a fresh UAC launch.
+        }
+    }
     private sealed record BrokerResult(bool Success, IReadOnlyDictionary<string, string>? Details, string? Error, bool UserCancelled);
+}
 }
